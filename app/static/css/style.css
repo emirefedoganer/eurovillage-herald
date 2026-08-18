@@ -537,6 +537,10 @@ body.drawer-open{ overflow: hidden; }
 .xw-cell.xw-correct::after{ content:""; position:absolute; inset:2px; border:2px solid #4caf6a; pointer-events:none; }
 .xw-cell.xw-incorrect{ color: var(--red-dark); }
 .xw-cell.xw-incorrect::after{ content:""; position:absolute; inset:2px; border:2px solid var(--red); background: rgba(200,16,46,.08); pointer-events:none; }
+.xw-mobile-input{
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; border: none;
+  opacity: 0; font-size: 16px; pointer-events: none;
+}
 .xw-controls{ display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 
 .xw-clues{ display: grid; grid-template-columns: 1fr 1fr; gap: 24px; min-width: 0; }

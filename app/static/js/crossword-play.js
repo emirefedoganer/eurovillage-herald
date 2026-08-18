@@ -73,6 +73,29 @@
     }
   }
 
+  // A single hidden text input, focused instead of the cell buttons.
+  // Buttons can't summon a mobile on-screen keyboard; a real text input
+  // can. Its "input" event (not keydown) is the letter-entry path so it
+  // works identically for a virtual keyboard's tap-to-type and a physical
+  // keyboard's keypress. It stays nested inside gridEl so Backspace/
+  // Delete/Arrow keys still bubble to the existing delegated listener.
+  const mobileInput = document.createElement("input");
+  mobileInput.type = "text";
+  mobileInput.className = "xw-mobile-input";
+  mobileInput.setAttribute("autocomplete", "off");
+  mobileInput.setAttribute("autocorrect", "off");
+  mobileInput.setAttribute("autocapitalize", "off");
+  mobileInput.setAttribute("spellcheck", "false");
+  mobileInput.setAttribute("aria-hidden", "true");
+  mobileInput.tabIndex = -1;
+  gridEl.appendChild(mobileInput);
+
+  function focusActiveCell() {
+    const cell = cellEls[state.row + "," + state.col];
+    if (cell) mobileInput.setAttribute("aria-label", cell.getAttribute("aria-label") || "");
+    mobileInput.focus({ preventScroll: true });
+  }
+
   // ---- clue lists ----
   function renderClueList(container, direction) {
     container.innerHTML = "";
@@ -180,7 +203,7 @@
     state.col = c;
     state.direction = slot.direction;
     highlight();
-    cellEls[key].focus({ preventScroll: true });
+    focusActiveCell();
   }
 
   function selectSlot(number, direction, focusFirst) {
@@ -190,7 +213,7 @@
     state.row = cells[0][0];
     state.col = cells[0][1];
     highlight();
-    if (focusFirst) cellEls[state.row + "," + state.col].focus({ preventScroll: true });
+    if (focusFirst) focusActiveCell();
   }
 
   function highlight() {
@@ -268,16 +291,23 @@
 
   const LETTER_RE = /^[a-zA-ZçğıöşüÇĞİÖŞÜ]$/;
 
+  // Letter entry (both physical and virtual/mobile keyboards) goes through
+  // the hidden input's "input" event below, not keydown -- keydown here
+  // only handles the non-character keys, which don't produce input events.
+  mobileInput.addEventListener("input", () => {
+    const typed = mobileInput.value;
+    mobileInput.value = "";
+    if (state.row == null || !typed) return;
+    const ch = typed.slice(-1);
+    if (!LETTER_RE.test(ch)) return;
+    setLetter(state.row, state.col, ch.toLocaleUpperCase("tr-TR"));
+    const next = nextCellInWord(1);
+    if (next) selectCell(next[0], next[1], state.direction); else highlight();
+    startTimer();
+  });
+
   gridEl.addEventListener("keydown", (e) => {
     if (state.row == null) return;
-    if (LETTER_RE.test(e.key)) {
-      e.preventDefault();
-      setLetter(state.row, state.col, e.key.toLocaleUpperCase("tr-TR"));
-      const next = nextCellInWord(1);
-      if (next) selectCell(next[0], next[1], state.direction); else highlight();
-      startTimer();
-      return;
-    }
     if (e.key === "Backspace") {
       e.preventDefault();
       const key = state.row + "," + state.col;
@@ -304,15 +334,6 @@
     if (e.key === "Tab") {
       // let Tab move focus normally between cells/controls; direction stays.
     }
-  });
-
-  gridEl.addEventListener("focusin", (e) => {
-    const cell = e.target.closest(".xw-cell:not(.xw-block)");
-    if (!cell) return;
-    const r = parseInt(cell.dataset.r, 10), c = parseInt(cell.dataset.c, 10);
-    if (r === state.row && c === state.col) return;
-    state.row = r; state.col = c;
-    highlight();
   });
 
   // ---- message helper ----
