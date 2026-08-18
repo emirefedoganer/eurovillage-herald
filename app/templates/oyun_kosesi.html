@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "_macros.html" import author_byline %}
+{% block title %}Oyun Köşesi — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="section-header">
+  <h1>Oyun Köşesi</h1>
+</div>
+<p style="font-family: var(--font-sans); color: var(--gray-500); margin-top:-10px; margin-bottom:26px;">
+  Günün çapraz bulmacasını ve sudokusunu doğrudan tarayıcınızda çözün.
+  <a href="{{ url_for('games_archive') }}" style="color: var(--red); text-decoration: underline;">Tüm arşive göz atın →</a>
+</p>
+
+{% if crosswords or sudokus %}
+<div class="game-archive-grid" style="margin-bottom: 44px;">
+  {% for c in crosswords %}
+  <a class="game-card" href="{{ url_for('crossword_play', slug=c.slug) }}">
+    <span class="game-card-type">Çapraz Bulmaca</span>
+    <h3>{{ c.title }}</h3>
+    {% if c.description %}<p>{{ c.description }}</p>{% endif %}
+    <div class="game-card-meta">
+      <span class="badge badge-secondary">{{ difficulty_labels.get(c.difficulty, c.difficulty) }}</span>
+      {% if c.publication_date %}<span>{{ c.publication_date }}</span>{% endif %}
+    </div>
+  </a>
+  {% endfor %}
+  {% for s in sudokus %}
+  <a class="game-card" href="{{ url_for('sudoku_play', slug=s.slug) }}">
+    <span class="game-card-type">Sudoku</span>
+    <h3>{{ s.title }}</h3>
+    {% if s.description %}<p>{{ s.description }}</p>{% endif %}
+    <div class="game-card-meta">
+      <span class="badge badge-secondary">{{ difficulty_labels.get(s.difficulty, s.difficulty) }}</span>
+      {% if s.publication_date %}<span>{{ s.publication_date }}</span>{% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p class="section-empty">Şu anda oynanabilir bir bulmaca yok — yakında burada olacak.</p>
+{% endif %}
+
+{% for a in articles %}
+<article style="border-top: 3px solid var(--black); padding-top: 20px; max-width: 700px; margin: 0 auto 30px;">
+  <span class="kicker">{{ a.kicker }}</span>
+  <h2 style="font-family: var(--font-headline); font-size: 30px; margin: 8px 0 12px;">{{ a.title }}</h2>
+  <div class="byline" style="margin-bottom: 14px;">{{ author_byline(resolve_authors(a)) }} · {{ a.date }}</div>
+  <div class="article-body" style="max-width: none; padding: 0;">
+    {% for block in a.body %}
+      {% if block.type == 'p' %}<p>{{ block.text }}</p>
+      {% elif block.type == 'h3' %}<h3>{{ block.text }}</h3>
+      {% elif block.type == 'list' %}<ul>{% for item in block['items'] %}<li>{{ item }}</li>{% endfor %}</ul>
+      {% endif %}
+    {% endfor %}
+  </div>
+</article>
+{% endfor %}
+
+{% endblock %}

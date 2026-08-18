@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Sudoku Oluşturucu — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Otomatik Sudoku Oluşturucu</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.sudoku_list') }}">← Listeye Dön</a>
+  </div>
+
+  <form class="admin-panel" method="post" style="max-width: 480px;">
+    <div class="form-row">
+      <label for="title">Başlık (opsiyonel)</label>
+      <input type="text" id="title" name="title" placeholder="ör. Günün Sudokusu No. 2">
+    </div>
+    <div class="form-row">
+      <label for="difficulty">Zorluk</label>
+      <select id="difficulty" name="difficulty">
+        {% for d in difficulty_choices %}<option value="{{ d }}">{{ difficulty_labels[d] }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="hint" style="margin-bottom: 16px;">
+      Sistem önce tam dolu, geçerli bir çözüm üretir, sonra her rakamı tek tek çıkarırken bulmacanın
+      <strong>tek bir çözümü</strong> kalıp kalmadığını denetler — sadece rastgele rakam silmez.
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-red" type="submit">Sudoku Üret</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "ffa3dceb09",
+    "email": "admin@eurovillageherald.com",
+    "password_hash": "pbkdf2:sha256:1000000$OL5fEGQWAnyUZMFA$62d2ca1433976fda8d0bb64ea91defbab6e21fa3b6e3d9c1408e2c2d08dbdf24",
+    "account_role": "master_admin",
+    "status": "active",
+    "must_change_password": false,
+    "created_at": "2026-08-17T19:25:03Z",
+    "updated_at": "2026-08-17T21:31:48Z"
+  },
+  {
+    "id": "ef309cf032",
+    "email": "eto@eurovillageherald.com",
+    "password_hash": "pbkdf2:sha256:1000000$vmdW9pPTmvrrAEef$7db75a18d87a8ba258a471239f0bbec71d738d45bbc4b3d4ebfca8b8adb83b03",
+    "account_role": "author",
+    "status": "active",
+    "must_change_password": false,
+    "created_at": "2026-08-17T20:31:49Z",
+    "updated_at": "2026-08-17T21:31:55Z"
+  }
+]

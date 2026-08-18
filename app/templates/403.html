@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Erişim Engellendi — {{ site.name }}{% endblock %}
+{% block content %}
+<div class="static-page" style="text-align:center; padding: 60px 0;">
+  <h1 style="font-size: 60px;">403</h1>
+  <p style="font-family: var(--font-sans); color: var(--gray-500);">Bu işlem için yetkiniz yok.</p>
+  <a class="btn btn-red" href="{{ url_for('home') }}">Anasayfaya Dön</a>
+</div>
+{% endblock %}

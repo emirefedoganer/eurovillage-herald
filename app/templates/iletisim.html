@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}İletişim — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="contact-page">
+  <div class="contact-intro">
+    <span class="kicker">İletişim</span>
+    <h1>{{ contact.intro_title or 'Bize Ulaşın' }}</h1>
+    <p>{{ contact.intro_text }}</p>
+  </div>
+
+  <div class="contact-grid">
+    <form class="contact-form" method="post">
+      <div class="form-row">
+        <label for="name">Ad Soyad</label>
+        <input type="text" id="name" name="name" required value="{{ form.name if form else '' }}">
+      </div>
+      <div class="form-row">
+        <label for="email">E-posta</label>
+        <input type="email" id="email" name="email" required value="{{ form.email if form else '' }}">
+      </div>
+      <div class="form-row">
+        <label for="subject">Konu</label>
+        <select id="subject" name="subject" required>
+          <option value="" disabled {{ '' if form and form.subject else 'selected' }}>Bir konu seçin</option>
+          {% for s in subjects %}
+          <option value="{{ s }}" {{ 'selected' if form and form.subject == s else '' }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="message">Mesajınız</label>
+        <textarea id="message" name="message" rows="7" required>{{ form.message if form else '' }}</textarea>
+      </div>
+      <button class="btn btn-red" type="submit">Mesajı Gönder</button>
+    </form>
+
+    <aside class="contact-directory">
+      <div class="sidebar-title">İletişim Bilgileri</div>
+      {% for person in site.leadership %}
+      {% set matched = authors_by_name.get(person.name) %}
+      <div class="contact-dept">
+        <div class="contact-dept-role">{{ person.roles|join(' · ') }}</div>
+        <div class="contact-dept-name">{{ person.name }}</div>
+        {% if matched and matched.contact_email %}
+        <a class="contact-dept-email" href="mailto:{{ matched.contact_email }}">{{ matched.contact_email }}</a>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% if contact.note %}
+      <p class="contact-note">
+        {{ contact.note }}
+        Yönetim ekibimiz hakkında daha fazla bilgi için
+        <a href="{{ url_for('kurumsal') }}">Gazete Yönetimi</a> sayfamızı ziyaret edebilirsiniz.
+      </p>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+
+{% endblock %}

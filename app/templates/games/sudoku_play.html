@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ sudoku.title }} — {{ site.name }}{% endblock %}
+{% block extra_head %}<script id="sudoku-data" type="application/json">{{ payload | tojson }}</script>{% endblock %}
+{% block content %}
+
+<div id="sudoku-root" data-preview="{{ '1' if preview else '0' }}"
+     data-check-url="{{ url_for('sudoku_check', slug=sudoku.slug) }}"
+     data-hint-url="{{ url_for('sudoku_hint', slug=sudoku.slug) }}">
+
+  {% if preview %}
+  <div class="flash flash-error" style="margin-bottom:16px;">Bu bir ÖN İZLEME'dir — bulmaca henüz yayımlanmadı.</div>
+  {% endif %}
+
+  <div class="game-header">
+    <span class="kicker">Sudoku{% if sudoku.issue %} · Sayı {{ sudoku.issue }}{% endif %}</span>
+    <h1>{{ sudoku.title }}</h1>
+    {% if sudoku.description %}<p class="game-description">{{ sudoku.description }}</p>{% endif %}
+    <div class="game-meta-row">
+      <span class="badge badge-secondary">{{ difficulty_labels.get(sudoku.difficulty, sudoku.difficulty) }}</span>
+      {% if sudoku.publication_date %}<span>{{ sudoku.publication_date }}</span>{% endif %}
+      {% if sudoku.settings.timer_enabled %}<span class="game-timer">⏱ <span id="sk-timer">0:00</span></span>{% endif %}
+      {% if sudoku.settings.mistake_counter %}<span>Hata: <span id="sk-mistakes">0</span></span>{% endif %}
+      {% if sudoku.settings.hints_enabled %}<span>İpucu kaldı: <span id="sk-hints-left">{{ sudoku.settings.max_hints or '∞' }}</span></span>{% endif %}
+    </div>
+  </div>
+
+  <div id="sk-message" class="xw-message" role="status" aria-live="polite" hidden></div>
+
+  <div id="sk-complete-banner" class="game-complete-banner" hidden>
+    <strong>Sudoku tamamlandı! Tebrikler.</strong>
+    <div class="sk-complete-summary"></div>
+  </div>
+
+  <div class="sk-layout">
+    <div class="sk-board-wrap">
+      <div id="sk-grid" class="sk-grid" role="grid" aria-label="Sudoku ızgarası"></div>
+
+      <div class="sk-numpad">
+        {% for n in range(1,10) %}
+        <button type="button" class="sk-numpad-btn" data-n="{{ n }}">{{ n }}</button>
+        {% endfor %}
+        <button type="button" id="sk-numpad-erase" class="sk-numpad-btn sk-numpad-erase">Sil</button>
+      </div>
+
+      <div class="xw-controls">
+        <button type="button" id="sk-undo" class="btn btn-outline">Geri Al</button>
+        <button type="button" id="sk-redo" class="btn btn-outline">İleri Al</button>
+        <button type="button" id="sk-notes-toggle" class="btn btn-outline" aria-pressed="false">Not Modu</button>
+        <button type="button" id="sk-check" class="btn btn-red">Kontrol Et</button>
+        {% if sudoku.settings.hints_enabled %}<button type="button" id="sk-hint" class="btn btn-outline">İpucu</button>{% endif %}
+        {% if sudoku.settings.timer_enabled %}<button type="button" id="sk-pause" class="btn btn-outline">Duraklat</button>{% endif %}
+        <button type="button" id="sk-restart" class="btn btn-danger">Sıfırla</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/game-storage.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sudoku-play.js') }}"></script>
+{% endblock %}

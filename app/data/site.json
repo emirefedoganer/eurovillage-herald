@@ -1,0 +1,58 @@
+{
+  "name": "The Eurovillage Herald",
+  "tagline": "Eurovillage'ın ilk ve bağımsız gazetesi",
+  "founders": "emirthecomposer ve dukeofakbadain",
+  "issue_no": 1,
+  "issue_label": "8 AĞUSTOS 2026 - 1. SAYI",
+  "imtiyaz_sahibi": "THE EUROVILLAGE HERALD BASIN VE YAYINCILIK ANONİM ŞİRKETİ adına EMIR THE COMPOSER",
+  "genel_yayin_yonetmeni": "EMIR THE COMPOSER",
+  "editor": "EMIR THE COMPOSER",
+  "gorsel_tasarim": "EMIR THE COMPOSER",
+  "okur_iliskileri": "DUKE OF AKBADAIN",
+  "legal": "The Eurovillage Herald, basın meslek ilkelerine uymaya söz vermiştir. The Eurovillage Herald ve eklerinde yer alan yazı, haber ve fotoğrafların her türlü telif hakkı The Eurovillage Herald Basın ve Yayıncılık Anonim Şirketine aittir. İzin almadan ve atıfta bulunmadan yayımlamak hukuki ve cezai yaptırıma tabidir.",
+  "motto": "DEMOCRACY DIES IN DARKNESS.",
+  "copyright": "© 2026 The Eurovillage Herald. All rights reserved.",
+  "disclaimer": [
+    "The Eurovillage Herald is a fictional publication created exclusively within Eurovillage, a virtual community and fictional setting based on a Minecraft server. Eurovillage, The Eurovillage Herald, and the persons, institutions, organisations, businesses, public bodies, events, stories, reports, advertisements and other material presented as part of this project are fictional or form part of the Eurovillage role-playing environment, unless explicitly stated otherwise. Any resemblance to actual persons, organisations, institutions, companies, governments, events or circumstances is purely coincidental and should not be interpreted as representing or referring to their real-world counterparts.",
+    "The content published by The Eurovillage Herald is produced for creative, entertainment and role-playing purposes. Statements, reports, opinions, political events, elections, public offices and other material appearing within the fictional setting do not necessarily represent the views, opinions, positions or activities of any real person or organisation.",
+    "Eurovillage and The Eurovillage Herald are independent community projects and are not affiliated with, endorsed by, sponsored by, or officially associated with Mojang Studios, Microsoft Corporation, Minecraft, or any of their subsidiaries or affiliates. Minecraft and associated names, trademarks and assets are the property of their respective owners."
+  ],
+  "eurovillage_site_url": "https://www.eurovillagebb.com",
+  "credit_name": "Emir Efe Doğaner",
+  "credit_url": "https://emirefedoganer.com",
+  "leadership": [
+    {
+      "name": "Emir the Composer",
+      "initials": "EC",
+      "roles": [
+        "İmtiyaz Sahibi",
+        "Genel Yayın Yönetmeni",
+        "Editör",
+        "Görsel Tasarım"
+      ],
+      "bio": "The Eurovillage Herald'ın kurucu ortağı ve tek muhabiri. Eurovillage'ın 30. vatandaşı ve Manifest Mahallesi'nin ilk sakini. Gazetenin ilk sayısındaki haberlerin, röportajların ve tasarımın tamamını tek başına üretti."
+    },
+    {
+      "name": "Duke of Akbadain",
+      "initials": "DA",
+      "roles": [
+        "Okur İlişkileri",
+        "Kurucu Ortak"
+      ],
+      "bio": "Gazetenin kurucu ortaklarından. Okur şikayetlerini ve iletişimini yönetir — kendisiyle ilgili haberlere itiraz başvuruları da bu departmana yapılabilir."
+    }
+  ],
+  "contact": {
+    "intro_title": "Bize Ulaşın",
+    "intro_text": "Bir haber ihbarınız mı var? Bir düzeltme mi talep ediyorsunuz? Yoksa yalnızca bir okur görüşünüzü mü paylaşmak istiyorsunuz? The Eurovillage Herald olarak Eurovillage halkını dinliyoruz.",
+    "note": "Tüm mesajlar doğrudan gazetemizin Okur İlişkileri departmanına iletilir.",
+    "subjects": [
+      "Haber İhbarı",
+      "Okur Şikayeti / Görüşü",
+      "Basın Bülteni Gönder",
+      "Reklam ve İş Birliği",
+      "Düzeltme Talebi",
+      "Diğer"
+    ]
+  }
+}

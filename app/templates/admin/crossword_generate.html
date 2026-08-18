@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Bulmaca Oluşturucu — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Otomatik Bulmaca Oluşturucu</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.crossword_list') }}">← Listeye Dön</a>
+  </div>
+
+  <form class="admin-panel" method="post">
+    <div class="form-row">
+      <label for="title">Bulmaca Başlığı</label>
+      <input type="text" id="title" name="title" placeholder="ör. Eurovillage Çapraz Bulmaca No. 2">
+    </div>
+
+    <div class="form-row">
+      <label for="entries">Cevap ve İpuçları</label>
+      <textarea id="entries" name="entries" class="entries-textarea" required
+        placeholder="Her satıra bir tane: CEVAP | İpucu metni&#10;ör:&#10;EUROVISION | Avrupa şarkı yarışması&#10;BERLIN | Almanya başkenti&#10;MOZART | Avusturyalı besteci"></textarea>
+      <div class="hint">
+        Her satıra <code>CEVAP | İpucu</code> biçiminde bir kelime yazın (dikey çizgiyle ayırın). Sistem kelimeleri
+        kesişimlerine göre otomatik olarak bir ızgaraya yerleştirmeye çalışacak; yerleştiremediği kelimeleri
+        size bildirecektir. Oluşturduktan sonra ızgarayı düzenleyicide elle de değiştirebilirsiniz.
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-red" type="submit">Izgarayı Oluştur</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

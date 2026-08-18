@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Gazete Arşivi (PDF) — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="section-header"><h1>Gazete Arşivi</h1></div>
+<p style="font-family: var(--font-sans); color: var(--gray-500); margin-top:-10px; margin-bottom:26px;">
+  Her sayının orijinal baskı tasarımını PDF olarak, tarayıcınızda okuyabilirsiniz.
+</p>
+
+{% if issues %}
+<div class="issues-grid">
+  {% for i in issues %}
+  <div class="issue-card">
+    {% if i.cover_image %}
+      <img src="{{ url_for('static', filename='img/articles/' + i.cover_image) }}" alt="{{ i.title }}">
+    {% else %}
+      <img src="{{ url_for('static', filename='img/articles/obgis-baskan-konusma.jpg') }}" alt="{{ i.title }}">
+    {% endif %}
+    <div class="issue-card-body">
+      <span class="kicker">SAYI {{ i.no }}</span>
+      <h3>{{ i.title }}</h3>
+      <p>{{ i.date }}{% if i.pages %} · {{ i.pages }} sayfa{% endif %}</p>
+      <a class="btn btn-red" href="{{ url_for('gazete_oku', issue_id=i.id) }}">PDF'i Oku</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="section-empty">Henüz yüklenmiş bir sayı yok.</p>
+{% endif %}
+
+{% endblock %}

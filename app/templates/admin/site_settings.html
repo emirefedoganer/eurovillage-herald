@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Site Ayarları — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Site Ayarları</h1>
+  </div>
+
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); font-size: 22px; margin: 0 0 4px;">Yayın Bilgileri</h2>
+    <p class="hint" style="margin-bottom: 18px;">
+      Üst bilgi çubuğunda ve <a href="{{ url_for('kurumsal') }}" target="_blank">Gazete Yönetimi</a>
+      sayfasındaki "Yayın Bilgileri" tablosunda görünen tarih, sayı numarası ve masthead bilgileri.
+    </p>
+    <form method="post" action="{{ url_for('admin.site_settings_publication') }}">
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label for="issue_label">Yayın Tarihi / Sayı Etiketi</label>
+          <input type="text" id="issue_label" name="issue_label" value="{{ site.issue_label or '' }}" placeholder="ör. 8 AĞUSTOS 2026 - 1. SAYI">
+          <div class="hint">Üst çubukta ve Gazete Yönetimi sayfasında olduğu gibi görünür.</div>
+        </div>
+        <div class="form-row">
+          <label for="issue_no">Sayı Numarası</label>
+          <input type="number" id="issue_no" name="issue_no" min="1" value="{{ site.issue_no or 1 }}">
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="imtiyaz_sahibi">İmtiyaz Sahibi</label>
+        <input type="text" id="imtiyaz_sahibi" name="imtiyaz_sahibi" value="{{ site.imtiyaz_sahibi or '' }}">
+      </div>
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label for="genel_yayin_yonetmeni">Genel Yayın Yönetmeni</label>
+          <input type="text" id="genel_yayin_yonetmeni" name="genel_yayin_yonetmeni" value="{{ site.genel_yayin_yonetmeni or '' }}">
+        </div>
+        <div class="form-row">
+          <label for="editor">Editör</label>
+          <input type="text" id="editor" name="editor" value="{{ site.editor or '' }}">
+        </div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label for="gorsel_tasarim">Görsel Tasarım</label>
+          <input type="text" id="gorsel_tasarim" name="gorsel_tasarim" value="{{ site.gorsel_tasarim or '' }}">
+        </div>
+        <div class="form-row">
+          <label for="okur_iliskileri">Okur İlişkileri</label>
+          <input type="text" id="okur_iliskileri" name="okur_iliskileri" value="{{ site.okur_iliskileri or '' }}">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-red" type="submit">Yayın Bilgilerini Kaydet</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); font-size: 22px; margin: 0 0 4px;">Gazete Yönetimi</h2>
+    <p class="hint" style="margin-bottom: 18px;">
+      "Gazete Yönetimi" sayfasında (<a href="{{ url_for('kurumsal') }}" target="_blank">/gazete-yonetimi</a>)
+      görünen ekip kartları. Bir ismin, aktif bir Yazar profiliyle aynı Görünen Ad'a sahip olması
+      durumunda kart otomatik olarak o yazarın profiline bağlanır. Boş bırakılan satırlar kaydedilmez.
+    </p>
+    <form method="post" action="{{ url_for('admin.site_settings_leadership') }}">
+      {% for person in site.leadership %}
+      <div class="leadership-row">
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label for="name_{{ loop.index0 }}">Ad Soyad</label>
+            <input type="text" id="name_{{ loop.index0 }}" name="name_{{ loop.index0 }}" value="{{ person.name }}">
+          </div>
+          <div class="form-row">
+            <label for="initials_{{ loop.index0 }}">Baş Harfler <span class="hint">(fotoğraf yoksa)</span></label>
+            <input type="text" id="initials_{{ loop.index0 }}" name="initials_{{ loop.index0 }}" value="{{ person.initials }}" maxlength="3">
+          </div>
+        </div>
+        <div class="form-row">
+          <label for="roles_{{ loop.index0 }}">Unvanlar <span class="hint">(virgülle ayırın)</span></label>
+          <input type="text" id="roles_{{ loop.index0 }}" name="roles_{{ loop.index0 }}" value="{{ person.roles|join(', ') }}">
+        </div>
+        <div class="form-row">
+          <label for="bio_{{ loop.index0 }}">Biyografi</label>
+          <textarea id="bio_{{ loop.index0 }}" name="bio_{{ loop.index0 }}" rows="2">{{ person.bio }}</textarea>
+        </div>
+      </div>
+      <hr style="border: none; border-top: 1px solid var(--gray-200); margin: 18px 0;">
+      {% endfor %}
+
+      {% for i in range(2) %}
+      {% set idx = site.leadership|length + i %}
+      <div class="leadership-row">
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label for="name_{{ idx }}">Ad Soyad <span class="hint">(yeni üye eklemek için doldurun)</span></label>
+            <input type="text" id="name_{{ idx }}" name="name_{{ idx }}" value="">
+          </div>
+          <div class="form-row">
+            <label for="initials_{{ idx }}">Baş Harfler</label>
+            <input type="text" id="initials_{{ idx }}" name="initials_{{ idx }}" value="" maxlength="3">
+          </div>
+        </div>
+        <div class="form-row">
+          <label for="roles_{{ idx }}">Unvanlar <span class="hint">(virgülle ayırın)</span></label>
+          <input type="text" id="roles_{{ idx }}" name="roles_{{ idx }}" value="">
+        </div>
+        <div class="form-row">
+          <label for="bio_{{ idx }}">Biyografi</label>
+          <textarea id="bio_{{ idx }}" name="bio_{{ idx }}" rows="2"></textarea>
+        </div>
+      </div>
+      {% if not loop.last %}<hr style="border: none; border-top: 1px solid var(--gray-200); margin: 18px 0;">{% endif %}
+      {% endfor %}
+
+      <div class="form-actions">
+        <button class="btn btn-red" type="submit">Gazete Yönetimini Kaydet</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); font-size: 22px; margin: 0 0 4px;">İletişim Bilgileri</h2>
+    <p class="hint" style="margin-bottom: 18px;">
+      "İletişim" sayfasında (<a href="{{ url_for('iletisim') }}" target="_blank">/iletisim</a>) görünen
+      başlık, tanıtım metni, açıklama notu ve konu seçenekleri.
+    </p>
+    <form method="post" action="{{ url_for('admin.site_settings_contact') }}">
+      <div class="form-row">
+        <label for="intro_title">Başlık</label>
+        <input type="text" id="intro_title" name="intro_title" value="{{ contact.intro_title or '' }}">
+      </div>
+      <div class="form-row">
+        <label for="intro_text">Tanıtım Metni</label>
+        <textarea id="intro_text" name="intro_text" rows="3">{{ contact.intro_text or '' }}</textarea>
+      </div>
+      <div class="form-row">
+        <label for="note">Açıklama Notu <span class="hint">(sağ sütunda, iletişim listesinin altında görünür)</span></label>
+        <textarea id="note" name="note" rows="2">{{ contact.note or '' }}</textarea>
+      </div>
+      <div class="form-row">
+        <label for="subjects">Konu Seçenekleri <span class="hint">(her satıra bir konu)</span></label>
+        <textarea id="subjects" name="subjects" rows="6">{{ (contact.subjects or [])|join('\n') }}</textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-red" type="submit">İletişim Bilgilerini Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

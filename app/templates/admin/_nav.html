@@ -1,0 +1,11 @@
+<nav class="admin-subnav">
+  <a href="{{ url_for('admin.dashboard') }}" class="{{ 'active' if active == 'dashboard' else '' }}">İçerik</a>
+  {% if is_master_admin %}
+  <a href="{{ url_for('admin.games_overview') }}" class="{{ 'active' if active == 'games' else '' }}">Oyunlar</a>
+  <a href="{{ url_for('admin.authors_list') }}" class="{{ 'active' if active == 'authors' else '' }}">Yazarlar</a>
+  <a href="{{ url_for('admin.site_settings') }}" class="{{ 'active' if active == 'site_settings' else '' }}">Site Ayarları</a>
+  <a href="{{ url_for('admin.audit_log_view') }}" class="{{ 'active' if active == 'audit' else '' }}">Denetim Kaydı</a>
+  {% else %}
+  <a href="{{ url_for('admin.my_profile') }}" class="{{ 'active' if active == 'my_profile' else '' }}">Profilim</a>
+  {% endif %}
+</nav>

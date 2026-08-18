@@ -1,0 +1,42 @@
+[
+  {
+    "id": "cc86566c9a",
+    "user_id": "ffa3dceb09",
+    "display_name": "Emir the Composer",
+    "slug": "emir-the-composer",
+    "slug_history": [],
+    "profile_image": null,
+    "cover_image": null,
+    "short_bio": "The Eurovillage Herald'ın kurucusu ve Genel Yayın Yönetmeni.",
+    "full_bio": "Emir the Composer, The Eurovillage Herald'ı Eurovillage'ın ilk bağımsız gazetesi olarak kurdu ve yayın kurulunu yönetiyor. Haftalık köşesinde şehir siyaseti ve topluluk gündemi üzerine yazıyor.",
+    "editorial_role": "Genel Yayın Yönetmeni",
+    "is_opinion_columnist": true,
+    "twitter_handle": "emirthecomposer",
+    "minecraft_username": "emirthecomposer",
+    "join_date": "2026-08-08",
+    "status": "active",
+    "created_at": "2026-08-17T19:25:03Z",
+    "updated_at": "2026-08-17T21:31:48Z",
+    "contact_email": "emir@eurovillageherald.com"
+  },
+  {
+    "id": "b7add231ce",
+    "user_id": "ef309cf032",
+    "display_name": "Duke of Akbadain",
+    "slug": "duke-of-akbadain",
+    "slug_history": [],
+    "profile_image": null,
+    "cover_image": null,
+    "short_bio": "",
+    "full_bio": "",
+    "editorial_role": "",
+    "is_opinion_columnist": false,
+    "twitter_handle": null,
+    "minecraft_username": null,
+    "join_date": "2026-08-17",
+    "status": "active",
+    "created_at": "2026-08-17T20:31:49Z",
+    "updated_at": "2026-08-17T21:31:55Z",
+    "contact_email": "eto@eurovillageherald.com"
+  }
+]

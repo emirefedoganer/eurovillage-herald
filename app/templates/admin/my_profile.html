@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Profilim — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Profilim</h1>
+    {% if author %}<a class="btn btn-outline" href="{{ url_for('author_profile', slug=author.slug) }}" target="_blank">Herkese Açık Profili Gör</a>{% endif %}
+  </div>
+
+  {% if not author %}
+  <div class="admin-panel">
+    <p>Hesabınıza bağlı bir yazar profili bulunmuyor. Bir Master Admin'in sizin için bir profil oluşturması gerekiyor.</p>
+  </div>
+  {% else %}
+  <form class="admin-panel" method="post" enctype="multipart/form-data">
+    <div class="form-row">
+      <label>Görünen Ad</label>
+      <input type="text" value="{{ author.display_name }}" disabled>
+      <div class="hint">Adınızı veya editoryal unvanınızı değiştirmek için bir Master Admin ile iletişime geçin.</div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label>Profil Fotoğrafı</label>
+        {% if author.profile_image %}
+        <div class="current-image">
+          <img src="{{ url_for('static', filename='img/authors/' + author.profile_image) }}" alt="">
+          <label style="font-weight:400;"><input type="checkbox" name="remove_profile_image" value="1" style="width:auto;"> Kaldır</label>
+        </div>
+        {% endif %}
+        <input type="file" name="profile_image" accept="image/*">
+      </div>
+      <div class="form-row">
+        <label>Kapak Görseli</label>
+        {% if author.cover_image %}
+        <div class="current-image">
+          <img src="{{ url_for('static', filename='img/authors/' + author.cover_image) }}" alt="">
+          <label style="font-weight:400;"><input type="checkbox" name="remove_cover_image" value="1" style="width:auto;"> Kaldır</label>
+        </div>
+        {% endif %}
+        <input type="file" name="cover_image" accept="image/*">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="short_bio">Kısa Biyografi <span class="hint">(profil kartlarında ve önizlemede görünür, ~280 karakter)</span></label>
+      <textarea id="short_bio" name="short_bio" rows="2" maxlength="280">{{ author.short_bio or '' }}</textarea>
+    </div>
+    <div class="form-row">
+      <label for="full_bio">Tam Biyografi</label>
+      <textarea id="full_bio" name="full_bio" rows="6">{{ author.full_bio or '' }}</textarea>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="twitter_handle">X / Twitter Kullanıcı Adı</label>
+        <input type="text" id="twitter_handle" name="twitter_handle" value="{{ author.twitter_handle or '' }}" placeholder="ör. emirthecomposer">
+        <div class="hint">Sadece kullanıcı adını girin, @ veya bağlantı gerekmez.</div>
+      </div>
+      <div class="form-row">
+        <label for="minecraft_username">Minecraft Kullanıcı Adı</label>
+        <input type="text" id="minecraft_username" name="minecraft_username" value="{{ author.minecraft_username or '' }}" placeholder="ör. EmirTheComposer">
+        <div class="hint">Karakter görseliniz otomatik olarak alınır.</div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="contact_email">Halka Açık İletişim E-postası</label>
+      <input type="email" id="contact_email" name="contact_email" value="{{ author.contact_email or '' }}" placeholder="ör. emir@eurovillageherald.com">
+      <div class="hint">Profil sayfanızda görünür ve okurların size doğrudan e-posta göndermesini sağlar. Giriş yaptığınız e-postadan farklı olabilir.</div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-red" type="submit">Profili Kaydet</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+{% endblock %}

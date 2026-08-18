@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "_macros.html" import author_byline %}
+{% block title %}{{ section_label(section) }} — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="section-header">
+  <h1>{{ section_label(section) }}</h1>
+</div>
+
+{% if articles %}
+<div class="section-list">
+  <div>
+    {% for a in articles %}
+    <article class="story-card {{ '' if a.image else 'story-card--noimg' }}" style="margin-bottom: 30px;">
+      <span class="kicker">{{ effective_kicker(a) }}</span>
+      {% if a.image %}
+      <a href="{{ url_for('article_page', slug=a.slug) }}">
+        <img src="{{ url_for('static', filename='img/articles/' + a.image) }}" alt="{{ a.title }}">
+      </a>
+      {% endif %}
+      <a href="{{ url_for('article_page', slug=a.slug) }}"><h3>{{ a.title }}</h3></a>
+      <p class="dek">{{ a.dek }}</p>
+      <div class="byline">{{ author_byline(resolve_authors(a)) }} · {{ a.date }}</div>
+    </article>
+    {% endfor %}
+  </div>
+  <aside class="sidebar">
+    <div class="ad-box sidebar-block">
+      <span class="ad-label">Reklam</span>
+      <div class="ad-body">
+        <div class="ad-title ad-title-frutiger">Buraya Bakarlar</div>
+        <div class="ad-sub">Bu alana reklam vermek için bizimle iletişime geçebilirsiniz.</div>
+        <div class="ad-handle">@dukeofakbadain</div>
+      </div>
+    </div>
+  </aside>
+</div>
+{% else %}
+<p class="section-empty">Bu bölümde henüz yayımlanmış bir haber bulunmuyor.</p>
+{% endif %}
+
+{% endblock %}

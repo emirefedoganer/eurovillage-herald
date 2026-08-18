@@ -1,0 +1,131 @@
+{% from "_macros.html" import nav_links with context %}
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ site.name }}{% endblock %}</title>
+<meta name="description" content="{{ site.tagline }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Noto+Serif:ital,wght@0,400;0,500;0,600;0,700;0,900;1,400;1,700&family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&family=Libre+Franklin:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23C8102E%22/><text x=%2250%22 y=%2270%22 font-size=%2270%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22Georgia%22>E</text></svg>">
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<div class="util-bar">
+  <div class="wrap util-inner">
+    <span class="util-date">{{ site.issue_label }}</span>
+    <nav class="util-links">
+      <a href="{{ url_for('gazete') }}">Gazete (PDF)</a>
+      <a href="{{ url_for('hakkimizda') }}">Hakkımızda</a>
+      <a href="{{ site.eurovillage_site_url }}" target="_blank" rel="noopener noreferrer">Eurovillage Büyükşehir Belediyesi</a>
+    </nav>
+  </div>
+</div>
+
+<header class="masthead {{ 'masthead-ari' if publication_context == 'ari' else '' }}">
+  <div class="wrap masthead-inner">
+    <button class="hamburger-btn" type="button" aria-label="Menüyü Aç" aria-expanded="false" aria-controls="mobile-drawer">
+      <span class="hamburger-bar"></span><span class="hamburger-bar"></span><span class="hamburger-bar"></span>
+    </button>
+    <div class="masthead-meta masthead-meta-left">Kurucu: {{ site.founders }}</div>
+    {% if publication_context == 'ari' %}
+    <a class="masthead-logo masthead-logo-ari" href="{{ url_for('magazin') }}">
+      <img src="{{ url_for('static', filename='img/ari-logo.svg') }}" alt="Arı Magazine">
+    </a>
+    {% else %}
+    <a class="masthead-logo" href="{{ url_for('home') }}">{{ site.name }}</a>
+    {% endif %}
+    <div class="masthead-meta masthead-meta-right">{{ site.tagline }}</div>
+    <button class="mobile-search-btn" type="button" aria-label="Ara" aria-controls="mobile-search-bar" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+    </button>
+  </div>
+  <form class="mobile-search-bar" id="mobile-search-bar" action="{{ url_for('search') }}" method="get" hidden>
+    <input type="search" name="q" placeholder="Ara..." value="{{ request.args.get('q','') }}" aria-label="Ara">
+    <button type="submit" class="btn btn-red">Ara</button>
+  </form>
+</header>
+
+<nav class="mainnav">
+  <div class="wrap mainnav-inner">
+    {{ nav_links(uppercase_opinion=True) }}
+    <form class="mainnav-search" action="{{ url_for('search') }}" method="get">
+      <input type="search" name="q" placeholder="Ara..." value="{{ request.args.get('q','') }}">
+    </form>
+  </div>
+</nav>
+
+<div class="drawer-overlay" id="drawer-overlay" hidden></div>
+<nav class="mobile-drawer" id="mobile-drawer" aria-label="Mobil gezinme" hidden>
+  <div class="drawer-header">
+    <span class="drawer-header-title">{{ site.name }}</span>
+    <button class="drawer-close-btn" type="button" aria-label="Menüyü Kapat">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <line x1="5" y1="5" x2="19" y2="19"></line>
+        <line x1="19" y1="5" x2="5" y2="19"></line>
+      </svg>
+    </button>
+  </div>
+  <div class="drawer-nav">
+    {{ nav_links() }}
+  </div>
+  <div class="drawer-utility">
+    <a href="{{ url_for('hakkimizda') }}">Hakkımızda</a>
+    <a href="{{ site.eurovillage_site_url }}" target="_blank" rel="noopener noreferrer">Eurovillage Büyükşehir Belediyesi</a>
+  </div>
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="wrap flash-wrap">
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<main class="wrap main-content">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div class="footer-top">
+      <div class="footer-logo">{{ site.name }}</div>
+      <div class="footer-links">
+        <a href="{{ url_for('kurumsal') }}">Gazete Yönetimi</a>
+        <a href="{{ url_for('hakkimizda') }}">Hakkımızda</a>
+        <a href="{{ url_for('gazete') }}">Gazete Arşivi</a>
+        <a href="{{ url_for('iletisim') }}">İletişim</a>
+      </div>
+    </div>
+    <p class="footer-legal">{{ site.legal }}</p>
+    <div class="footer-motto">{{ site.motto }}</div>
+
+    <div class="footer-disclaimer">
+      <p class="footer-copyright">{{ site.copyright }}</p>
+      {% for p in site.disclaimer %}
+        <p>{{ p }}</p>
+      {% endfor %}
+      <p>For further information about Eurovillage, please visit <a href="{{ site.eurovillage_site_url }}" target="_blank" rel="noopener">www.eurovillagebb.com</a>.</p>
+    </div>
+
+    <div class="footer-credit">Website by <a href="{{ site.credit_url }}" target="_blank" rel="noopener">{{ site.credit_name }}</a></div>
+  </div>
+</footer>
+
+<script id="author-preview-data" type="application/json">{{ author_preview_json | safe }}</script>
+<script src="{{ url_for('static', filename='js/author-card.js') }}"></script>
+<script src="{{ url_for('static', filename='js/mobile-nav.js') }}"></script>
+{% block extra_scripts %}{% endblock %}
+
+</body>
+</html>

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Yeni Sayı Yükle — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  <div class="admin-header">
+    <h1>Yeni Sayı Yükle</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.dashboard') }}">← Panele Dön</a>
+  </div>
+
+  <form class="admin-panel" method="post" enctype="multipart/form-data">
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="title">Sayı Başlığı</label>
+        <input type="text" id="title" name="title" required placeholder="ör. Ekim Sayısı">
+      </div>
+      <div class="form-row">
+        <label for="no">Sayı No</label>
+        <input type="number" id="no" name="no" min="1" required>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="date">Yayın Tarihi</label>
+      <input type="date" id="date" name="date" required>
+    </div>
+
+    <div class="form-row">
+      <label for="description">Açıklama</label>
+      <textarea id="description" name="description" rows="3"></textarea>
+    </div>
+
+    <div class="form-row">
+      <label for="pdf_file">PDF Dosyası</label>
+      <input type="file" id="pdf_file" name="pdf_file" accept="application/pdf" required>
+    </div>
+
+    <div class="form-row">
+      <label for="cover_file">Kapak Görseli (opsiyonel)</label>
+      <input type="file" id="cover_file" name="cover_file" accept="image/*">
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-red" type="submit">Sayıyı Yükle</button>
+      <a class="btn btn-outline" href="{{ url_for('admin.dashboard') }}">Vazgeç</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

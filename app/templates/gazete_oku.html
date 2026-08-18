@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}{{ issue.title }} — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="reader-layout">
+  <div class="reader-frame-wrap">
+    <div class="pdf-toolbar">
+      <button type="button" id="pdfPrev" class="pdf-btn" aria-label="Önceki sayfa">‹</button>
+      <span id="pdfPageInfo" class="pdf-page-info">Yükleniyor…</span>
+      <button type="button" id="pdfNext" class="pdf-btn" aria-label="Sonraki sayfa">›</button>
+      <span class="pdf-toolbar-spacer"></span>
+      <button type="button" id="pdfZoomOut" class="pdf-btn" aria-label="Uzaklaştır">−</button>
+      <span id="pdfZoomLevel" class="pdf-page-info">100%</span>
+      <button type="button" id="pdfZoomIn" class="pdf-btn" aria-label="Yakınlaştır">+</button>
+    </div>
+    <div class="pdf-viewport" id="pdfViewport">
+      <canvas id="pdfCanvas"></canvas>
+    </div>
+  </div>
+  <aside class="reader-side">
+    <span class="kicker">SAYI {{ issue.no }}</span>
+    <h1>{{ issue.title }}</h1>
+    <div class="issue-date">{{ issue.date }}{% if issue.pages %} · {{ issue.pages }} sayfa{% endif %}</div>
+    <p style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">{{ issue.description }}</p>
+    <a class="btn btn-outline" style="margin-top: 10px;" href="{{ url_for('static', filename='issues/' + issue.pdf) }}" download>PDF'i İndir</a>
+    <a class="btn btn-outline" style="margin-top: 10px;" href="{{ url_for('static', filename='issues/' + issue.pdf) }}" target="_blank" rel="noopener">Yeni Sekmede Aç</a>
+
+    {% if others %}
+    <div class="sidebar-block" style="margin-top: 30px;">
+      <div class="sidebar-title">Diğer Sayılar</div>
+      <div class="other-issues-list">
+        {% for o in others %}
+        <a href="{{ url_for('gazete_oku', issue_id=o.id) }}">Sayı {{ o.no }} — {{ o.title }}</a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </aside>
+</div>
+
+<script type="module">
+import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.worker.min.mjs";
+
+const url = {{ url_for('static', filename='issues/' + issue.pdf)|tojson }};
+const canvas = document.getElementById('pdfCanvas');
+const ctx = canvas.getContext('2d');
+const viewport_el = document.getElementById('pdfViewport');
+const pageInfo = document.getElementById('pdfPageInfo');
+const zoomLevel = document.getElementById('pdfZoomLevel');
+
+let pdfDoc = null;
+let pageNum = 1;
+let baseScale = 1;
+let zoomFactor = 1;
+let rendering = false;
+let pendingPage = null;
+
+function renderPage(num) {
+  if (rendering) { pendingPage = num; return; }
+  rendering = true;
+  pdfDoc.getPage(num).then(function (page) {
+    const viewport = page.getViewport({ scale: baseScale * zoomFactor });
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const renderTask = page.render({ canvasContext: ctx, viewport: viewport });
+    return renderTask.promise.then(function () {
+      rendering = false;
+      pageInfo.textContent = num + ' / ' + pdfDoc.numPages;
+      zoomLevel.textContent = Math.round(zoomFactor * 100) + '%';
+      if (pendingPage !== null) {
+        const next = pendingPage;
+        pendingPage = null;
+        renderPage(next);
+      }
+    });
+  }).catch(function (err) {
+    rendering = false;
+    viewport_el.innerHTML = '<div style="padding:40px; text-align:center; font-family: var(--font-sans);"><p>PDF yüklenemedi.</p><a class="btn btn-red" href="' + url + '">PDF\'i indir</a></div>';
+  });
+}
+
+pdfjsLib.getDocument({ url: url }).promise.then(function (doc) {
+  pdfDoc = doc;
+  return doc.getPage(1).then(function (page) {
+    const unscaled = page.getViewport({ scale: 1 });
+    const containerWidth = viewport_el.clientWidth - 32;
+    baseScale = Math.max(0.2, containerWidth / unscaled.width);
+    pageNum = 1;
+    renderPage(pageNum);
+  });
+}).catch(function (err) {
+  viewport_el.innerHTML = '<div style="padding:40px; text-align:center; font-family: var(--font-sans);"><p>PDF yüklenemedi.</p><a class="btn btn-red" href="' + url + '">PDF\'i indir</a></div>';
+});
+
+document.getElementById('pdfPrev').addEventListener('click', function () {
+  if (!pdfDoc || pageNum <= 1) return;
+  pageNum -= 1;
+  renderPage(pageNum);
+});
+document.getElementById('pdfNext').addEventListener('click', function () {
+  if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
+  pageNum += 1;
+  renderPage(pageNum);
+});
+document.getElementById('pdfZoomIn').addEventListener('click', function () {
+  if (!pdfDoc) return;
+  zoomFactor = Math.min(zoomFactor + 0.2, 2.5);
+  renderPage(pageNum);
+});
+document.getElementById('pdfZoomOut').addEventListener('click', function () {
+  if (!pdfDoc) return;
+  zoomFactor = Math.max(zoomFactor - 0.2, 0.4);
+  renderPage(pageNum);
+});
+</script>
+
+{% endblock %}

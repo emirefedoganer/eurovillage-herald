@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Denetim Kaydı — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Denetim Kaydı</h1>
+  </div>
+
+  <div class="admin-panel">
+    <table class="admin-table">
+      <thead><tr><th>Zaman</th><th>Yapan</th><th>İşlem</th><th>Hedef</th></tr></thead>
+      <tbody>
+        {% for e in entries %}
+        <tr>
+          <td style="white-space:nowrap;">{{ e.at }}</td>
+          <td>{{ e.actor }}</td>
+          <td>{{ e.action }}</td>
+          <td>{{ e.target }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">Henüz kayıt yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

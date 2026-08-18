@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_macros.html" import author_byline %}
+{% block title %}"{{ q }}" için arama sonuçları — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="section-header"><h1>Arama: "{{ q }}"</h1></div>
+
+{% if results %}
+<div class="section-list">
+  <div>
+    {% for a in results %}
+    <article class="story-card {{ '' if a.image else 'story-card--noimg' }}" style="margin-bottom: 30px;">
+      <span class="kicker">{{ effective_kicker(a) }}</span>
+      {% if a.image %}
+      <a href="{{ url_for('article_page', slug=a.slug) }}">
+        <img src="{{ url_for('static', filename='img/articles/' + a.image) }}" alt="{{ a.title }}">
+      </a>
+      {% endif %}
+      <a href="{{ url_for('article_page', slug=a.slug) }}"><h3>{{ a.title }}</h3></a>
+      <p class="dek">{{ a.dek }}</p>
+      <div class="byline">{{ author_byline(resolve_authors(a)) }} · {{ a.date }}</div>
+    </article>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<p class="section-empty">{{ 'Sonuç bulunamadı.' if q else 'Aramak için bir kelime yazın.' }}</p>
+{% endif %}
+
+{% endblock %}

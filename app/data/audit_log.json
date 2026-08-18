@@ -1,0 +1,167 @@
+[
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "login",
+    "target": "admin@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-17T19:55:31Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "author_created",
+    "target": "Test Yazar <test.yazar@example.com>",
+    "meta": {
+      "account_role": "author"
+    },
+    "at": "2026-08-17T19:55:52Z"
+  },
+  {
+    "actor": "test.yazar@example.com",
+    "action": "login",
+    "target": "test.yazar@example.com",
+    "meta": {},
+    "at": "2026-08-17T19:56:23Z"
+  },
+  {
+    "actor": "test.yazar@example.com",
+    "action": "password_set_self",
+    "target": "test.yazar@example.com",
+    "meta": {},
+    "at": "2026-08-17T19:56:23Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "profile_edited_by_admin",
+    "target": "Emir the Composer",
+    "meta": {},
+    "at": "2026-08-17T19:57:41Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "profile_edited_by_admin",
+    "target": "Test Yazar",
+    "meta": {},
+    "at": "2026-08-17T19:58:04Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "author_deleted",
+    "target": "Test Yazar",
+    "meta": {},
+    "at": "2026-08-17T19:58:24Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "login",
+    "target": "admin@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-17T20:07:05Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "login",
+    "target": "admin@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-17T20:31:44Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "author_created",
+    "target": "Duke of Akbadain <eto@eurovillageherald.com>",
+    "meta": {
+      "account_role": "author"
+    },
+    "at": "2026-08-17T20:31:49Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "password_reset_initiated",
+    "target": "eto@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-17T20:32:25Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "password_reset_initiated",
+    "target": "eto@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-17T20:32:32Z"
+  },
+  {
+    "actor": "eto@eurovillageherald.com",
+    "action": "login",
+    "target": "eto@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-17T20:32:41Z"
+  },
+  {
+    "actor": "eto@eurovillageherald.com",
+    "action": "password_set_self",
+    "target": "eto@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-17T20:32:48Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "login",
+    "target": "admin@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-17T21:31:25Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "profile_edited_by_admin",
+    "target": "Emir the Composer",
+    "meta": {},
+    "at": "2026-08-17T21:31:48Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "profile_edited_by_admin",
+    "target": "Duke of Akbadain",
+    "meta": {},
+    "at": "2026-08-17T21:31:55Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "site_settings_updated",
+    "target": "İletişim Bilgileri",
+    "meta": {},
+    "at": "2026-08-17T21:34:07Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "site_settings_updated",
+    "target": "İletişim Bilgileri",
+    "meta": {},
+    "at": "2026-08-17T21:34:22Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "site_settings_updated",
+    "target": "Gazete Yönetimi",
+    "meta": {},
+    "at": "2026-08-17T21:34:34Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "site_settings_updated",
+    "target": "Yayın Bilgileri",
+    "meta": {},
+    "at": "2026-08-17T21:39:51Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "site_settings_updated",
+    "target": "Yayın Bilgileri",
+    "meta": {},
+    "at": "2026-08-17T21:39:59Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "login",
+    "target": "admin@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-17T22:19:20Z"
+  }
+]

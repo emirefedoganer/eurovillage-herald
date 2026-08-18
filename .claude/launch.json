@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "eurovillage-herald",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["/Users/emirmini/Eurovillage Herald Website/app/app.py"],
+      "port": 5050
+    }
+  ]
+}

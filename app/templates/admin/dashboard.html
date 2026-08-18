@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Yönetim Paneli — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+  <div class="admin-header">
+    <h1>Yönetim Paneli</h1>
+    <div class="admin-actions">
+      <a class="btn btn-outline" href="{{ url_for('admin.change_password') }}">Şifre Değiştir</a>
+      <a class="btn btn-red" href="{{ url_for('admin.article_new') }}">+ Yeni Makale</a>
+    </div>
+  </div>
+
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); margin-top:0;">İletişim Mesajları ({{ messages|length }})</h2>
+    {% if messages %}
+    <table class="admin-table">
+      <thead>
+        <tr><th>Tarih</th><th>Ad Soyad</th><th>E-posta</th><th>Konu</th><th>Mesaj</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for m in messages %}
+        <tr>
+          <td style="white-space:nowrap;">{{ m.date }}</td>
+          <td>{{ m.name }}</td>
+          <td><a href="mailto:{{ m.email }}">{{ m.email }}</a></td>
+          <td>{{ m.subject }}</td>
+          <td style="max-width:320px; white-space:pre-wrap;">{{ m.message }}</td>
+          <td class="admin-actions">
+            <form method="post" action="{{ url_for('admin.message_delete', mid=m.id) }}" onsubmit="return confirm('Bu mesajı silmek istediğinize emin misiniz?');">
+              <button class="btn btn-danger" type="submit">Sil</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="font-family: var(--font-sans); color: var(--gray-500); margin:0;">Henüz mesaj gelmedi.</p>
+    {% endif %}
+  </div>
+
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); margin-top:0;">Makaleler ({{ articles|length }})</h2>
+    <table class="admin-table">
+      <thead>
+        <tr><th>Başlık</th><th>Bölüm</th><th>Tarih</th><th>Etiket</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for a in articles %}
+        <tr>
+          <td><a href="{{ url_for('article_page', slug=a.slug) }}" target="_blank">{{ a.title }}</a></td>
+          <td>{{ section_label(a.section) }}</td>
+          <td>{{ a.date }}</td>
+          <td>
+            {% if a.featured == 'lead' %}<span class="badge badge-lead">Manşet</span>{% endif %}
+            {% if a.featured == 'secondary' %}<span class="badge badge-secondary">Öne Çıkan</span>{% endif %}
+            {% if a.breaking %}<span class="badge badge-breaking">Son Dakika</span>{% endif %}
+          </td>
+          <td class="admin-actions">
+            <a class="btn btn-outline" href="{{ url_for('admin.article_edit', slug=a.slug) }}">Düzenle</a>
+            <form method="post" action="{{ url_for('admin.article_delete', slug=a.slug) }}" onsubmit="return confirm('Bu makaleyi silmek istediğinize emin misiniz?');">
+              <button class="btn btn-danger" type="submit">Sil</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">Henüz makale yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="admin-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="font-family: var(--font-headline); margin:0;">Gazete Sayıları ({{ issues|length }})</h2>
+      <a class="btn btn-red" href="{{ url_for('admin.issue_new') }}">+ Yeni Sayı Yükle</a>
+    </div>
+    <table class="admin-table" style="margin-top:16px;">
+      <thead>
+        <tr><th>Başlık</th><th>No</th><th>Tarih</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for i in issues %}
+        <tr>
+          <td><a href="{{ url_for('gazete_oku', issue_id=i.id) }}" target="_blank">{{ i.title }}</a></td>
+          <td>{{ i.no }}</td>
+          <td>{{ i.date }}</td>
+          <td class="admin-actions">
+            <form method="post" action="{{ url_for('admin.issue_delete', issue_id=i.id) }}" onsubmit="return confirm('Bu sayıyı silmek istediğinize emin misiniz?');">
+              <button class="btn btn-danger" type="submit">Sil</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">Henüz sayı yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

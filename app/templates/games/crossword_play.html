@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ crossword.title }} — {{ site.name }}{% endblock %}
+{% block extra_head %}<script id="crossword-data" type="application/json">{{ payload | tojson }}</script>{% endblock %}
+{% block content %}
+
+<div id="crossword-root" data-preview="{{ '1' if preview else '0' }}"
+     data-check-url="{{ url_for('crossword_check', slug=crossword.slug) }}">
+
+  {% if preview %}
+  <div class="flash flash-error" style="margin-bottom:16px;">Bu bir ÖN İZLEME'dir — bulmaca henüz yayımlanmadı.</div>
+  {% endif %}
+
+  <div class="game-header">
+    <span class="kicker">Çapraz Bulmaca{% if crossword.issue %} · Sayı {{ crossword.issue }}{% endif %}</span>
+    <h1>{{ crossword.title }}</h1>
+    {% if crossword.description %}<p class="game-description">{{ crossword.description }}</p>{% endif %}
+    <div class="game-meta-row">
+      <span class="badge badge-secondary">{{ difficulty_labels.get(crossword.difficulty, crossword.difficulty) }}</span>
+      {% if crossword.publication_date %}<span>{{ crossword.publication_date }}</span>{% endif %}
+      {% if crossword.author %}<span>{{ crossword.author }}</span>{% endif %}
+      {% if crossword.settings.timer_enabled %}<span class="game-timer">⏱ <span id="xw-timer">0:00</span></span>{% endif %}
+    </div>
+  </div>
+
+  <div id="xw-message" class="xw-message" role="status" aria-live="polite" hidden></div>
+
+  <div id="xw-complete-banner" class="game-complete-banner" hidden>
+    <strong>Tebrikler! Bulmacayı tamamladınız.</strong>
+  </div>
+
+  <div class="xw-layout">
+    <div class="xw-board-wrap">
+      <div id="xw-grid" class="xw-grid" role="grid" aria-label="Çapraz bulmaca ızgarası"></div>
+      <div class="xw-controls">
+        {% if crossword.settings.allow_check_letter %}<button type="button" id="xw-check-letter" class="btn btn-outline">Harfi Kontrol Et</button>{% endif %}
+        {% if crossword.settings.allow_check_word %}<button type="button" id="xw-check-word" class="btn btn-outline">Kelimeyi Kontrol Et</button>{% endif %}
+        {% if crossword.settings.allow_check_puzzle %}<button type="button" id="xw-check-puzzle" class="btn btn-red">Bulmacayı Kontrol Et</button>{% endif %}
+        {% if crossword.settings.reveal_answer %}<button type="button" id="xw-reveal" class="btn btn-outline">Cevabı Göster</button>{% endif %}
+        <button type="button" id="xw-restart" class="btn btn-danger">Sıfırla</button>
+      </div>
+    </div>
+
+    <div class="xw-clues">
+      <div class="xw-clue-col">
+        <h2 class="rail-title">Soldan Sağa</h2>
+        <ol id="xw-across-list" class="xw-clue-list"></ol>
+      </div>
+      <div class="xw-clue-col">
+        <h2 class="rail-title">Yukarıdan Aşağıya</h2>
+        <ol id="xw-down-list" class="xw-clue-list"></ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/game-storage.js') }}"></script>
+<script src="{{ url_for('static', filename='js/crossword-play.js') }}"></script>
+{% endblock %}

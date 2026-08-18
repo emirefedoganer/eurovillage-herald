@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Yönetim Paneli — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Hoş geldiniz{% if author %}, {{ author.display_name }}{% endif %}</h1>
+    <div class="admin-actions">
+      <a class="btn btn-outline" href="{{ url_for('admin.my_profile') }}">Profilim</a>
+      <a class="btn btn-red" href="{{ url_for('admin.article_new') }}">+ Yeni Makale</a>
+    </div>
+  </div>
+
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); margin-top:0;">Makalelerim ({{ articles|length }})</h2>
+    <table class="admin-table">
+      <thead><tr><th>Başlık</th><th>Bölüm</th><th>Tarih</th><th>Durum</th><th></th></tr></thead>
+      <tbody>
+        {% for a in articles %}
+        <tr>
+          <td><a href="{{ url_for('article_page', slug=a.slug) }}" target="_blank">{{ a.title }}</a></td>
+          <td>{{ section_label(a.section) }}</td>
+          <td>{{ a.date }}</td>
+          <td>
+            {% if a.featured == 'lead' %}<span class="badge badge-lead">Manşet</span>{% endif %}
+            {% if a.featured == 'secondary' %}<span class="badge badge-secondary">Öne Çıkan</span>{% endif %}
+          </td>
+          <td class="admin-actions">
+            <a class="btn btn-outline" href="{{ url_for('admin.article_edit', slug=a.slug) }}">Düzenle</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">Henüz bir makaleniz yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

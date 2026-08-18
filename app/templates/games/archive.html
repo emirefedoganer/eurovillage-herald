@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Oyun Arşivi — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="section-header"><h1>Oyun Arşivi</h1></div>
+
+<form class="game-filters" method="get">
+  <div class="game-filter-row">
+    <label>Tür
+      <select name="tur">
+        <option value="" {{ 'selected' if not filter_type else '' }}>Tümü</option>
+        <option value="bulmaca" {{ 'selected' if filter_type == 'bulmaca' else '' }}>Çapraz Bulmaca</option>
+        <option value="sudoku" {{ 'selected' if filter_type == 'sudoku' else '' }}>Sudoku</option>
+      </select>
+    </label>
+    <label>Zorluk
+      <select name="zorluk">
+        <option value="" {{ 'selected' if not filter_difficulty else '' }}>Tümü</option>
+        {% for key, label in difficulty_labels.items() %}
+        <option value="{{ key }}" {{ 'selected' if filter_difficulty == key else '' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Yıl
+      <select name="yil">
+        <option value="" {{ 'selected' if not filter_year else '' }}>Tümü</option>
+        {% for y in years %}
+        <option value="{{ y }}" {{ 'selected' if filter_year == y else '' }}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="btn btn-red" type="submit">Filtrele</button>
+  </div>
+</form>
+
+<div class="game-archive-grid">
+  {% for c in crosswords %}
+  <a class="game-card" href="{{ url_for('crossword_play', slug=c.slug) }}">
+    <span class="game-card-type">Çapraz Bulmaca</span>
+    <h3>{{ c.title }}</h3>
+    <div class="game-card-meta">
+      <span class="badge badge-secondary">{{ difficulty_labels.get(c.difficulty, c.difficulty) }}</span>
+      <span>{{ c.publication_date }}</span>
+    </div>
+  </a>
+  {% endfor %}
+  {% for s in sudokus %}
+  <a class="game-card" href="{{ url_for('sudoku_play', slug=s.slug) }}">
+    <span class="game-card-type">Sudoku</span>
+    <h3>{{ s.title }}</h3>
+    <div class="game-card-meta">
+      <span class="badge badge-secondary">{{ difficulty_labels.get(s.difficulty, s.difficulty) }}</span>
+      <span>{{ s.publication_date }}</span>
+    </div>
+  </a>
+  {% endfor %}
+  {% if not crosswords and not sudokus %}
+  <p class="section-empty">Bu filtrelerle eşleşen bir oyun bulunamadı.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

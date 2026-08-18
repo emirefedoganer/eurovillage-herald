@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% from "_macros.html" import author_byline, author_avatar %}
+{% block title %}{{ article.title }} — {{ site.name }}{% endblock %}
+{% block extra_head %}<meta name="description" content="{{ article.dek }}">{% endblock %}
+{% block content %}
+
+<article>
+  <div class="article-head {{ 'article-head-opinion' if columnist else '' }}">
+    <span class="kicker">{{ effective_kicker(article) }}</span>
+    <h1>{{ article.title }}</h1>
+    {% if article.dek %}<p class="dek">{{ article.dek }}</p>{% endif %}
+
+    {% if columnist %}
+    <div class="columnist-header">
+      {{ author_avatar(columnist, size=64, css_class="columnist-header-avatar") }}
+      <div class="columnist-header-info">
+        <a href="{{ url_for('author_profile', slug=columnist.slug) }}" class="author-link columnist-header-name" data-author-id="{{ columnist.id }}">{{ columnist.display_name }}</a>
+        {% if columnist.editorial_role %}<div class="columnist-header-role">{{ columnist.editorial_role }}</div>{% endif %}
+        {% if columnist.short_bio %}<p class="columnist-header-bio">{{ columnist.short_bio }}</p>{% endif %}
+      </div>
+      <span class="columnist-header-date">{{ article.date }}</span>
+    </div>
+    {% else %}
+    <div class="article-byline">
+      <span>{{ author_byline(article_authors, prefix="Yazan:") }} · {{ article.byline_title }}</span>
+      <span>{{ article.date }}</span>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if article.image %}
+  <div class="article-hero">
+    <img src="{{ url_for('static', filename='img/articles/' + article.image) }}" alt="{{ article.title }}">
+    {% if article.image_caption %}<p class="figcap" style="text-align:center; max-width:700px; margin:8px auto 0;">{{ article.image_caption }}</p>{% endif %}
+  </div>
+  {% endif %}
+
+  <div class="article-body">
+    {% for block in article.body %}
+      {% if block.type == 'p' %}
+        <p>{{ block.text }}</p>
+      {% elif block.type == 'h3' %}
+        <h3>{{ block.text }}</h3>
+      {% elif block.type == 'pullquote' %}
+        <div class="pullquote">
+          “{{ block.text }}”
+          {% if block.attribution %}<span class="pullquote-attr">— {{ block.attribution }}</span>{% endif %}
+        </div>
+      {% elif block.type == 'qa' %}
+        <div class="qa">
+          <p class="q">{{ block.q }}</p>
+          <p class="a">{{ block.a }}</p>
+        </div>
+      {% elif block.type == 'list' %}
+        <ul>
+          {% for item in block['items'] %}<li>{{ item }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    {% endfor %}
+
+    {% if article.section == 'gorus' %}
+    <div class="column-note">Bu, gazetemizin köşe yazarlarına ait bir görüş yazısıdır ve The Eurovillage Herald'ın kurumsal görüşünü yansıtmayabilir.</div>
+    {% endif %}
+  </div>
+
+  {% if article.gallery %}
+  <div class="article-gallery">
+    {% for img in article.gallery %}
+    <img src="{{ url_for('static', filename='img/articles/' + img) }}" alt="{{ article.title }}">
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if article.tags %}
+  <div class="article-tags">
+    {% for t in article.tags %}<a href="{{ url_for('search', q=t) }}">#{{ t }}</a>{% endfor %}
+  </div>
+  {% endif %}
+</article>
+
+{% if related %}
+<div class="related-block">
+  <h2 class="rail-title">{{ section_label(article.section) }} Bölümünden Diğer Haberler</h2>
+  <div class="secondary-grid">
+    {% for a in related %}
+    <article class="story-card {{ '' if a.image else 'story-card--noimg' }}">
+      {% if a.image %}
+      <a href="{{ url_for('article_page', slug=a.slug) }}">
+        <img src="{{ url_for('static', filename='img/articles/' + a.image) }}" alt="{{ a.title }}">
+      </a>
+      {% endif %}
+      <a href="{{ url_for('article_page', slug=a.slug) }}"><h3>{{ a.title }}</h3></a>
+      <div class="byline">{{ a.date }}</div>
+    </article>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

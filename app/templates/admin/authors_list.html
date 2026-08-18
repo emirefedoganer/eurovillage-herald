@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Yazarlar — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Yazarlar</h1>
+    <a class="btn btn-red" href="{{ url_for('admin.author_new') }}">+ Yeni Yazar</a>
+  </div>
+
+  <div class="admin-panel">
+    <table class="admin-table">
+      <thead>
+        <tr><th></th><th>Ad</th><th>E-posta</th><th>Editoryal Rol</th><th>Hesap Rolü</th><th>Durum</th><th>Makale</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% set a = row.author %}
+        {% set u = row.user %}
+        <tr>
+          <td>
+            {% if a.profile_image %}
+            <img src="{{ url_for('static', filename='img/authors/' + a.profile_image) }}" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover;">
+            {% else %}
+            <span style="display:inline-flex;width:34px;height:34px;border-radius:50%;background:var(--gray-200);align-items:center;justify-content:center;font-family:var(--font-headline);font-weight:700;">{{ a.display_name[0] }}</span>
+            {% endif %}
+          </td>
+          <td><a href="{{ url_for('author_profile', slug=a.slug) }}" target="_blank">{{ a.display_name }}</a>{% if a.is_opinion_columnist %} <span class="badge badge-secondary">Köşe Yazarı</span>{% endif %}</td>
+          <td>{{ u.email if u else '—' }}</td>
+          <td>{{ a.editorial_role or '—' }}</td>
+          <td>{{ 'Master Admin' if u and u.account_role == 'master_admin' else 'Yazar' }}</td>
+          <td>
+            {% if a.status == 'archived' %}<span class="badge badge-secondary">Arşiv</span>{% endif %}
+            {% if u and u.status == 'disabled' %}<span class="badge badge-breaking">Devre Dışı</span>{% elif u %}<span class="badge badge-lead">Aktif</span>{% endif %}
+            {% if u and u.must_change_password %}<span class="badge badge-secondary">Kurulum Bekliyor</span>{% endif %}
+          </td>
+          <td>{{ row.article_count }}</td>
+          <td class="admin-actions">
+            <a class="btn btn-outline" href="{{ url_for('admin.author_edit_master', aid=a.id) }}">Düzenle</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8">Henüz yazar yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

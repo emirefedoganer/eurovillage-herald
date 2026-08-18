@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}{{ author.display_name }} — Yazar Düzenle — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>{{ author.display_name }}</h1>
+    <div class="admin-actions">
+      <a class="btn btn-outline" href="{{ url_for('author_profile', slug=author.slug) }}" target="_blank">Herkese Açık Profili Gör</a>
+      <a class="btn btn-outline" href="{{ url_for('admin.authors_list') }}">← Listeye Dön</a>
+    </div>
+  </div>
+
+  <div class="admin-stat-grid" style="grid-template-columns: repeat(3,1fr);">
+    <div class="admin-stat-card"><span class="n">{{ article_count }}</span><span class="l">Yayımlanmış İçerik</span></div>
+    <div class="admin-stat-card"><span class="n">{{ 'Aktif' if linked_user and linked_user.status=='active' else 'Devre Dışı' }}</span><span class="l">Hesap Durumu</span></div>
+    <div class="admin-stat-card"><span class="n">{{ 'Arşiv' if author.status=='archived' else 'Aktif' }}</span><span class="l">Profil Durumu</span></div>
+  </div>
+
+  <form class="admin-panel" method="post" enctype="multipart/form-data">
+    <h2 style="font-family: var(--font-headline); margin-top:0;">Editoryal Profil</h2>
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="display_name">Görünen Ad</label>
+        <input type="text" id="display_name" name="display_name" required value="{{ author.display_name }}">
+      </div>
+      <div class="form-row">
+        <label for="slug">Profil Adresi (slug)</label>
+        <input type="text" id="slug" name="slug" value="{{ author.slug }}">
+        <div class="hint">/profil/{{ author.slug }} — değiştirilirse eski adres otomatik yönlendirilir.</div>
+      </div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="editorial_role">Editoryal Unvan</label>
+        <input type="text" id="editorial_role" name="editorial_role" list="editorial-role-options" value="{{ author.editorial_role or '' }}">
+        <datalist id="editorial-role-options">
+          {% for r in editorial_roles %}<option value="{{ r }}">{% endfor %}
+        </datalist>
+      </div>
+      <div class="form-row">
+        <label for="join_date">Katılım Tarihi</label>
+        <input type="date" id="join_date" name="join_date" value="{{ author.join_date or '' }}">
+      </div>
+    </div>
+    <div class="checkbox-row" style="margin-bottom:16px;">
+      <input type="checkbox" id="is_opinion_columnist" name="is_opinion_columnist" {{ 'checked' if author.is_opinion_columnist else '' }}>
+      <label for="is_opinion_columnist" style="margin:0;">Opinion Columnist (Köşe Yazarı) olarak işaretle</label>
+    </div>
+
+    <div class="form-row">
+      <label for="short_bio">Kısa Biyografi</label>
+      <textarea id="short_bio" name="short_bio" rows="2" maxlength="280">{{ author.short_bio or '' }}</textarea>
+    </div>
+    <div class="form-row">
+      <label for="full_bio">Tam Biyografi</label>
+      <textarea id="full_bio" name="full_bio" rows="6">{{ author.full_bio or '' }}</textarea>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="twitter_handle">X / Twitter Kullanıcı Adı</label>
+        <input type="text" id="twitter_handle" name="twitter_handle" value="{{ author.twitter_handle or '' }}">
+      </div>
+      <div class="form-row">
+        <label for="minecraft_username">Minecraft Kullanıcı Adı</label>
+        <input type="text" id="minecraft_username" name="minecraft_username" value="{{ author.minecraft_username or '' }}">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="contact_email">Halka Açık İletişim E-postası</label>
+      <input type="email" id="contact_email" name="contact_email" value="{{ author.contact_email or '' }}" placeholder="ör. emir@eurovillageherald.com">
+      <div class="hint">Profil sayfasında görünür; okurlar buraya doğrudan e-posta gönderebilir. Hesabın giriş e-postasından ayrıdır.</div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label>Profil Fotoğrafı</label>
+        {% if author.profile_image %}
+        <div class="current-image">
+          <img src="{{ url_for('static', filename='img/authors/' + author.profile_image) }}" alt="">
+          <label style="font-weight:400;"><input type="checkbox" name="remove_profile_image" value="1" style="width:auto;"> Kaldır</label>
+        </div>
+        {% endif %}
+        <input type="file" name="profile_image" accept="image/*">
+      </div>
+      <div class="form-row">
+        <label>Kapak Görseli</label>
+        {% if author.cover_image %}
+        <div class="current-image">
+          <img src="{{ url_for('static', filename='img/authors/' + author.cover_image) }}" alt="">
+          <label style="font-weight:400;"><input type="checkbox" name="remove_cover_image" value="1" style="width:auto;"> Kaldır</label>
+        </div>
+        {% endif %}
+        <input type="file" name="cover_image" accept="image/*">
+      </div>
+    </div>
+
+    {% if linked_user %}
+    <h2 style="font-family: var(--font-headline);">Hesap</h2>
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="email">E-posta</label>
+        <input type="email" id="email" name="email" value="{{ linked_user.email }}">
+      </div>
+      <div class="form-row">
+        <label for="account_role">Hesap Rolü</label>
+        <select id="account_role" name="account_role">
+          <option value="author" {{ 'selected' if linked_user.account_role=='author' else '' }}>Yazar</option>
+          <option value="master_admin" {{ 'selected' if linked_user.account_role=='master_admin' else '' }}>Master Admin</option>
+        </select>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="form-actions">
+      <button class="btn btn-red" type="submit">Kaydet</button>
+    </div>
+  </form>
+
+  {% if linked_user %}
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); margin-top:0;">Hesap İşlemleri</h2>
+    <div class="admin-actions" style="flex-wrap: wrap;">
+      <form method="post" action="{{ url_for('admin.author_reset_password', aid=author.id) }}" onsubmit="return confirm('Yeni bir geçici şifre oluşturulacak. Devam edilsin mi?');">
+        <button class="btn btn-outline" type="submit">Şifreyi Sıfırla</button>
+      </form>
+      {% if linked_user.status == 'active' %}
+      <form method="post" action="{{ url_for('admin.author_set_account_status', aid=author.id) }}" onsubmit="return confirm('Bu hesabı devre dışı bırakmak istediğinize emin misiniz?');">
+        <input type="hidden" name="status" value="disabled">
+        <button class="btn btn-danger" type="submit">Hesabı Devre Dışı Bırak</button>
+      </form>
+      {% else %}
+      <form method="post" action="{{ url_for('admin.author_set_account_status', aid=author.id) }}">
+        <input type="hidden" name="status" value="active">
+        <button class="btn btn-outline" type="submit">Hesabı Yeniden Etkinleştir</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); margin-top:0;">Yazar Profili İşlemleri</h2>
+    <div class="admin-actions" style="flex-wrap: wrap;">
+      <form method="post" action="{{ url_for('admin.author_toggle_archive', aid=author.id) }}">
+        <button class="btn btn-outline" type="submit">{{ 'Arşivden Çıkar' if author.status == 'archived' else 'Arşivle' }}</button>
+      </form>
+      {% if article_count == 0 %}
+      <form method="post" action="{{ url_for('admin.author_delete', aid=author.id) }}" onsubmit="return confirm('Bu yazarı kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.');">
+        <button class="btn btn-danger" type="submit">Yazarı Kalıcı Olarak Sil</button>
+      </form>
+      {% else %}
+      <span class="hint">{{ article_count }} makaleye bağlı olduğu için silinemez — önce Arşivle'yi kullanın.</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}

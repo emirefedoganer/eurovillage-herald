@@ -1,0 +1,938 @@
+[
+  {
+    "slug": "obgis-hep-baskan-baskan-hep-obgis",
+    "section": "politika",
+    "kicker": "DARBEYE RAĞMEN DEMOKRASİ KAZANDI",
+    "title": "Obgis Hep Başkan, Başkan Hep Obgis!",
+    "dek": "17 Temmuz'da başlayan ve 22 Temmuz'da sona eren Eurovillage Büyükşehir Belediyesi seçimlerini, kullanılan geçerli oyların yüzde 48,2'sini alan Obgis kazandı. Seçim zaferiyle birlikte Obgis, Eurovillage yönetimindeki üçüncü dönemine girerken; oylamanın ardından yaşanan vandalizm ve darbe girişimi, seçim sürecini kent tarihinin en kritik demokratik sınavlarından birine dönüştürdü.",
+    "author": "Emir the Composer",
+    "byline_title": "Muhabir",
+    "date": "2026-08-08",
+    "featured": "lead",
+    "breaking": false,
+    "image": "obgis-baskan-konusma.jpg",
+    "image_caption": "Seçilmiş Başkan Obgis, kesin sonuçların açıklanmasının ardından belediye binasının balkonundan halka seslendi.",
+    "tags": [
+      "seçim",
+      "obgis",
+      "belediye"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "EUROVILLAGE — Eurovillage halkı, günler süren gerilimli seçim sürecinin ardından tercihini bir kez daha Obgis'ten yana kullandı. Sandıkların 17 Temmuz'da açılmasıyla başlayan oy verme işlemleri, 22 Temmuz gecesi tamamlandı. Resmî sonuçlara göre OBGİS, toplam 14 oy ve yüzde 48,2 oy oranıyla Eurovillage Büyükşehir Belediye Başkanlığına yeniden seçildi."
+      },
+      {
+        "type": "p",
+        "text": "Seçimin ikinci sırasında yüzde 37,9 ile BARA_VAELP, üçüncü sırasında ise yüzde 13,7 ile HULYAVON yer aldı. Böylece Obgis, belediye yönetimindeki siyasi üstünlüğünü koruyarak üçüncü dönem için halktan yetki aldı."
+      },
+      {
+        "type": "p",
+        "text": "Sonuç yalnızca bir belediye başkanlığı seçiminin galibini belirlemedi. Eurovillage seçmeni, seçimlerden hemen sonra kentte yaşanan olağanüstü gelişmeler karşısında sandığın ve demokratik meşruiyetin yanında durduğunu da açık biçimde gösterdi."
+      },
+      {
+        "type": "h3",
+        "text": "Rest of the City'de Zafer Hulyavon'un"
+      },
+      {
+        "type": "p",
+        "text": "Seçimlerin Rest of the City (ROTC) ayağında kazanan Hulyavon oldu. Toplam 29 oy kullanılan oylamada HulyAvon, 13 oy ve yüzde 44,8 oy oranıyla sandıktan birinci çıktı. Obgis, kullanılan oyların yüzde 34,5'ini alarak 10 oyla ikinci sırada yer aldı. Üçüncü aday bara_vaelp ise 6 oy ve yüzde 20,7 oy oranıyla seçimi üçüncü sırada tamamladı."
+      },
+      {
+        "type": "p",
+        "text": "Bu sonuçlarla birlikte HulyAvon, Rest of the City oylamasını kazanmasının yanı sıra genel oylama hesabına 1 ilave oy yazdırmış oldu. ROTC seçmeninin tercihi, HulyAvon'un kent dışındaki seçmenler arasında en güçlü aday olduğunu ortaya koydu. Hulyavon oyların yarısına ulaşamasa da en yakın rakibi Obgis'e 3 oy fark atarak ROTC yarışını açık biçimde önde tamamladı."
+      },
+      {
+        "type": "h3",
+        "text": "Obgis: Halk Yönetimime Devam Dedi"
+      },
+      {
+        "type": "p",
+        "text": "Başkanlığına yeniden seçilen Obgis, kesin sonuçların açıklanmasının ardından belediye binasının balkonundan halka seslendi. Kentte yaşanan darbe girişimlerine, vandalizm eylemlerine, siyasi iftiralara ve önceki yönetimden devralınan ağır mali tabloya dikkat çeken Obgis, seçim sonucunu iki yıllık belediye yönetimine verilen güvenoyu olarak değerlendirdi."
+      },
+      {
+        "type": "p",
+        "text": "Konuşmasına kendisini destekleyen seçmenlere teşekkür ederek başlayan seçilmiş başkan, Eurovillage'ın son iki yılda yalnızca belediye hizmetleri açısından değil, demokratik düzen bakımından da ağır sınavlardan geçtiğini söyledi."
+      },
+      {
+        "type": "pullquote",
+        "text": "Üç darbe girişimi, sayısız iftiralar ve vandalizm yaşadık. Bütçemizin üç katı kadar borçla devraldık. Bırakın metroyu, asfalt yollarımız dahi yoktu. Halk iki sene nasıl yönettiğimizi gördü ve bir sene daha dedi.",
+        "attribution": "Obgis, Eurovillage Büyükşehir Belediye Başkanı"
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "slug": "demokrasinin-kara-gunu-darbe-girisimi",
+    "section": "politika",
+    "kicker": "VANDALİZMDEN İKTİDAR TEŞEBBÜSÜNE",
+    "title": "Demokrasinin Kara Günü",
+    "dek": "Seçimlerin tamamlanmasından bir gün sonra vandalizm eylemi gerçekleştiren Akbadain Dükü, 25 Temmuz'da halkın sandıkta ortaya koyduğu sonucu tanımayarak kendisini belediye başkanı ilan etmeye kalktı.",
+    "author": "Emir the Composer",
+    "byline_title": "Muhabir",
+    "date": "2026-08-08",
+    "featured": "secondary",
+    "breaking": true,
+    "image": null,
+    "image_caption": null,
+    "tags": [
+      "darbe",
+      "akbadain",
+      "seçim"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "EUROVILLAGE — Eurovillage Büyükşehir Belediyesi seçimlerinin ardından kentte demokratik bir devir teslim ve yeni yönetim döneminin başlaması beklenirken, Akbadain Dükü'nün art arda gerçekleştirdiği eylemler şehri tarihinin en ağır siyasi krizlerinden biriyle karşı karşıya bıraktı. Seçim sürecinin tamamlanmasından yalnızca bir gün sonra vandalizm eylemine girişen Dük, iki gün sonra ise seçilmiş belediye yönetimini ortadan kaldırmaya ve kent idaresini zorla ele geçirmeye teşebbüs etti."
+      },
+      {
+        "type": "p",
+        "text": "17 Temmuz'da başlayan Eurovillage Büyükşehir Belediyesi seçimlerinde oy verme işlemleri beş gün boyunca devam etti. Sandıklar 22 Temmuz'da kapandı ve kullanılan oyların sayımına geçildi. Seçimlerin sonucunda halkın tercihi bir kez daha Obgis'ten yana olurken, mevcut başkan üçüncü dönemi için demokratik yetki kazandı."
+      },
+      {
+        "type": "p",
+        "text": "Seçim sürecinin tamamlanmasıyla birlikte adayların ve destekçilerinin halkın kararına saygı göstermesi bekleniyordu. Ancak 23 Temmuz'da Akbadain Dükü tarafından gerçekleştirilen vandalizm eylemi, seçim sonrasındaki siyasi atmosferi kısa sürede değiştirdi. Kentin ortak değerlerini ve kamusal düzenini hedef alan eylem, yalnızca maddi zarar veren bir saldırı olarak değil, sandıktan çıkan sonuca yönelik ilk açık meydan okuma olarak değerlendirildi."
+      },
+      {
+        "type": "h3",
+        "text": "Vandalizmden İktidar Teşebbüsüne"
+      },
+      {
+        "type": "p",
+        "text": "23 Temmuz'daki eylemin ardından Akbadain Dükü'nün geri adım atması veya seçim sonucunu kabul etmesi beklenirken, yaşananlar bunun tam tersini gösterdi. Dük, 25 Temmuz'da herhangi bir demokratik yetkiye, halk desteğine veya hukuki karara dayanmaksızın kendisini aday bile olmadan Eurovillage Büyükşehir Belediye Başkanı ilan etmeye kalktı."
+      },
+      {
+        "type": "p",
+        "text": "Bu teşebbüs, seçimlerde yarışan adaylar arasındaki olağan bir siyasi anlaşmazlığın ötesine geçti. Akbadain Dükü, halkın oylarıyla belirlenen yönetimin yerine kişisel iradesini koyarak belediye idaresinin meşru kaynağını ortadan kaldırmak istedi. Seçilmiş başkanın yetkilerini gasbetmeye yönelik girişim, Eurovillage'daki demokratik düzeni doğrudan hedef aldı."
+      },
+      {
+        "type": "p",
+        "text": "Darbe girişimi sırasında ortaya konulan söylem, yalnızca mevcut belediye yönetimine değil, muhalefet hakkına ve ifade özgürlüğüne yönelik tehditler de içeriyordu. Dük'ün kendisine karşı çıkan herkesi düşman olarak gösteren yaklaşımı, kurulmak istenen yönetimin seçimlere, çoğulculuğa veya halkın rızasına dayanmayacağını açıkça ortaya koydu."
+      },
+      {
+        "type": "h3",
+        "text": "Saldırının Hedefi Bütün Halktı"
+      },
+      {
+        "type": "p",
+        "text": "Akbadain Dükü'nün girişimi ilk bakışta Obgis yönetimine karşı gerçekleştirilmiş gibi görünse de saldırının gerçek hedefi Eurovillage halkının tamamıydı. Çünkü darbe teşebbüsü yalnızca seçimi kazanan adayın yetkisini değil, seçimlerde kullanılan bütün oyların anlamını ortadan kaldırmayı amaçlıyordu."
+      },
+      {
+        "type": "p",
+        "text": "Obgis'e oy veren seçmenlerin iradesi doğrudan gasbedilmek istenirken, diğer adayları destekleyen yurttaşların oyları da aynı biçimde yok sayıldı. Sandık sonucunu tek taraflı olarak geçersiz ilan eden bir yönetimin, gelecekte yapılacak seçimleri veya muhalefetin haklarını koruması mümkün değildi."
+      },
+      {
+        "type": "p",
+        "text": "Demokratik sistem yalnızca çoğunluğun yönetme hakkından ibaret değildir. Seçimi kaybedenlerin güvenliğini, eleştiri hakkını ve gelecekte yeniden iktidar için yarışabilmesini de güvence altına alır. Bu nedenle halkın kararını zorla değiştirmeye yönelik her teşebbüs, seçimlerde hangi adaya oy verdiğine bakılmaksızın bütün yurttaşların siyasi haklarına yönelmiş bir saldırıdır."
+      },
+      {
+        "type": "h3",
+        "text": "\"Halkım İçin Yönetime El Koydum\""
+      },
+      {
+        "type": "p",
+        "text": "Akbadain Dükü, sonuçlar henüz resmen açıklanmadan kendisini Eurovillage Büyükşehir Belediye Başkanı ilan etti. Belediyenin \"Seçimlerde aday dahi değildi\" açıklamasına rağmen geri adım atmayan Dük, \"Halkım için yönetime el koydum\" sözleriyle teşebbüsünün niteliğini açıkça ortaya koydu."
+      },
+      {
+        "type": "p",
+        "text": "25 Temmuz'da yayımladığı mesajda, \"EUBB seçim sonuçlarına göre yeni başkanımız şahsım olmuştur\" ifadelerini kullanan Akbadain Dükü, bu iddiasını herhangi bir oy sayısına, sandık tutanağına veya resmî karara dayandırmadı. Demokratik sürecin dışında kalan kişisel bir açıklama, halkın oylarıyla belirlenen seçim sonucunun yerine konulmaya çalışıldı."
+      },
+      {
+        "type": "p",
+        "text": "Eurovillage Büyükşehir Belediyesi, kısa süre içerisinde kamuoyuna açıklama yaparak vatandaşları yayılan söylentilere karşı uyardı. Belediye, seçim sonuçlarının henüz resmî olarak açıklanmadığını belirtirken Akbadain Dükü'nün seçimlerde aday olarak gösterilmediğini ve dolayısıyla seçimi kazanmasının mümkün olmadığını açıkça bildirdi."
+      },
+      {
+        "type": "p",
+        "text": "Ancak Dük, belediyenin açıklamasının ardından geri adım atmadı. Kendisine yöneltilen \"Seçmen iradesini yok sayıyorsunuz\" eleştirilerine karşılık verdiği bir mesajda, \"Ben milletimizin istikbalini ve egemenliğini savunuyorum. Halkım için yönetime el koydum\" ifadelerini kullandı."
+      },
+      {
+        "type": "p",
+        "text": "Akbadain yanlısı bazı hesaplar da bu iddiayı yaymaya başladı. Dük'ü \"yeni başkan\" olarak kutlayan paylaşımlar yapılırken, Eurovillage'ın onun yönetimi altında yeni bir döneme gireceği ileri sürüldü. Böylece hiçbir resmî dayanağı bulunmayan başkanlık ilanının sosyal medya üzerinden gerçek bir seçim sonucuymuş gibi sunulmasına çalışıldı."
+      },
+      {
+        "type": "p",
+        "text": "Akbadain Dükü, 26 Temmuz'da yaptığı başka bir açıklamada ise \"Bütün oylara sahip çıkıyorum\" dedi. Kendisine seçimlerde verilmiş herhangi bir oy bulunmadığının hatırlatılması üzerine iddiasından vazgeçmedi; var olmayan oyların kendisine ait olduğunu savunmayı sürdürdü."
+      },
+      {
+        "type": "p",
+        "text": "Teşebbüs 25 Temmuz'daki ilanla da sınırlı kalmadı. Akbadain Dükü, 1 Ağustos'ta bu kez Trumpvari bir şekilde \"STOP THE COUNT!\" paylaşımı yaparak oy sayımının durdurulmasını istedi. Aynı gün kendisini yeniden \"seçilmiş EUBB Başkanı\" olarak tanımladı ve mazbatasını teslim alacağını duyurdu."
+      },
+      {
+        "type": "p",
+        "text": "Aday olmadığı bir seçimin galibi olduğunu ilan eden Dük, demokratik meşruiyetin kaynağı olarak sandığı değil kendi sözlerini göstermeye çalıştı. Ancak başkanlık iddiasından daha ağır olan, bu iddiaya karşı çıkacak kişilere nasıl davranılacağını açıklayan sözleriydi."
+      },
+      {
+        "type": "p",
+        "text": "Bu sözler, yapılmak istenenin yalnızca usulsüz bir makam ilanı olmadığını gösterdi. Akbadain, kendisine itiraz edenleri siyasi rakip veya muhalif olarak değil, susturulması ve cezalandırılması gereken kişiler olarak tanımlıyordu. Kendisine yöneltilen tepkiler üzerine de geri adım atmayan Dük, utanması gereken tarafın kendisi değil, karşısındakiler olduğunu savundu. Bir başka mesajında kullandığı \"Beni tanımak demek beni benimsemek demektir\" ifadesi ise farklı düşüncelerin meşruiyetini reddeden yaklaşımını daha da açık hâle getirdi."
+      },
+      {
+        "type": "p",
+        "text": "Akbadain'ın söylemi ilerleyen günlerde de değişmedi. Seçim sonucuna yönelik itirazlarını sürdürürken oy sayımının durdurulmasını istedi, kendisini yeniden \"seçilmiş başkan\" ilan etti ve iddiası kabul edilmediği takdirde yöneticilerin \"olacakların sonucuna katlanacağını\" söyledi. Yalnızca bir tehdit değil, kurmak istediği yönetimin en açık özeti olarak kayda geçti."
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "slug": "akbadaina-sanal-mesruiyet",
+    "section": "politika",
+    "kicker": "KENTTEN HABERLER",
+    "title": "Akbadain'a Sanal Meşruiyet!",
+    "dek": "Akbadain Dükü'nün aday olmadığı seçimde kendisini başkan ilan etmesinin ardından destekçi hesaplar, gerçek dışı zafer kutlamaları ve \"oylarımızı çalamazsınız\" paylaşımlarıyla başkanlık iddiasını meşrulaştırmaya çalıştı. Ayıp, ayıp!",
+    "author": "Emir the Composer",
+    "byline_title": "Muhabir",
+    "date": "2026-08-08",
+    "featured": null,
+    "breaking": false,
+    "image": "dukeofakbadain-tweet.png",
+    "image_caption": "Akbadain yanlısı bir destekçi hesap, Dük'ü \"EUBB'nin yeni başkanı\" ilan ederek kutladı. Belediye ise aynı gün söylentilere itibar edilmemesi çağrısı yaptı.",
+    "tags": [
+      "darbe",
+      "akbadain",
+      "sosyal medya"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "EUROVILLAGE — Akbadain Dükü'nün 25 Temmuz'da kendisini Eurovillage Büyükşehir Belediye Başkanı ilan etmesi, yalnızca kişisel bir açıklama olarak kalmadı. Seçimlerde aday olmadığı ve kendisine verilmiş geçerli bir oy bulunmadığı belediye tarafından açıklanmasına rağmen, Dük'ü destekleyen bazı hesaplar bu iddiayı gerçek bir seçim sonucuymuş gibi yaymaya başladı."
+      },
+      {
+        "type": "p",
+        "text": "Akbadain yanlısı paylaşımlarda Dük \"yeni başkan\" olarak kutlanırken, Eurovillage'ın onun yönetimiyle yeni bir döneme gireceği öne sürüldü. Böylece hiçbir sandık tutanağına, oy sayısına veya resmî karara dayanmayan başkanlık ilanı, sosyal medya üzerinden toplumsal kabul kazanmış gibi gösterilmeye çalışıldı."
+      },
+      {
+        "type": "h3",
+        "text": "İlk Kutlama Destekçi Hesaptan"
+      },
+      {
+        "type": "p",
+        "text": "Akbadain Dükü'nün ilanının ardından destekçi bir hesap, Dük'ü \"EUBB'nin yeni başkanı\" olarak kutladı. Paylaşımda Eurovillage'ın Akbadain yönetiminde \"muhteşem bir şehre dönüşeceği\" iddia edilirken, Dük de bu mesajı yeniden yayımlayarak destek verdi."
+      },
+      {
+        "type": "p",
+        "text": "Ancak aynı saatlerde Eurovillage Büyükşehir Belediyesi, kamuoyunu söylentilere karşı uyarmış ve Akbadain Dükü'nün seçimlerde aday olmadığını açıkça duyurmuştu. Belediye, aday olmayan bir kişinin seçimi kazanmasının mümkün olmadığını belirtmesine rağmen destekçiler, resmî açıklamayı dikkate almadan kutlamalarını sürdürdü."
+      },
+      {
+        "type": "p",
+        "text": "Akbadain yanlısı hesaplar, belediyenin resmî yalanlamasına rağmen Dük'ün başkanlık iddiasını yaymayı sürdürdü."
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "slug": "manifestin-ilk-ev-sahibi",
+    "section": "sehir",
+    "kicker": "KENTTEN HABERLER",
+    "title": "Manifest'in İlk Ev Sahibi Oldu",
+    "dek": "Eurovillage'ın 30. vatandaşı Emirthecomposer oldu. Yeni kurulan Manifest Mahallesi'nin ilk sakini, İspanyol mimarisinden esinlenen villasıyla mahallenin gelecekteki mimari kimliğine öncülük edecek.",
+    "author": "Emir the Composer",
+    "byline_title": "Muhabir",
+    "date": "2026-08-08",
+    "featured": "secondary",
+    "breaking": false,
+    "image": "manifest-villa.jpg",
+    "image_caption": "Manifest Mahallesi'nin ilk konutu, İspanyol mimarisinden esinlenen kiremit çatısı ve geniş avlusuyla dikkat çekiyor.",
+    "tags": [
+      "manifest mahallesi",
+      "konut",
+      "belediye"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "EUROVILLAGE — Eurovillage nüfusuna katılan 30. vatandaş Emir the Composer, aynı zamanda yeni kurulan Manifest Mahallesi'nin ilk sakini olarak kayıtlara geçti. Belediye Başkanı Obgis, yeni vatandaşını tebrik ederek Eurovillage'a hoş geldin mesajı yayımladı."
+      },
+      {
+        "type": "p",
+        "text": "Emir the Composer, mahallede İspanyol mimarisinden esinlenen bir villa inşa etti. Kiremit çatısı, geniş avlusu ve Akdeniz üslubundaki ayrıntılarıyla tasarlanan yapının, Manifest Mahallesi'nin ilk konutu olması nedeniyle bölgenin gelecekteki mimari kimliğine de öncülük etmesi bekleniyor."
+      },
+      {
+        "type": "p",
+        "text": "İnşaat çalışmalarının tamamlanmasıyla birlikte Emir the Composer, villasının kapılarını bütün Eurovillage halkına açacağını duyurdu. Yeni ev sahibi, mahalle sakinlerini ve kent halkını düzenleyeceği açılış davetinde misafir etmek istediğini belirtti."
+      },
+      {
+        "type": "p",
+        "text": "Manifest Mahallesi'nin ilk yerleşimiyle birlikte Eurovillage'ın büyüme sürecinde yeni bir dönem başlarken, belediyenin bölgede metro, yol, çevre düzenlemesi ve diğer temel hizmetlere yönelik çalışmalar yürütmesi bekleniyor."
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "slug": "demokrasi-tek-sesli-bir-mars-degildir",
+    "section": "gorus",
+    "kicker": "KÖŞE YAZISI",
+    "title": "Demokrasi Tek Sesli Bir Marş Değildir",
+    "dek": "Bir besteci için sessizlik de ses kadar önemlidir. Demokrasi de böyledir: Herkesin aynı şeyi söylediği tek sesli bir marş değil, farklı görüşlerin korkmadan var olabildiği ortak bir hayat biçimidir.",
+    "author": "Emir the Composer",
+    "byline_title": "Köşe Yazarı",
+    "date": "2026-08-08",
+    "featured": null,
+    "breaking": false,
+    "image": null,
+    "image_caption": null,
+    "tags": [
+      "görüş",
+      "demokrasi",
+      "köşe yazısı"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "Bir besteci için sessizlik de ses kadar önemlidir. Müzik, aynı notanın durmadan tekrarlanmasından değil; farklı seslerin birbirini dinlemesinden, kimi zaman çatışmasından ve sonunda ortak bir anlam kurmasından doğar. Demokrasi de böyledir: Herkesin aynı şeyi söylediği tek sesli bir marş değil, farklı görüşlerin korkmadan var olabildiği ortak bir hayat biçimidir."
+      },
+      {
+        "type": "p",
+        "text": "Eurovillage halkı sandığa gitti. Adaylar yarıştı, yurttaşlar tercihlerini yaptı ve yönetme yetkisini Obgis'e bir yıl daha verdi. Bu sonucu herkes beğenmek veya kazananı desteklemek zorunda değildir. Fakat sandığın hükmüne saygı göstermek zorundadır. Çünkü bugün istemediğimiz bir sonucun korunması, yarın kendi tercihimizin de korunacağının güvencesidir. Akbadain Dükü ise seçimlerde aday dahi olmadığı hâlde kendisini belediye başkanı ilan etti. Ardından, \"Bana karşı çıkan her ses bastırılacak, bana kalkan her el kırılacaktır\" dedi. Bu bir seçim itirazı veya demokratik muhalefet değildir. Bu, halk adına konuşarak halkın söz hakkını elinden alma teşebbüsüdür. Bu bir tehdittir. Bu tehdidin hedefi yalnızca Obgis değildir. HulyAvon'a, bara_vaelp'e veya başka bir tercihe yönelenler; gazeteciler, eleştirmenler ve sıradan yurttaşlar da bu tehdidin kapsamındadır. Otoriterlik önce güçlü rakibini, sonra eleştirenleri, en sonunda da sessiz kalanları susturur."
+      },
+      {
+        "type": "p",
+        "text": "Obgis'in yeniden seçilmesi onu eleştiriden muaf kılmaz. Verilen sözleri izlemek, belediyeyi sorgulamak ve gerektiğinde itiraz etmek demokratik sorumluluğumuzdur. Ancak eleştiri ile darbe arasında kesin bir sınır vardır: Eleştiri iktidarı denetler; darbe halkın denetim hakkını ortadan kaldırır."
+      },
+      {
+        "type": "p",
+        "text": "Eurovillage hiç kimsenin kişisel mülkü değildir. Belediye makamı bir unvanın, soyun veya yüksek sesle tekrarlanan bir iddianın ödülü değil; halkın belirli bir süre için verdiği emanettir."
+      },
+      {
+        "type": "p",
+        "text": "Demokrasi dünyanın en narin çiçeğidir. Onu yaşatan uzlaşı ve hoşgörüdür. Fakat onu korumak bazen zorbalığa zorbalık demeyi, hakikati yazmayı ve sandığın yanında tereddütsüz durmayı gerektirir."
+      },
+      {
+        "type": "p",
+        "text": "Çünkü demokrasi sustuğunda geriye yalnızca emirler kalır:"
+      },
+      {
+        "type": "pullquote",
+        "text": "DEMOCRACY DIES IN DARKNESS.",
+        "attribution": null
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "slug": "buyuksehirden-yeni-donem-yeni-slogan",
+    "section": "sehir",
+    "kicker": "İLETİŞİM",
+    "title": "Büyükşehir'den Yeni Dönem, Yeni Slogan",
+    "dek": "Eurovillage Büyükşehir Belediyesi, iki dönemdir sürdürdüğü iletişim kampanyalarında yeni bir sayfa açtı. \"Tam Yol İleri\" ve \"Eurovillage Başardı!\" kampanyalarının ardından belediye, üçüncü yılına \"Eurovillage Seni Seviyor\" sloganıyla giriyor.",
+    "author": "Emir the Composer",
+    "byline_title": "Muhabir",
+    "date": "2026-08-08",
+    "featured": "secondary",
+    "breaking": false,
+    "image": "kampanya-kirmizi.jpg",
+    "image_caption": "Yeni kampanyanın görsel kimliği, Eurovision'ın \"Celebrating Diversity\" anlayışından esinlenen dört farklı renk üzerine kuruldu.",
+    "gallery": [
+      "kampanya-kirmizi.jpg",
+      "kampanya-mavi.jpg",
+      "kampanya-turkuaz.png",
+      "kampanya-sari.jpg"
+    ],
+    "tags": [
+      "belediye",
+      "kampanya",
+      "iletişim"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "EUROVILLAGE — Eurovillage Büyükşehir Belediyesi, iki dönemdir sürdürdüğü iletişim kampanyalarında yeni bir sayfa açtı. İlk dönem kullanılan \"Tam Yol İleri\" ve ikinci döneme damgasını vuran \"Eurovillage Başardı!\" kampanyalarının ardından belediye, üçüncü yılına \"Eurovillage Seni Seviyor\" sloganıyla giriyor."
+      },
+      {
+        "type": "p",
+        "text": "Yeni kampanya, belediyenin bugüne kadar öne çıkardığı hizmet ve başarı anlatısından farklı olarak doğrudan Eurovillage halkını merkeze alıyor. Seçimlerin, siyasi gerilimlerin ve kentte yaşanan olağanüstü gelişmelerin ardından hazırlanan yeni iletişim anlayışı; birliktelik, aidiyet ve sevgi kavramları üzerine kuruluyor."
+      },
+      {
+        "type": "h3",
+        "text": "Başarıdan Sevgiye"
+      },
+      {
+        "type": "p",
+        "text": "İkinci dönemin \"Eurovillage Başardı!\" kampanyası, Büyükşehir Belediyesi tarafından tamamlanan projeleri ve kentte yaşanan dönüşümü görünür kılmayı amaçlıyordu. Yeni dönemde ise belediye, yapılanlardan çok bunların kimin için yapıldığına dikkat çekiyor."
+      },
+      {
+        "type": "p",
+        "text": "Bu anlayışın ürünü olan \"Eurovillage Seni Seviyor\", yalnızca yeni bir slogan olarak değil, üçüncü dönemin iletişim dilinin temelini oluşturacak yeni bir yaklaşım olarak tasarlandı."
+      },
+      {
+        "type": "p",
+        "text": "Kampanyanın hazırlık sürecinde \"Eurovillage'ın Kalbinde Sen Varsın\" ve \"United by Eurovillage\" gibi farklı sloganların da değerlendirildiği öğrenildi. Lansmanda kullanılan \"Eurovillage'da Biz\" ifadesi ise \"Eurovillage Seni Seviyor\" ile birlikte yeni dönemin ikinci önemli mesajı olarak öne çıktı."
+      },
+      {
+        "type": "h3",
+        "text": "Dört Renk, Tek Eurovillage"
+      },
+      {
+        "type": "p",
+        "text": "Kampanyanın görsel kimliği de önceki dönemlerden belirgin biçimde ayrılıyor. Tek bir renk ve tasarım anlayışı yerine dört farklı renk üzerinden hazırlanan tasarımlar, Eurovillage'ın farklı kesimlerini aynı kampanya çatısı altında buluşturuyor."
+      },
+      {
+        "type": "p",
+        "text": "Eurovision'ın \"Celebrating Diversity\" anlayışından esinlenen görsel kimlik, farklılıkları ortadan kaldırmak yerine onları görünür kılmayı ve kutlamayı amaçlıyor. Minimalist tasarım diliyle hazırlanan yeni kimlikte vatandaş, kampanyanın yalnızca izleyicisi değil, doğrudan öznesi hâline geliyor."
+      },
+      {
+        "type": "h3",
+        "text": "Sadece Billboardlarda Kalmayacak"
+      },
+      {
+        "type": "p",
+        "text": "Büyükşehir Belediyesi, \"Eurovillage Seni Seviyor\" kampanyasını yalnızca afişler ve billboardlardan oluşan geleneksel bir tanıtım çalışması olarak konumlandırmıyor. Kampanyanın önümüzdeki aylarda belediyenin farklı çalışmalarına yayılarak vatandaşların doğrudan dâhil olacağı daha geniş bir yapıya dönüşmesi planlanıyor."
+      },
+      {
+        "type": "p",
+        "text": "Yeni iletişim döneminin yaklaşan milletvekili seçimlerine de yansıması beklenirken, kampanya aynı zamanda Büyükşehir Belediyesinin üçüncü yıl vizyonunun ilk işaretlerini taşıyor."
+      },
+      {
+        "type": "p",
+        "text": "Yeni mahallelerden raylı sistem yatırımlarına, Avrupa yakasındaki büyüme hedeflerinden EUROMER ile geliştirilecek ilişkilere kadar pek çok başlığın gündemde olduğu yeni dönemde belediyenin vermek istediği mesaj ise oldukça açık: Eurovillage artık yalnızca başardıklarını anlatmıyor. Eurovillage, vatandaşına onu sevdiğini söylüyor."
+      },
+      {
+        "type": "h3",
+        "text": "Obgis ile Yeni Dönemi Konuştuk"
+      },
+      {
+        "type": "p",
+        "text": "Eurovillage Büyükşehir Belediye Başkanı Obgis, yeni kampanyanın yalnızca bir slogan değişikliğinden ibaret olmadığını, üçüncü yılın yeni iletişim ve yönetim anlayışını temsil ettiğini söyledi."
+      },
+      {
+        "type": "p",
+        "text": "Seçim sürecinin beklenenden daha sert geçtiğini belirten Obgis, yeni dönemde belediyenin birleştirici ve vatandaş merkezli bir dil benimseyeceğini vurguladı. \"Eurovillage Başardı!\" kampanyasının hizmetleri anlatmakta önemli bir rol oynadığını ifade eden Başkan, yeni dönemde ise yapılanlardan çok insanın ve aidiyet duygusunun öne çıkarılacağını söyledi."
+      },
+      {
+        "type": "p",
+        "text": "Seçim sonuçlarını da değerlendiren Obgis, yarışın son ana kadar oldukça yakın geçtiğini kabul ederken halkın sonunda mevcut yönetime devam mesajı verdiğini belirtti. Darbe girişimine ilişkin ise belediyenin siyasi tartışmalardan çok hizmet ve projelere odaklanacağını, benzer girişimlere karşı caydırıcı adımların gündemde olduğunu ifade etti."
+      },
+      {
+        "type": "p",
+        "text": "Yeni dönemde Eurovillage'ın büyüme yönünün Avrupa yakasına çevrileceğini açıklayan Başkan; üç yeni mahalle, yüzde 33'lük nüfus kapasitesi artışı ve M8, M10 ile F4 raylı sistem hatlarını öncelikli projeler arasında gösterdi."
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "slug": "obgis-ile-roportaj",
+    "section": "roportaj",
+    "kicker": "RÖPORTAJ",
+    "title": "Obgis ile Röportaj: \"Pes Etmek Aklımın Ucundan Bile Geçmedi\"",
+    "dek": "Seçim, darbe girişimi, siyasi krizler ve şimdi yepyeni bir dönem... Bütün bunların ortasındaki isimle, Eurovillage Büyükşehir Belediye Başkanı Obgis ile konuştuk.",
+    "author": "Emir the Composer",
+    "byline_title": "Röportaj",
+    "date": "2026-08-08",
+    "featured": "secondary",
+    "breaking": false,
+    "image": null,
+    "image_caption": null,
+    "tags": [
+      "röportaj",
+      "obgis",
+      "belediye"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "Eurovillage son aylarda hiç olmadığı kadar hareketli. Bir yandan \"Eurovillage Başardı!\" dönemi kapanıyor, diğer yandan belediye \"Eurovillage Seni Seviyor\" diyerek bambaşka bir iletişim anlayışına geçiyor."
+      },
+      {
+        "type": "p",
+        "text": "Bütün bunların ortasındaki isimle, Eurovillage Büyükşehir Belediye Başkanı Obgis ile konuştum. Yeni kampanyanın nasıl doğduğunu, son seçimde yaşananları, Duke of Akbadain'ın darbe girişimini, belediyenin yeni dönem vizyonunu ve Eurovillage'ı bundan sonra nelerin beklediğini sordum. İşte Obgis ile röportajımız..."
+      },
+      {
+        "type": "qa",
+        "q": "\"Eurovillage Başardı!\" kampanyasını bitirme kararını ne zaman aldınız? \"Eurovillage Seni Seviyor\" kampanyası üzerine ne zamandan beri çalışıyorsunuz? Nasıl aşamalardan geçildi?",
+        "a": "Birinci dönem kampanyamız \"Tam Yol İleri\" idi. İkinci dönem kampanyamız \"Eurovillage Başardı\" oldu ve şimdi 3. yılımız için özenle hazırlanmış bir kampanyaya geçiyoruz. Bitirmek demekten ziyade bir gelenek diyebiliriz. Bu kampanya aslında 1 haftada hazırlanmış gibi görünse de aslında daha önceden düşünülüyordu. Minimalizm akımıyla beraber daha da pekişti ve güncel trendlere uygun hale getirildi. Şimdi ise her kesimi kucaklayan bir hale geldi."
+      },
+      {
+        "type": "qa",
+        "q": "Darbe gecesi, seçim gecesi, siyasi krizler… Bunlar sadece son zamanlarda yaşanan önemli olaylar. Hiç pes etmeyi düşündünüz mü? Acaba bıraksam dediğiniz oldu mu?",
+        "a": "Elbette zor zamanlardan geçeceğiz ancak pes etmek aklımın ucundan bile geçmedi. Halihazırda başkan vekilime çok güveniyorum ve fiili olarak olamasam bile Eurovillage hak ettiği gibi yönetilmeye devam ediyor."
+      },
+      {
+        "type": "qa",
+        "q": "\"Eurovillage Başardı!\" başarıyı anlatıyordu. \"Eurovillage Seni Seviyor\" ise bir duygu ifade ediyor. Bu değişimin arkasındaki düşünce neydi?",
+        "a": "Zor bir seçim zamanından geçtik. Beklediğimizden daha çok olaylar yaşandı diyebiliriz. Biz de sevginin birleştirici gücünü benimsemeye karar verdik. Bizim derdimiz hizmet değil insan. Zaten gerisi her şekilde hallolur."
+      },
+      {
+        "type": "qa",
+        "q": "Yeni kampanyanın merkezinde hizmet değil, vatandaş var. Belediye iletişiminde bu bakış açısı sizce ne kadar ve neden önemli?",
+        "a": "İletişimimizde bazen zayıflıklar oldu. Seçimler biraz sert geçti ve sevgiyi en çok hatırlamamız gereken zamanlardayız. Eurovillage'da asla kutuplaşmaya ve ayrıştırmaya yer vermedik. \"Eurovillage Başardı\" zaten hizmetlerimizi çok güzel bir şekilde betimliyorken insanımızı göz ardı edemezdik."
+      },
+      {
+        "type": "qa",
+        "q": "Bu kampanya yalnızca bir slogan değişikliği mi, yoksa belediyenin yeni dönem vizyonunun ilk adımı mı?",
+        "a": "Yeni dönemimizin yeni vizyonu verilen vaatlerin çok ötesinde. Ziferblat ve Gordienko gibi daha muhalif bölgelere hizmetlerimizi götürmeye devam ettik ve arttırarak devam ettireceğiz. EUROMER kanallarıyla da ilişkimizi güçlendireceğiz."
+      },
+      {
+        "type": "qa",
+        "q": "Başka sloganlar da değerlendirildi mi?",
+        "a": "Elbette. \"Eurovillage'ın kalbinde sen varsın\" ya da \"United by Eurovillage\" gibi sloganlar da düşünüldü. Eğer tanıtım lansmanımızı izlediyseniz orada \"Eurovillage'da Biz\" sloganını göreceksiniz. Yani aynı hamlede 2 slogan seçildi diyebiliriz."
+      },
+      {
+        "type": "qa",
+        "q": "Lansmanda birbirinden farklı renkler ve tasarım anlayışları kullanıldı. Bu çeşitlilikle vatandaşlara nasıl bir mesaj vermek istediniz?",
+        "a": "Eurovision'un en temel mottosu olan \"Celebrating diversity\"den yola çıkarak 4 farklı rengi sunduk. Tüm kesimleri kapsarken çeşitliliği kutlamayı ve yenisini üretmeyi hedefledik."
+      },
+      {
+        "type": "qa",
+        "q": "Vatandaşlar önümüzdeki aylarda bu kampanyayı nerelerde görecek? Bizi nasıl bir dönem bekliyor?",
+        "a": "Bu kampanya billboardlardaki sıradan bir görsel olmaktan çıkacak ve gerçek bir ruha dönüşecek. İster istemez herkesin dahil olacağı bir sistem kuruyoruz. Milletvekili seçimlerine de yeni bir soluk getireceğine inanıyoruz."
+      },
+      {
+        "type": "qa",
+        "q": "Duke of Akbadain'ın yapmaya çalıştığı darbe girişimi sizce ne ifade ediyor? Kendisiyle ilgili nasıl adımlar atılacak?",
+        "a": "Biz dedikodu değil hizmet derdindeyiz. Laf değil proje yarıştırma derdindeyiz. Maalesef bu tarz sahte girişimler pek bir değişim sağlamadı. Caydırıcı cezalar düşünülüyor."
+      },
+      {
+        "type": "qa",
+        "q": "Seçim sonuçlarını nasıl değerlendiriyorsunuz?",
+        "a": "Açıkçası seçim sonuçlarını ben de bu şekilde beklemiyordum ama EPA tarafından düzenlenen seçimde %100 sandık güvenliğiyle adeta demokrasi şöleni yapıldı. Floptropicalılar ve anlık öfkeyle diğer adayları tercih edenler oldukça fazlaydı. Oy kullanan herkese teşekkür ederim. Ayrıca reklam bütçemiz azalmıştı ve vaatlerim kalmıştı ama yine de herkes memnun."
+      },
+      {
+        "type": "qa",
+        "q": "Rakiplerinize son anda fark attınız. Eğer son atağınız olmasa kazanamayacaktınız? Bu konuda ne düşünüyorsunuz? Sizce de bu bir güvensizlik oyu değil midir?",
+        "a": "Son 5-6 kişi oy kullanana kadar 1. değildim. En yüksek berabere olmuştum. Rakibimin seçmen desteği ve vaatleri çok güçlüydü. ROTC oylamasını da diğer rakibim hakkıyla kazandı. Ancak biz sonuçlara bakıyoruz. Halk yönetime devam dedi ve biz de devam edeceğiz."
+      },
+      {
+        "type": "qa",
+        "q": "Nasılsınız? Son zamanlarda neler yapıyorsunuz?",
+        "a": "Bu muhteşem gazeteyle iş birliği yaptığım için mutluyum :)"
+      },
+      {
+        "type": "qa",
+        "q": "Yeni çalışmalar nedir? Şehrimizi kısa vadede ne bekliyor?",
+        "a": "Eurovillage'da yeni imara göre Anadolu kısmında gelişmeyi durduruyoruz. Yeni hedefimiz Avrupa. Toplam nüfus kapasitemizi tam %33 arttırmak için 3 yeni mahalle kuruyoruz. Manifest kentsel dönüşümü bitti. M8, M10 ve F4 raylı sistem hatlarına başladık. Aynı zamanda Milletvekili seçimleri hesaplanıyor. Bu şartlar altında bütçemizi verimli kullanmaya da özen gösteriyoruz."
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "slug": "secim-haritasi-neden-yaniltiyor",
+    "section": "politika",
+    "kicker": "ANALİZ",
+    "title": "Sayılarla Eurovillage Seçimleri: Bu Harita Neden Yanıltıyor?",
+    "dek": "2026 Eurovillage Başkanlık Seçimlerinin sonuçları ilk bakışta açık bir tablo ortaya koyuyor. Ancak sayıların anlattığı hikâye yalnızca kimin kazandığından ibaret değil — ve belediyenin yayımladığı seçim haritası, tam da bu noktada yanıltıcı.",
+    "author": "Emir the Composer",
+    "byline_title": "Analiz",
+    "date": "2026-08-08",
+    "featured": "secondary",
+    "breaking": false,
+    "image": "secim-haritasi.png",
+    "image_caption": "Belediyenin yayımladığı seçim haritası, bölgesel kazananlar ile şehir geneli oy oranlarını aynı görselde birleştirerek okuyucuyu yanıltma riski taşıyor.",
+    "tags": [
+      "seçim",
+      "analiz",
+      "veri görselleştirme"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "EUROVILLAGE — 2026 Eurovillage Başkanlık Seçimlerinin sonuçları, ilk bakışta açık bir tablo ortaya koyuyor: OBGIS yüzde 48,2 ile birinci, BARA_VAELP yüzde 37,9 ile ikinci, HULYAVON ise yüzde 13,7 ile üçüncü sırada yer aldı. Ancak sayıların anlattığı hikâye yalnızca kimin kazandığından ibaret değil. Sonuçlar, Eurovillage siyasetinin birden fazla toplumsal ve coğrafi merkez etrafında şekillendiğini gösteriyor."
+      },
+      {
+        "type": "p",
+        "text": "Obgis, salt çoğunluğa ulaşamamış olsa da açık ara en yüksek oy oranını alarak seçimi önde tamamladı. Bu da seçmenin önemli bir bölümünün, mevcut yönetimin devamından yana tavır aldığını gösteriyor. Özellikle belediye yönetiminin görünür olduğu bölgelerde Obgis'in daha güçlü bir zemin bulduğu anlaşılıyor."
+      },
+      {
+        "type": "p",
+        "text": "Buna karşılık bara_vaelp'in yüzde 37,9'luk oyu, yarışın sanıldığından daha rekabetçi geçtiğini ortaya koyuyor. Bara_vaelp, yalnızca \"kaybeden aday\" olarak okunamayacak ölçüde güçlü bir toplumsal tabana sahip görünüyor. Bu oran, özellikle muhalefetin belli bölgelerde ciddi bir karşılık üretebildiğini ve seçimin iki ana blok arasında geçtiğini düşündürüyor."
+      },
+      {
+        "type": "p",
+        "text": "HulyAvon'un yüzde 13,7'lik toplam oyu ise ilk bakışta sınırlı görünebilir. Ancak \"Rest of the City\" sonuçları tabloyu daha ilginç hâle getiriyor. ROTC oylamasında HulyAvon'un 13 oyla yüzde 44,8 ile birinci gelmesi, kentte yaşamayan seçmen kümeleri içinde özel bir karşılık bulduğunu gösteriyor. Obgis'in burada yüzde 34,5, bara_vaelp'in ise yüzde 20,7 alması, HulyAvon'un toplam tabloda küçük ama stratejik bir ağırlık taşıdığını düşündürüyor."
+      },
+      {
+        "type": "p",
+        "text": "Bu nedenle sonuçlar yalnızca \"birinci, ikinci, üçüncü\" sıralaması olarak okunmamalı. Eurovillage'da seçmen davranışı hem coğrafi olarak parçalı, hem de siyasal olarak çok katmanlı bir görüntü veriyor. Obgis şehir genelinde en büyük desteği toplarken, bara_vaelp güçlü bir rakip blok oluşturuyor; HulyAvon ise toplam oyda geride kalsa da belli alanlarda ve ROTC'de etkili bir ağırlık merkezine dönüşüyor."
+      },
+      {
+        "type": "h3",
+        "text": "Bu Harita Hatalı. Peki Ya Neden?"
+      },
+      {
+        "type": "p",
+        "text": "Yayımlanan seçim haritası ise tam bu noktada dikkatli okunmalı. Çünkü bu görsel, sonuçları göstermekten çok bazı yanlış izlenimler üretme potansiyeline sahip."
+      },
+      {
+        "type": "p",
+        "text": "Öncelikle election map'ler böyle çalışmaz. Bir seçim haritasının temel amacı, bölgelerin hangi aday tarafından kazanıldığını açık biçimde göstermektir. Ancak tek başına bölgeyi boyamak, özellikle de bölgelerin fiziksel büyüklüğü ile seçmen sayısı arasında büyük fark varsa, yanıltıcı olur. Haritada geniş alan kaplayan bir bölge, daha çok oy varmış izlenimi verebilir; oysa seçimlerde belirleyici olan alan büyüklüğü değil, seçmen sayısıdır."
+      },
+      {
+        "type": "p",
+        "text": "Bu yüzden mevcut harita, bazı adayların çok büyük coğrafi alanlara yayılmış görünmesine rağmen gerçekte aynı ölçüde seçmen desteğine sahip olup olmadığını göstermiyor. Örneğin büyük yüzölçümlü bir bölgenin tek renkle boyanması, o adayın şehir genelinde ezici üstünlüğü varmış hissi yaratabilir. Oysa toplam oy oranları bunun çok daha dengeli olduğunu söylüyor: Obgis yüzde 48,2, bara_vaelp yüzde 37,9, HulyAvon yüzde 13,7."
+      },
+      {
+        "type": "p",
+        "text": "İkinci sorun, haritanın toplam oy oranları ile bölgesel kazananları aynı anda vermeye çalışırken iki farklı mantığı karıştırması. Sol tarafta şehir geneli oy oranları yer alırken, sağ tarafta bölgesel kazançlar gösteriliyor. Bu ikisi birlikte kullanılabilir; ancak aralarındaki ilişkinin daha açık kurulması gerekir. Aksi takdirde okuyucu, bölgesini çok gören adayın toplamda daha güçlü olduğunu sanabilir."
+      },
+      {
+        "type": "p",
+        "text": "Üçüncü olarak, çizgili alanlar ve renk kodlaması da görsel dili karmaşıklaştırıyor. Bir election map'te temel ilke sadeliktir: her aday için net bir renk, açık bir lejant ve mümkünse her bölgenin kaç oy farkla kazanıldığını gösteren küçük notlar. Mevcut tasarım ise estetik olarak dikkat çekse de, analitik berraklık açısından zayıf kalıyor."
+      },
+      {
+        "type": "h3",
+        "text": "Nasıl Olmalıydı?"
+      },
+      {
+        "type": "p",
+        "text": "Daha doğru bir seçim görselleştirmesi için şu yöntemler tercih edilebilirdi:"
+      },
+      {
+        "type": "list",
+        "items": [
+          "Kazanan bölge haritası: Her bölge yalnızca kazanan adaya göre boyanmalı.",
+          "Oy oranı çubuk grafiği: Şehir geneli yüzdeler ayrı bir grafikte verilmeli.",
+          "Nüfus/seçmen ağırlıklı harita: Bölgelerin fiziksel değil, seçmen büyüklüğüne göre yeniden ölçeklendirildiği bir kartogram kullanılmalı.",
+          "ROTC için ayrı kutu: Rest of the City sonucu, ana haritadan ayrı ve açık bir biçimde sunulmalı."
+        ]
+      },
+      {
+        "type": "p",
+        "text": "Böylece okuyucu hem kim nerede kazandı sorusuna, hem de kim toplamda ne kadar oy aldı sorusuna daha sağlıklı yanıt bulabilirdi..."
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "section": "sehir",
+    "kicker": "KENTTEN HABERLER",
+    "title": "Bakır Parkı Halka Açıldı",
+    "dek": "Zjerm Adası'ndaki boş ve tekinsiz arazi yeşil alana dönüştürüldü.",
+    "author": "Emir the Composer",
+    "byline_title": "Muhabir",
+    "date": "2026-08-08",
+    "featured": null,
+    "breaking": false,
+    "image_caption": "Bakır Parkı'nın yeni girişi, ahşap ve taş malzemenin bir arada kullanıldığı sade bir tasarımla halkın kullanımına açıldı.",
+    "tags": [
+      "park",
+      "yeşil alan",
+      "belediye"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "EUROVILLAGE — Eurovillage Büyükşehir Belediyesi, Zjerm Adası'nda uzun süredir kullanılmayan boş araziyi düzenleyerek Bakır Parkı adıyla halkın kullanımına açtı. Belediye, yeni parkla birlikte kentteki yeşil alan sayısının artırıldığını ve söz konusu arazinin yapılaşmaya açılmasının önüne geçildiğini duyurdu."
+      },
+      {
+        "type": "p",
+        "text": "Park açılışında konuşan Obgis, bu düzenlemenin \"Eurovillage Seni Seviyor\" kampanyasının bir parçası olduğunu vurguladı."
+      }
+    ],
+    "slug": "bakir-parki-halka-acildi",
+    "image": "bakir-parki.jpg",
+    "gallery": null,
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "slug": "etc-musikforum-yeni-kultur-odagi",
+    "section": "kultur",
+    "kicker": "KÜLTÜR SANAT",
+    "title": "ETC Musikforum: Eurovillage'ın Yeni Kültür Odağı",
+    "dek": "Emir the Composer Musikforum, filarmoni, opera, modern sanat, sinema ve kamusal alanları aynı çatı altında buluşturacak. İnşaatı hızla ilerleyen dev kültür kompleksinin doğrudan içine bir metro istasyonu yapılması da planlanıyor.",
+    "author": "Emir the Composer",
+    "byline_title": "Muhabir",
+    "date": "2026-08-08",
+    "featured": "secondary",
+    "breaking": false,
+    "image": null,
+    "image_caption": null,
+    "tags": [
+      "kültür",
+      "musikforum",
+      "belediye"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "EUROVILLAGE — Eurovillage'ın yeni kültür ve sanat merkezi ETC Musikforum - Emir the Composer Musikforum'un inşaatı hızla devam ediyor. Modern mimari anlayışla tasarlanan dev kompleks, kentin müzik, opera, modern sanat ve sinema alanındaki yeni merkezi olmaya hazırlanıyor."
+      },
+      {
+        "type": "p",
+        "text": "Yalnızca konserlerin gerçekleştirileceği bir yapı olarak değil, farklı sanat disiplinlerinin ve kent yaşamının bir araya geleceği büyük bir kamusal merkez olarak planlanan ETC Musikforum; ETC Philharmonie ve ETC Opera başta olmak üzere Eurovillage'ın yeni sanat kurumlarına ev sahipliği yapacak."
+      },
+      {
+        "type": "h3",
+        "text": "İnşaatı Emir the Composer Yürütüyor"
+      },
+      {
+        "type": "p",
+        "text": "ETC Musikforum'un tasarım ve inşa süreci doğrudan Emir the Composer tarafından yürütülüyor. Projenin ilk aşamalarında mimarlık görevini üstlenmesi planlanan Duke of Akbadain ise kendisine verilen rolü Musikforum'un yapımında kullanmadı."
+      },
+      {
+        "type": "p",
+        "text": "Süreç bununla da sınırlı kalmadı. Duke of Akbadain'ın proje çevresinde çeşitli vandal eylemlerde bulunması, Musikforum'un yapım sürecinde yeni bir krize yol açtı. İnşaatın ilerleyebilmesi için gerekli mimarlık çalışmalarının yürütülmemesi üzerine projenin sorumluluğu fiilen Emir the Composer tarafından üstlenildi."
+      },
+      {
+        "type": "p",
+        "text": "Yaşananlara rağmen ETC Musikforum'un yapımı durmadı. Emir the Composer'ın doğrudan yürüttüğü çalışmalarla inşaat hızla ilerlemeye devam ediyor. Böylece Musikforum projesi, yaşanan anlaşmazlıklar ve vandal eylemlere rağmen Eurovillage'ın en büyük kültür-sanat yatırımlarından biri olarak yükseliyor."
+      },
+      {
+        "type": "h3",
+        "text": "Berlin'den Los Angeles'a, Şimdi Eurovillage'da"
+      },
+      {
+        "type": "p",
+        "text": "ETC Musikforum'un en dikkat çekici bölümlerinden biri ETC Philharmonie'nin kullanacağı ana konser salonu olacak. Salonda, çağdaş konser salonu mimarisinin en önemli yaklaşımlarından biri olan \"vineyard style\" düzen kullanılacak. Bu düzenle birlikte geleneksel salonların aksine sahne izleyicinin merkezine alınacak ve herkes rahatlıkla izleyebilecek."
+      },
+      {
+        "type": "p",
+        "text": "Berlin Philharmonie ile modern konser salonu mimarisinin simgelerinden biri hâline gelen, Hamburg Elbphilharmonie, Walt Disney Concert Hall ve Philharmonie de Paris gibi yapılarda farklı biçimlerde kullanılan vineyard anlayışı, ETC Musikforum'un ana salonunun da temelini oluşturacak."
+      },
+      {
+        "type": "h3",
+        "text": "Opera Salonu Geçmiş ile Geleceği Buluşturacak"
+      },
+      {
+        "type": "p",
+        "text": "ETC Philharmonie'nin çağdaş ve yenilikçi ana salonuna karşılık, ETC Opera'nın sahne alacağı opera salonunda farklı bir mimari kimlik oluşturulacak. Opera salonunun temel tasarım anlayışı geçmiş ile gelecek üzerine kuruluyor. Geleneksel opera salonlarının tarihsel ihtişamı ve törensel karakteri korunurken bunların çağdaş mimari unsurlar ve geleceğe dönük bir tasarım diliyle yeniden yorumlanması planlanıyor."
+      },
+      {
+        "type": "h3",
+        "text": "Kırmızı Daire Merkezin Simgesi Olacak"
+      },
+      {
+        "type": "p",
+        "text": "İki büyük salonun yanı sıra ETC Musikforum bünyesinde daha küçük ölçekli etkinliklerin gerçekleştirilebileceği dairesel bir salon da bulunacak. Bu salonla birlikte kullanılan kırmızı daire, ETC Musikforum'un mimari ve görsel kimliğinin temel sembollerinden biri olacak. Yapının farklı noktalarında karşılaşılacak dairesel formun, merkezin zaman içerisinde en kolay tanınan görsel unsurlarından birine dönüşmesi hedefleniyor."
+      },
+      {
+        "type": "h3",
+        "text": "Metropolitan Modern Art Museum Musikforum'da"
+      },
+      {
+        "type": "p",
+        "text": "ETC Musikforum yalnızca müziğe ayrılmış bir merkez olmayacak. Yeni kurulacak Metropolitan Modern Art Museum da aynı kompleks içerisinde faaliyet gösterecek. Müze bünyesinde kalıcı koleksiyonların yanı sıra değişen sanatçı ve temalara ayrılacak geçici sergi alanları oluşturulacak. Ancak yeni müzenin en dikkat çekici uygulamalarından biri, sergi programının oluşturulmasında Eurovillage vatandaşlarının da söz sahibi olabilmesi olacak."
+      },
+      {
+        "type": "p",
+        "text": "Vatandaşlar müzede yer verilmesini istedikleri sanatçıları önerebilecek. Yapılan değerlendirme sonucunda uygun bulunan öneriler için müzenin belirlenen alanlarında sanatçıya özel sergiler oluşturulabilecek. Böylelikle müzenin programı yalnızca merkezi bir kürasyon anlayışıyla değil, kent sakinlerinin kültürel tercihleriyle de şekillenebilecek."
+      },
+      {
+        "type": "h3",
+        "text": "IMAX Salonu da Planlanıyor"
+      },
+      {
+        "type": "p",
+        "text": "Musikforum'un kültür-sanat programının sinemayı da kapsaması planlanıyor. Mevcut planlar içerisinde kompleks bünyesinde 70 mm IMAX gösterimine uygun bir sinema salonunun oluşturulması bulunuyor."
+      },
+      {
+        "type": "h3",
+        "text": "Metrodan İnen Doğrudan Musikforum'a Girecek"
+      },
+      {
+        "type": "p",
+        "text": "Projenin dikkat çeken bir diğer özelliği ise ulaşım planlaması. ETC Musikforum'a hizmet verecek metro istasyonunun yapının yakınındaki ayrı bir noktaya değil, doğrudan kültür merkezinin içerisine yapılması planlanıyor. Böylece metro ile gelen ziyaretçiler istasyondan çıktıktan sonra başka bir yapıya geçmek veya dışarıdaki bir istasyon girişini kullanmak zorunda kalmadan doğrudan Musikforum kompleksine ulaşabilecek."
+      },
+      {
+        "type": "p",
+        "text": "İnşaat çalışmalarının hızla devam ettiği merkez tamamlandığında müzik, opera, modern sanat, sinema ve kent yaşamı ilk kez bu ölçekte tek bir yapıda buluşacak."
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "slug": "kanyon-istasyonu-acildi",
+    "section": "sehir",
+    "kicker": "ULAŞIM",
+    "title": "Kanyon İstasyonu Açıldı",
+    "dek": "B1 hattındaki Kanyon İstasyonu baştan sona yenilendi. Doğayla bütünleşen tasarımıyla istasyon, Eurovillage'ın ilk yarı açık–yarı kapalı konsept istasyonu oldu.",
+    "author": "Emir the Composer",
+    "byline_title": "Muhabir",
+    "date": "2026-08-08",
+    "featured": "secondary",
+    "breaking": false,
+    "image": "kanyon-istasyonu.jpg",
+    "image_caption": "Kanyon İstasyonu'nun yeni tasarımında taş, ahşap ve yeşil yüzeyler öne çıkıyor; açık peron doğal ışık ve manzarayla buluşuyor.",
+    "tags": [
+      "metro",
+      "ulaşım",
+      "belediye"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "EUROVILLAGE — Eurovillage Büyükşehir Belediyesi, B1 hattında hizmet veren Kanyon İstasyonu'nun yenileme çalışmalarının tamamlandığını duyurdu. Baştan sona yeniden tasarlanan istasyon, çevresindeki doğal dokuya uyum sağlayan mimarisi ve kamufle edilmiş görünümüyle kentin ilk konsept istasyonu olarak hizmete girdi."
+      },
+      {
+        "type": "p",
+        "text": "Yeni tasarımda taş, ahşap ve yeşil yüzeyler ağırlıklı olarak kullanılırken istasyon yapısı çevredeki araziyle bütünleştirildi. Açık alanlarla kapalı bölümlerin bir arada kullanıldığı proje, yolcuların doğal ışıktan ve manzaradan yararlanabilmesine olanak sağlayacak biçimde hazırlandı."
+      },
+      {
+        "type": "p",
+        "text": "Belediye, Eurovillage'ın ilk yarı açık-yarı kapalı istasyonu olan Kanyon'un tasarımında Marmaray Ayrılık Çeşmesi İstasyonu'ndan esinlenildiğini açıkladı. İstasyonun peron ve giriş bölümleri açık hava ile doğrudan ilişki kurarken üst örtüler ve kapalı geçiş alanları kötü hava koşullarına karşı koruma sağlıyor."
+      },
+      {
+        "type": "p",
+        "text": "Belediye yönetimi, Kanyon'da uygulanan konseptin başarılı olması hâlinde benzer tasarımların doğal alanlara yakın diğer istasyonlarda da kullanılabileceğini bildirdi."
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "slug": "nikah-salonu-acildi",
+    "section": "sehir",
+    "kicker": "KENTTEN HABERLER",
+    "title": "Nikah Salonu Açıldı!",
+    "dek": "Eurovillage Büyükşehir Belediyesi'nden monogamiyi destekleyenlere büyük müjde! Meclis binası içerisinde yapımı tamamlanan yeni Nikah Salonu hizmete açıldı.",
+    "author": "Emir the Composer",
+    "byline_title": "Muhabir",
+    "date": "2026-08-08",
+    "featured": null,
+    "breaking": false,
+    "image": "nikah-salonu.jpg",
+    "image_caption": "Pembe tonları, çiçekli süslemeleri ve kırmızı halısıyla dikkat çeken Nikah Salonu, meclis binası içerisinde hizmete açıldı.",
+    "tags": [
+      "belediye",
+      "nikah salonu"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "EUROVILLAGE — Eurovillage Büyükşehir Belediyesi'nden monogamiyi destekleyenlere büyük müjde! Meclis binası içerisinde yapımı tamamlanan yeni Nikah Salonu hizmete açıldı. Pembe tonları, çiçekli süslemeleri ve kırmızı halısıyla dikkat çeken salon, hayatlarını resmî olarak birleştirmek isteyen Eurovillage vatandaşlarını ağırlamaya başladı."
+      },
+      {
+        "type": "p",
+        "text": "\"Eurovillage Seni Seviyor\" kampanyası kapsamında hayata geçirilen yeni hizmetle belediye, vatandaşların yeni hayatlarına güzel bir başlangıç yapmasını hedefliyor. Böylece kentimizde bekarlığa veda etmek isteyenler için kapılar açıldı."
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "slug": "iki-yeni-tunel-acildi",
+    "section": "sehir",
+    "kicker": "ALTYAPI",
+    "title": "İki Yeni Tünel Açıldı",
+    "dek": "Eurovillage'ın yeni kurulan mahallelerindeki altyapı yatırımları devam ediyor. Büyükşehir Belediyesi, Değirmenaltı bölgesinde yapımı tamamlanan iki yeni tüneli hizmete açtı.",
+    "author": "Emir the Composer",
+    "byline_title": "Muhabir",
+    "date": "2026-08-08",
+    "featured": null,
+    "breaking": false,
+    "image": "tunel.jpg",
+    "image_caption": "Tünel girişlerinde belediyenin yeni dönem kurumsal kimliği ve \"Eurovillage Seni Seviyor\" kampanyasına ait tasarımlar da kullanıldı.",
+    "tags": [
+      "altyapı",
+      "ulaşım",
+      "belediye"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "EUROVILLAGE — Eurovillage'ın yeni kurulan mahallelerindeki altyapı yatırımları devam ediyor. Büyükşehir Belediyesi, Değirmenaltı bölgesinde yapımı tamamlanan iki yeni tüneli hizmete açtı. Yeni yerleşim alanlarının ulaşım ihtiyacını karşılamak amacıyla inşa edilen tünellerin bölgedeki bağlantıları güçlendirmesi hedefleniyor."
+      },
+      {
+        "type": "p",
+        "text": "Tünel girişlerinde belediyenin yeni dönem kurumsal kimliği ve \"Eurovillage Seni Seviyor\" kampanyasına ait tasarımlar da kullanıldı."
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "slug": "ayni-anda-3-metro-basarisi",
+    "section": "sehir",
+    "kicker": "ULAŞIM",
+    "title": "Aynı Anda 3 Metro Başarısı",
+    "dek": "Eurovillage Büyükşehir Belediyesi, Avrupa kıtasındaki ulaşım yatırımlarını üç yeni raylı sistem hattıyla sürdürüyor.",
+    "author": "Emir the Composer",
+    "byline_title": "Muhabir",
+    "date": "2026-08-08",
+    "featured": null,
+    "breaking": false,
+    "image": null,
+    "image_caption": null,
+    "tags": [
+      "metro",
+      "ulaşım",
+      "belediye"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "EUROVILLAGE — Eurovillage Büyükşehir Belediyesi, Avrupa kıtasındaki ulaşım yatırımlarını üç yeni raylı sistem hattıyla sürdürüyor. M10 numaralı Gordienko-Kanyon, M8 numaralı Müze-Değirmenaltı ve F4 numaralı Küçükyalı-Değirmenaltı hatlarının inşaatları eş zamanlı olarak devam ediyor."
+      },
+      {
+        "type": "p",
+        "text": "Üç hattın tamamlanmasıyla özellikle yeni gelişen bölgelerin mevcut ulaşım ağıyla bağlantısının güçlendirilmesi hedefleniyor. Böylece kentimiz ulaştığın şehir kavramına daha çok yaklaşacak."
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  },
+  {
+    "slug": "en-iyi-ev-yarismasi",
+    "section": "oyun",
+    "kicker": "OYUN KÖŞESİ",
+    "title": "En İyi Ev Yarışması Başlıyor",
+    "dek": "Eurovillage'ın en iyi tasarlanmış evini halk seçiyor! Yarışmaya sınırlar içerisindeki tamamlanmış tüm konutlar katılabilir.",
+    "author": "Emir the Composer",
+    "byline_title": "Oyun Köşesi",
+    "date": "2026-08-08",
+    "featured": null,
+    "breaking": false,
+    "image": null,
+    "image_caption": null,
+    "tags": [
+      "yarışma",
+      "oyun köşesi"
+    ],
+    "body": [
+      {
+        "type": "p",
+        "text": "Eurovillage'ın en iyi tasarlanmış evini halk seçiyor! Yarışmaya sınırlar içerisindeki tamamlanmış tüm konutlar katılabilir. Başvurular 8 Eylül 2026'ya, The Eurovillage Herald'ın bir sonraki sayısına kadar kabul edilecektir."
+      },
+      {
+        "type": "p",
+        "text": "Başvuruların tamamlanmasının ardından aday evler ilan edilecek ve Google Docs üzerinden halk oylaması gerçekleştirilecektir. Her katılımcı yalnızca bir oy kullanabilir; mükerrer oylar geçersiz sayılır."
+      },
+      {
+        "type": "p",
+        "text": "Oylamada evlerin yalnızca büyüklüğü değil; mimari tasarımı, özgünlüğü, iç ve dış mekân bütünlüğü, çevre düzenlemesi, detayları ve genel karakteri dikkate alınmalıdır."
+      },
+      {
+        "type": "p",
+        "text": "Herhangi bir derecede iki veya daha fazla evin aynı sayıda oy alması halinde, eşitliği paylaşan adaylar arasında ikinci tur halk oylaması yapılacaktır. Eşitliğin devam etmesi durumunda sonuç kesinleşene kadar yeni tur düzenlenir."
+      },
+      {
+        "type": "h3",
+        "text": "Ödüller"
+      },
+      {
+        "type": "list",
+        "items": [
+          "Birinci olan eve sürpriz ödül!",
+          "Yarışmada ilk üçe giren evlerin her biri, Eurovillage Gazetesi'nin magazin eki ARI'da kendilerine ayrılan özel bir sayfada tanıtılacaktır."
+        ]
+      },
+      {
+        "type": "p",
+        "text": "Son Başvuru: 8 Eylül 2026"
+      }
+    ],
+    "author_ids": [
+      "cc86566c9a"
+    ]
+  }
+]

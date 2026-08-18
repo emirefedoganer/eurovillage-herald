@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Yeni Yazar — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Yeni Yazar Oluştur</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.authors_list') }}">← Listeye Dön</a>
+  </div>
+
+  <form class="admin-panel" method="post" enctype="multipart/form-data">
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="display_name">Görünen Ad</label>
+        <input type="text" id="display_name" name="display_name" required value="{{ form.display_name or '' }}" placeholder="ör. Emir the Composer">
+      </div>
+      <div class="form-row">
+        <label for="email">E-posta (giriş için)</label>
+        <input type="email" id="email" name="email" required value="{{ form.email or '' }}">
+      </div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="slug">Profil Adresi (slug)</label>
+        <input type="text" id="slug" name="slug" value="{{ form.slug or '' }}" placeholder="boş bırakılırsa addan otomatik oluşturulur">
+        <div class="hint">/profil/&lt;slug&gt;</div>
+      </div>
+      <div class="form-row">
+        <label for="account_role">Hesap Rolü</label>
+        <select id="account_role" name="account_role">
+          <option value="author" {{ 'selected' if form.account_role=='author' else '' }}>Yazar</option>
+          <option value="master_admin" {{ 'selected' if form.account_role=='master_admin' else '' }}>Master Admin</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="editorial_role">Editoryal Unvan</label>
+        <input type="text" id="editorial_role" name="editorial_role" list="editorial-role-options" value="{{ form.editorial_role or '' }}" placeholder="ör. Muhabir, Opinion Columnist">
+        <datalist id="editorial-role-options">
+          {% for r in editorial_roles %}<option value="{{ r }}">{% endfor %}
+        </datalist>
+      </div>
+      <div class="form-row">
+        <label>&nbsp;</label>
+        <div class="checkbox-row" style="height:41px;">
+          <input type="checkbox" id="is_opinion_columnist" name="is_opinion_columnist" {{ 'checked' if form.is_opinion_columnist else '' }}>
+          <label for="is_opinion_columnist" style="margin:0;">Opinion Columnist (Köşe Yazarı) olarak işaretle</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="short_bio">Kısa Biyografi</label>
+      <textarea id="short_bio" name="short_bio" rows="2" maxlength="280">{{ form.short_bio or '' }}</textarea>
+    </div>
+    <div class="form-row">
+      <label for="full_bio">Tam Biyografi</label>
+      <textarea id="full_bio" name="full_bio" rows="5">{{ form.full_bio or '' }}</textarea>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="twitter_handle">X / Twitter Kullanıcı Adı</label>
+        <input type="text" id="twitter_handle" name="twitter_handle" value="{{ form.twitter_handle or '' }}">
+      </div>
+      <div class="form-row">
+        <label for="minecraft_username">Minecraft Kullanıcı Adı</label>
+        <input type="text" id="minecraft_username" name="minecraft_username" value="{{ form.minecraft_username or '' }}">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="contact_email">Halka Açık İletişim E-postası</label>
+      <input type="email" id="contact_email" name="contact_email" value="{{ form.contact_email or '' }}" placeholder="ör. emir@eurovillageherald.com">
+      <div class="hint">Profil sayfasında görünür; okurlar buraya doğrudan e-posta gönderebilir. Hesabın giriş e-postasından ayrıdır — isteğe bağlıdır.</div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label>Profil Fotoğrafı</label>
+        <input type="file" name="profile_image" accept="image/*">
+      </div>
+      <div class="form-row">
+        <label>Kapak Görseli</label>
+        <input type="file" name="cover_image" accept="image/*">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="join_date">Katılım Tarihi</label>
+      <input type="date" id="join_date" name="join_date">
+    </div>
+
+    <div class="hint" style="margin-bottom:16px;">
+      Hesap oluşturulunca güvenli, rastgele bir geçici şifre üretilecek ve size bir kez gösterilecektir.
+      Yazar ilk girişinde kendi şifresini belirlemek zorunda kalacak.
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-red" type="submit">Yazarı Oluştur</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

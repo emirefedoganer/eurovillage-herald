@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Oyunlar — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Oyunlar</h1>
+  </div>
+
+  <div class="admin-stat-grid">
+    <div class="admin-stat-card"><span class="n">{{ crosswords|selectattr('status','equalto','published')|list|length }}</span><span class="l">Yayındaki Bulmaca</span></div>
+    <div class="admin-stat-card"><span class="n">{{ sudokus|selectattr('status','equalto','published')|list|length }}</span><span class="l">Yayındaki Sudoku</span></div>
+    <div class="admin-stat-card"><span class="n">{{ (crosswords|selectattr('status','equalto','draft')|list|length) + (sudokus|selectattr('status','equalto','draft')|list|length) }}</span><span class="l">Taslak</span></div>
+    <div class="admin-stat-card"><span class="n">{{ crosswords|length + sudokus|length }}</span><span class="l">Toplam Oyun</span></div>
+  </div>
+
+  <div class="admin-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <h2 style="font-family: var(--font-headline); margin:0;">Çapraz Bulmacalar</h2>
+      <div class="admin-actions">
+        <a class="btn btn-outline" href="{{ url_for('admin.crossword_list') }}">Tümünü Gör</a>
+        <a class="btn btn-outline" href="{{ url_for('admin.crossword_generate') }}">Otomatik Oluştur</a>
+        <a class="btn btn-red" href="{{ url_for('admin.crossword_new') }}">+ Yeni Bulmaca</a>
+      </div>
+    </div>
+    <table class="admin-table">
+      <thead><tr><th>Başlık</th><th>Zorluk</th><th>Durum</th><th>Güncellendi</th><th></th></tr></thead>
+      <tbody>
+        {% for c in crosswords[:5] %}
+        <tr>
+          <td>{{ c.title }}</td>
+          <td>{{ difficulty_labels.get(c.difficulty, c.difficulty) }}</td>
+          <td><span class="badge {{ 'badge-lead' if c.status=='published' else 'badge-secondary' }}">{{ status_labels.get(c.status, c.status) }}</span></td>
+          <td>{{ c.updated_at[:10] if c.updated_at else '' }}</td>
+          <td><a class="btn btn-outline" href="{{ url_for('admin.crossword_edit', cid=c.id) }}">Düzenle</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">Henüz bulmaca yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="admin-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <h2 style="font-family: var(--font-headline); margin:0;">Sudokular</h2>
+      <div class="admin-actions">
+        <a class="btn btn-outline" href="{{ url_for('admin.sudoku_list') }}">Tümünü Gör</a>
+        <a class="btn btn-outline" href="{{ url_for('admin.sudoku_generate') }}">Otomatik Oluştur</a>
+        <a class="btn btn-red" href="{{ url_for('admin.sudoku_new') }}">+ Yeni Sudoku</a>
+      </div>
+    </div>
+    <table class="admin-table">
+      <thead><tr><th>Başlık</th><th>Zorluk</th><th>Durum</th><th>Güncellendi</th><th></th></tr></thead>
+      <tbody>
+        {% for s in sudokus[:5] %}
+        <tr>
+          <td>{{ s.title }}</td>
+          <td>{{ difficulty_labels.get(s.difficulty, s.difficulty) }}</td>
+          <td><span class="badge {{ 'badge-lead' if s.status=='published' else 'badge-secondary' }}">{{ status_labels.get(s.status, s.status) }}</span></td>
+          <td>{{ s.updated_at[:10] if s.updated_at else '' }}</td>
+          <td><a class="btn btn-outline" href="{{ url_for('admin.sudoku_edit', sid=s.id) }}">Düzenle</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">Henüz sudoku yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

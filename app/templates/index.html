@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% from "_macros.html" import author_byline, author_avatar %}
+{% block title %}{{ site.name }} — {{ site.tagline }}{% endblock %}
+{% block content %}
+
+<div class="front-grid">
+  <div>
+    {% if lead %}
+    <article class="lead-story">
+      <span class="kicker">{{ effective_kicker(lead) }}</span>
+      <a href="{{ url_for('article_page', slug=lead.slug) }}"><h1>{{ lead.title }}</h1></a>
+      <p class="dek">{{ lead.dek }}</p>
+      {% if lead.image %}
+      <a href="{{ url_for('article_page', slug=lead.slug) }}">
+        <img src="{{ url_for('static', filename='img/articles/' + lead.image) }}" alt="{{ lead.title }}">
+      </a>
+      {% if lead.image_caption %}<p class="figcap">{{ lead.image_caption }}</p>{% endif %}
+      {% endif %}
+      <div class="byline">{{ author_byline(resolve_authors(lead)) }} · {{ lead.byline_title }} · {{ lead.date }}</div>
+    </article>
+    {% endif %}
+
+    {% if secondary %}
+    <div class="secondary-grid">
+      {% for a in secondary %}
+      <article class="story-card {{ '' if a.image else 'story-card--noimg' }}">
+        <span class="kicker">{{ effective_kicker(a) }}</span>
+        {% if a.image %}
+        <a href="{{ url_for('article_page', slug=a.slug) }}">
+          <img src="{{ url_for('static', filename='img/articles/' + a.image) }}" alt="{{ a.title }}">
+        </a>
+        {% endif %}
+        <a href="{{ url_for('article_page', slug=a.slug) }}"><h3>{{ a.title }}</h3></a>
+        <p class="dek">{{ a.dek }}</p>
+        <div class="byline">{{ a.date }}</div>
+      </article>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if rest %}
+    <div class="river">
+      <h2 class="rail-title">Diğer Haberler</h2>
+      <div class="river-list">
+        {% for a in rest %}
+        <div class="river-item">
+          {% if a.image %}
+          <a href="{{ url_for('article_page', slug=a.slug) }}">
+            <img src="{{ url_for('static', filename='img/articles/' + a.image) }}" alt="{{ a.title }}">
+          </a>
+          {% endif %}
+          <div class="body">
+            <span class="kicker">{{ effective_kicker(a) }}</span>
+            <a href="{{ url_for('article_page', slug=a.slug) }}"><h4>{{ a.title }}</h4></a>
+            <div class="byline">{{ a.date }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <aside class="sidebar">
+    <div class="ad-box sidebar-block">
+      <span class="ad-label">Reklam</span>
+      <div class="ad-body">
+        <div class="ad-title ad-title-frutiger">Buraya Bakarlar</div>
+        <div class="ad-sub">Bu alana reklam vermek için bizimle iletişime geçebilirsiniz.</div>
+        <div class="ad-handle">@dukeofakbadain</div>
+      </div>
+    </div>
+
+    {% if opinion %}
+    <div class="sidebar-block">
+      <div class="sidebar-title">OPINION</div>
+      {% for a in opinion %}
+      {% set op_authors = resolve_authors(a) %}
+      {% set pq = article_lead_quote(a) %}
+      <div class="op-item">
+        {% if op_authors and op_authors[0].profile_image %}
+        <div class="op-item-row">
+          {{ author_avatar(op_authors[0], size=36) }}
+          <div>
+            <span class="op-kicker">{{ effective_kicker(a) }}</span>
+            <a href="{{ url_for('article_page', slug=a.slug) }}"><h4>{{ a.title }}</h4></a>
+            <div class="op-author">{{ author_byline(op_authors) }}</div>
+          </div>
+        </div>
+        {% else %}
+        <span class="op-kicker">{{ effective_kicker(a) }}</span>
+        <a href="{{ url_for('article_page', slug=a.slug) }}"><h4>{{ a.title }}</h4></a>
+        <div class="op-author">{{ author_byline(op_authors) }}</div>
+        {% endif %}
+        {% if pq %}
+        <a href="{{ url_for('article_page', slug=a.slug) }}" class="op-pullquote">
+          “{{ pq.text }}”{% if pq.attribution %}<span class="op-pullquote-attr">— {{ pq.attribution }}</span>{% endif %}
+        </a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="sidebar-block">
+      <div class="sidebar-title">Oyun Köşesi</div>
+      <div class="puzzle-teaser">
+        <img src="{{ url_for('static', filename='img/articles/crossword.png') }}" alt="Bulmaca">
+        {% if current_crossword or current_sudoku %}
+        <div class="puzzle-teaser-list">
+          {% if current_crossword %}
+          <a class="puzzle-teaser-item" href="{{ url_for('crossword_play', slug=current_crossword.slug) }}">
+            <span class="game-card-type">Çapraz Bulmaca</span>
+            <strong>{{ current_crossword.title }}</strong>
+            <span class="badge badge-secondary">{{ difficulty_labels.get(current_crossword.difficulty, current_crossword.difficulty) }}</span>
+          </a>
+          {% endif %}
+          {% if current_sudoku %}
+          <a class="puzzle-teaser-item" href="{{ url_for('sudoku_play', slug=current_sudoku.slug) }}">
+            <span class="game-card-type">Sudoku</span>
+            <strong>{{ current_sudoku.title }}</strong>
+            <span class="badge badge-secondary">{{ difficulty_labels.get(current_sudoku.difficulty, current_sudoku.difficulty) }}</span>
+          </a>
+          {% endif %}
+        </div>
+        {% else %}
+        <p style="font-family: var(--font-sans); font-size: 13px; margin: 0 0 12px;">Şu anda oynanabilir bir bulmaca yok — yakında burada olacak.</p>
+        {% endif %}
+        <a class="btn btn-outline" href="{{ url_for('oyun_kosesi') }}">Oyun Köşesine Git</a>
+      </div>
+    </div>
+
+    <div class="sidebar-block">
+      <div class="sidebar-title">Gazeteyi Oku</div>
+      <div class="puzzle-teaser">
+        <p style="font-family: var(--font-sans); font-size: 13px; margin: 0 0 12px;">Sayının tamamını PDF olarak, orijinal sayfa tasarımıyla okuyun.</p>
+        <a class="btn btn-red" href="{{ url_for('gazete') }}">PDF Arşivine Git</a>
+      </div>
+    </div>
+  </aside>
+</div>
+
+{% endblock %}

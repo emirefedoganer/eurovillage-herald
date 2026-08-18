@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Hakkımızda — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="static-page">
+  <span class="kicker">{{ site.issue_label }}</span>
+  <h1>Hakkımızda</h1>
+  <p style="font-family: var(--font-body); font-size: 17px; color: var(--gray-700);">
+    {{ site.name }}, Eurovillage'ın ilk ve bağımsız gazetesidir. {{ site.founders }} tarafından kurulmuştur ve
+    basın meslek ilkelerine uymaya söz vermiştir. Yönetim ekibimiz ve yayın bilgilerimiz için
+    <a href="{{ url_for('kurumsal') }}" style="text-decoration: underline; color: var(--red);">Gazete Yönetimi</a>
+    sayfamızı ziyaret edebilirsiniz.
+  </p>
+
+  <p style="font-family: var(--font-sans); font-size: 13px; color: var(--gray-500); line-height: 1.6;">{{ site.legal }}</p>
+
+  <div class="footer-motto" style="color: var(--ink); margin-top: 30px;">{{ site.motto }}</div>
+</div>
+
+{% endblock %}

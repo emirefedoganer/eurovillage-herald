@@ -1,0 +1,401 @@
+[
+  {
+    "id": "3889769855",
+    "title": "Eurovillage Çapraz Bulmaca No. 1",
+    "slug": "eurovillage-capraz-bulmaca-1",
+    "publication_date": "2026-08-08",
+    "issue": 1,
+    "difficulty": "easy",
+    "status": "published",
+    "description": "Eurovillage gündemine dair ilk çapraz bulmacamız.",
+    "author": "Emir the Composer",
+    "width": 10,
+    "height": 8,
+    "grid": [
+      [
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        }
+      ],
+      [
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": false,
+          "solution": "P"
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": false,
+          "solution": "H"
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": false,
+          "solution": "O"
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        }
+      ],
+      [
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": false,
+          "solution": "A"
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": false,
+          "solution": "E"
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": false,
+          "solution": "B"
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        }
+      ],
+      [
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": false,
+          "solution": "R"
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": false,
+          "solution": "R"
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": false,
+          "solution": "G"
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        }
+      ],
+      [
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": false,
+          "solution": "A"
+        },
+        {
+          "block": false,
+          "solution": "K"
+        },
+        {
+          "block": false,
+          "solution": "B"
+        },
+        {
+          "block": false,
+          "solution": "A"
+        },
+        {
+          "block": false,
+          "solution": "D"
+        },
+        {
+          "block": false,
+          "solution": "A"
+        },
+        {
+          "block": false,
+          "solution": "I"
+        },
+        {
+          "block": false,
+          "solution": "N"
+        },
+        {
+          "block": true,
+          "solution": ""
+        }
+      ],
+      [
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": false,
+          "solution": "L"
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": false,
+          "solution": "S"
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        }
+      ],
+      [
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": false,
+          "solution": "D"
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        }
+      ],
+      [
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        },
+        {
+          "block": true,
+          "solution": ""
+        }
+      ]
+    ],
+    "clues": [
+      {
+        "number": 1,
+        "direction": "down",
+        "row": 1,
+        "col": 2,
+        "length": 4,
+        "answer": "PARK",
+        "clue": "Bakır ... halka açıldı"
+      },
+      {
+        "number": 2,
+        "direction": "down",
+        "row": 1,
+        "col": 4,
+        "length": 6,
+        "answer": "HERALD",
+        "clue": "The Eurovillage ..."
+      },
+      {
+        "number": 3,
+        "direction": "down",
+        "row": 1,
+        "col": 7,
+        "length": 5,
+        "answer": "OBGIS",
+        "clue": "Eurovillage Büyükşehir Belediye Başkanı"
+      },
+      {
+        "number": 4,
+        "direction": "across",
+        "row": 4,
+        "col": 1,
+        "length": 8,
+        "answer": "AKBADAIN",
+        "clue": "Darbe girişiminde bulunan Dük"
+      }
+    ],
+    "settings": {
+      "allow_check_letter": true,
+      "allow_check_word": true,
+      "allow_check_puzzle": true,
+      "allow_hints": true,
+      "reveal_answer": true,
+      "timer_enabled": true
+    },
+    "created_at": "2026-08-17T18:27:07Z",
+    "updated_at": "2026-08-17T22:21:11Z"
+  }
+]

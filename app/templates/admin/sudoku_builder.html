@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}{{ sudoku.title }} — Sudoku Düzenle — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>{{ sudoku.title }}</h1>
+    <div class="admin-actions">
+      <span class="badge {{ 'badge-lead' if sudoku.status=='published' else 'badge-secondary' }}">{{ sudoku.status }}</span>
+      <a class="btn btn-outline" href="{{ url_for('admin.sudoku_preview', sid=sudoku.id) }}" target="_blank">Ön İzleme</a>
+      <a class="btn btn-outline" href="{{ url_for('admin.sudoku_png', sid=sudoku.id) }}">PNG İndir</a>
+      <a class="btn btn-outline" href="{{ url_for('admin.sudoku_png', sid=sudoku.id) }}?solved=1">Çözüm PNG</a>
+      <a class="btn btn-outline" href="{{ url_for('admin.sudoku_list') }}">← Listeye Dön</a>
+    </div>
+  </div>
+
+  <details class="admin-panel" style="margin-bottom: 20px;">
+    <summary style="cursor:pointer; font-family: var(--font-headline); font-size: 18px;">Bilgiler ve Oyun Ayarları</summary>
+    <form method="post" style="margin-top: 16px;">
+      <input type="hidden" name="form_kind" value="meta">
+      <div class="form-grid-2">
+        <div class="form-row"><label for="title">Başlık</label><input type="text" id="title" name="title" value="{{ sudoku.title }}" required></div>
+        <div class="form-row"><label for="difficulty">Zorluk</label>
+          <select id="difficulty" name="difficulty">
+            {% for d in difficulty_choices %}<option value="{{ d }}" {{ 'selected' if sudoku.difficulty==d else '' }}>{{ {'easy':'Kolay','medium':'Orta','hard':'Zor','expert':'Uzman'}[d] }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-row"><label for="publication_date">Yayın Tarihi</label><input type="date" id="publication_date" name="publication_date" value="{{ sudoku.publication_date }}"></div>
+        <div class="form-row"><label for="issue">Sayı No</label><input type="text" id="issue" name="issue" value="{{ sudoku.issue }}"></div>
+      </div>
+      <div class="form-row"><label for="description">Açıklama</label><textarea id="description" name="description" rows="2">{{ sudoku.description }}</textarea></div>
+
+      <div class="form-grid-2">
+        <div class="form-row"><label for="error_checking">Hata Kontrolü</label>
+          <select id="error_checking" name="error_checking">
+            <option value="immediate" {{ 'selected' if sudoku.settings.error_checking=='immediate' else '' }}>Anında</option>
+            <option value="on_check" {{ 'selected' if sudoku.settings.error_checking=='on_check' else '' }}>Kontrol Et'e basınca</option>
+            <option value="disabled" {{ 'selected' if sudoku.settings.error_checking=='disabled' else '' }}>Kapalı</option>
+          </select>
+        </div>
+        <div class="form-row"><label for="max_hints">Maksimum İpucu</label><input type="number" id="max_hints" name="max_hints" min="0" max="20" value="{{ sudoku.settings.max_hints }}"></div>
+      </div>
+      <div class="xw-build-toolbar">
+        <label><input type="checkbox" name="hints_enabled" {{ 'checked' if sudoku.settings.hints_enabled else '' }}> İpucu aktif</label>
+        <label><input type="checkbox" name="notes_enabled" {{ 'checked' if sudoku.settings.notes_enabled else '' }}> Not modu aktif</label>
+        <label><input type="checkbox" name="timer_enabled" {{ 'checked' if sudoku.settings.timer_enabled else '' }}> Süre sayacı</label>
+        <label><input type="checkbox" name="conflict_highlighting" {{ 'checked' if sudoku.settings.conflict_highlighting else '' }}> Çakışma vurgusu</label>
+        <label><input type="checkbox" name="mistake_counter" {{ 'checked' if sudoku.settings.mistake_counter else '' }}> Hata sayacı</label>
+      </div>
+      <div class="form-actions"><button class="btn btn-red" type="submit">Bilgileri Kaydet</button></div>
+    </form>
+  </details>
+
+  <div class="admin-panel">
+    <form method="post">
+      <input type="hidden" name="form_kind" value="grid">
+      <label>Başlangıç Rakamları</label>
+      <div class="hint" style="margin-bottom:10px;">Sadece verilen (sabit) rakamları girin. Kaydettiğinizde sistem tek çözümlü olup olmadığını doğrular.</div>
+      <div class="skb-grid">
+        {% for r in range(9) %}
+          {% for c in range(9) %}
+          <input type="text" inputmode="numeric" pattern="[1-9]" maxlength="1" name="cell_{{ r }}_{{ c }}" value="{{ sudoku.starting_grid[r][c] or '' }}">
+          {% endfor %}
+        {% endfor %}
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-red" type="submit">Kaydet ve Doğrula</button>
+      </div>
+    </form>
+
+    <form method="post" action="{{ url_for('admin.sudoku_set_status', sid=sudoku.id) }}" style="margin-top: 10px; display:flex; gap:8px;">
+      {% if sudoku.status != 'published' %}
+      <input type="hidden" name="status" value="published"><button class="btn btn-outline" type="submit">Yayımla</button>
+      {% else %}
+      <input type="hidden" name="status" value="draft"><button class="btn btn-outline" type="submit">Yayından Kaldır</button>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/sudoku-builder.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Şifre Sıfırlandı' if reset else 'Yazar Oluşturuldu' }} — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>{{ 'Şifre Sıfırlandı' if reset else 'Yazar Oluşturuldu' }}</h1>
+  </div>
+
+  <div class="admin-panel" style="max-width: 560px;">
+    <p style="font-family: var(--font-sans);">
+      {% if reset %}
+      <strong>{{ author.display_name }}</strong> ({{ user.email }}) için yeni bir geçici şifre oluşturuldu.
+      {% else %}
+      <strong>{{ author.display_name }}</strong> ({{ user.email }}) hesabı oluşturuldu.
+      {% endif %}
+    </p>
+
+    <div style="background: var(--gray-100); border: 1px solid var(--gray-300); padding: 18px; margin: 18px 0; text-align: center;">
+      <div class="hint" style="margin-bottom: 6px;">Geçici Şifre</div>
+      <code style="font-size: 22px; font-weight: 700; letter-spacing: .05em;">{{ temp_password }}</code>
+    </div>
+
+    <p class="hint">
+      Bu şifre yalnızca bir kez, şimdi gösterilir — bir daha görüntülenemez. Yazara güvenli bir şekilde iletin.
+      İlk girişte kendi şifresini belirlemesi istenecektir.
+    </p>
+
+    <div class="form-actions">
+      <a class="btn btn-red" href="{{ url_for('admin.author_edit_master', aid=author.id) }}">Yazar Profiline Git</a>
+      <a class="btn btn-outline" href="{{ url_for('admin.authors_list') }}">Yazarlar Listesine Dön</a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

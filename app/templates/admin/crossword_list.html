@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Çapraz Bulmacalar — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Çapraz Bulmacalar</h1>
+    <div class="admin-actions">
+      <a class="btn btn-outline" href="{{ url_for('admin.crossword_generate') }}">Otomatik Oluştur</a>
+      <a class="btn btn-red" href="{{ url_for('admin.crossword_new') }}">+ Yeni Bulmaca</a>
+    </div>
+  </div>
+
+  <div class="admin-panel">
+    <table class="admin-table">
+      <thead><tr><th>Başlık</th><th>Boyut</th><th>Zorluk</th><th>Durum</th><th>Sayı</th><th>Güncellendi</th><th></th></tr></thead>
+      <tbody>
+        {% for c in crosswords %}
+        <tr>
+          <td>{{ c.title }}</td>
+          <td>{{ c.width }}×{{ c.height }}</td>
+          <td>{{ difficulty_labels.get(c.difficulty, c.difficulty) }}</td>
+          <td><span class="badge {{ 'badge-lead' if c.status=='published' else ('badge-breaking' if c.status=='archived' else 'badge-secondary') }}">{{ status_labels.get(c.status, c.status) }}</span></td>
+          <td>{{ c.issue or '—' }}</td>
+          <td>{{ c.updated_at[:10] if c.updated_at else '' }}</td>
+          <td class="admin-actions">
+            <a class="btn btn-outline" href="{{ url_for('admin.crossword_edit', cid=c.id) }}">Düzenle</a>
+            <a class="btn btn-outline" href="{{ url_for('admin.crossword_preview', cid=c.id) }}" target="_blank">Ön İzleme</a>
+            <a class="btn btn-outline" href="{{ url_for('admin.crossword_png', cid=c.id) }}">PNG</a>
+            {% if c.status != 'published' %}
+            <form method="post" action="{{ url_for('admin.crossword_set_status', cid=c.id) }}"><input type="hidden" name="status" value="published"><button class="btn btn-red" type="submit">Yayımla</button></form>
+            {% else %}
+            <form method="post" action="{{ url_for('admin.crossword_set_status', cid=c.id) }}"><input type="hidden" name="status" value="draft"><button class="btn btn-outline" type="submit">Yayından Kaldır</button></form>
+            {% endif %}
+            {% if c.status != 'archived' %}
+            <form method="post" action="{{ url_for('admin.crossword_set_status', cid=c.id) }}"><input type="hidden" name="status" value="archived"><button class="btn btn-outline" type="submit">Arşivle</button></form>
+            {% endif %}
+            <form method="post" action="{{ url_for('admin.crossword_duplicate', cid=c.id) }}"><button class="btn btn-outline" type="submit">Kopyala</button></form>
+            <form method="post" action="{{ url_for('admin.crossword_delete', cid=c.id) }}" onsubmit="return confirm('Bu bulmacayı silmek istediğinize emin misiniz?');"><button class="btn btn-danger" type="submit">Sil</button></form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">Henüz bulmaca yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

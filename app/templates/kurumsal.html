@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_macros.html" import author_avatar %}
+{% block title %}Gazete Yönetimi — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="leadership-page">
+  <div class="leadership-intro">
+    <span class="kicker">Kurumsal</span>
+    <h1>Gazete Yönetimi</h1>
+    <p>{{ site.name }}'ı yöneten ve her sayıyı hazırlayan ekiple tanışın.</p>
+  </div>
+
+  <div class="leadership-grid">
+    {% for person in site.leadership %}
+    {% set matched = authors_by_name.get(person.name) %}
+    <div class="leadership-card">
+      {% if matched and matched.profile_image %}
+      {{ author_avatar(matched, size=108, css_class="leadership-avatar-photo") }}
+      {% else %}
+      <div class="leadership-avatar">{{ person.initials }}</div>
+      {% endif %}
+      {% if matched %}
+      <h2><a href="{{ url_for('author_profile', slug=matched.slug) }}" class="author-link" data-author-id="{{ matched.id }}">{{ person.name }}</a></h2>
+      {% else %}
+      <h2>{{ person.name }}</h2>
+      {% endif %}
+      <div class="leadership-roles">{{ person.roles|join(' · ') }}</div>
+      <p class="leadership-bio">{{ person.bio }}</p>
+      {% if matched %}<a class="btn btn-outline" style="margin-top:10px;" href="{{ url_for('author_profile', slug=matched.slug) }}">Yazar Profilini Gör</a>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="leadership-info">
+    <span class="kicker">Yayın Bilgileri</span>
+    <table class="masthead-table">
+      <tr><td>Yayın</td><td>{{ site.issue_label }}</td></tr>
+      <tr><td>İmtiyaz Sahibi</td><td>{{ site.imtiyaz_sahibi }}</td></tr>
+      <tr><td>Yayın Türü</td><td>Yaygın Süreli Yayın</td></tr>
+    </table>
+    <p class="footer-legal" style="color: var(--gray-500);">{{ site.legal }}</p>
+    <div class="leadership-motto">{{ site.motto }}</div>
+  </div>
+</div>
+
+{% endblock %}

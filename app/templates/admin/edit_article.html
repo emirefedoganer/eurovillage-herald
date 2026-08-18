@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Makale Düzenle' if article else 'Yeni Makale' }} — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  <div class="admin-header">
+    <h1>{{ 'Makale Düzenle' if article else 'Yeni Makale' }}</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.dashboard') }}">← Panele Dön</a>
+  </div>
+
+  <form class="admin-panel" method="post" enctype="multipart/form-data">
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="title">Başlık</label>
+        <input type="text" id="title" name="title" required value="{{ article.title if article else '' }}">
+      </div>
+      <div class="form-row">
+        <label for="kicker">Üst Başlık (Kicker)</label>
+        <input type="text" id="kicker" name="kicker" value="{{ article.kicker if article else '' }}">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="dek">Spot (Dek)</label>
+      <textarea id="dek" name="dek" rows="2">{{ article.dek if article else '' }}</textarea>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="section">Bölüm</label>
+        <select id="section" name="section">
+          {% for key, s in sections.items() %}
+          <option value="{{ key }}" {{ 'selected' if article and article.section == key else '' }}>{{ s.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="date">Tarih</label>
+        <input type="date" id="date" name="date" value="{{ article.date if article else '' }}">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>Yazar(lar)</label>
+      {% if is_master %}
+      <div class="xw-build-toolbar" style="flex-wrap:wrap;">
+        {% for a in authors %}
+        <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+          <input type="checkbox" name="author_ids" value="{{ a.id }}" style="width:auto;"
+            {{ 'checked' if article and a.id in (article.author_ids or []) else '' }}>
+          {{ a.display_name }}
+        </label>
+        {% endfor %}
+      </div>
+      {% if not authors %}<p class="hint">Henüz aktif yazar yok — önce Yazarlar bölümünden bir yazar oluşturun.</p>{% endif %}
+      {% else %}
+      <input type="text" value="{{ authors[0].display_name if authors else 'Bilinmiyor' }}" disabled>
+      <div class="hint">Bu yazı size ait olarak yayımlanacak. Yazar değişikliği için bir Master Admin'e başvurun.</div>
+      {% endif %}
+    </div>
+    <div class="form-row">
+      <label for="byline_title">Yazar Ünvanı (bu yazı için)</label>
+      <input type="text" id="byline_title" name="byline_title" value="{{ article.byline_title if article else 'Muhabir' }}">
+      <div class="hint">ör. Muhabir, Analiz, Röportaj, Köşe Yazarı — yazarın kalıcı editoryal unvanından farklı olarak yalnızca bu yazı için görünür.</div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="featured">Öne Çıkarma</label>
+        <select id="featured" name="featured">
+          <option value="" {{ 'selected' if article and not article.featured else '' }}>Normal</option>
+          <option value="secondary" {{ 'selected' if article and article.featured == 'secondary' else '' }}>Öne Çıkan (Anasayfa)</option>
+          <option value="lead" {{ 'selected' if article and article.featured == 'lead' else '' }}>Manşet (Anasayfa Lead)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>&nbsp;</label>
+        <div class="checkbox-row" style="height: 41px;">
+          <input type="checkbox" id="breaking" name="breaking" value="1" {{ 'checked' if article and article.breaking else '' }}>
+          <label for="breaking" style="margin:0;">Son Dakika olarak işaretle</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="tags">Etiketler (virgülle ayırın)</label>
+      <input type="text" id="tags" name="tags" value="{{ (article.tags or [])|join(', ') if article else '' }}">
+    </div>
+
+    <div class="form-row">
+      <label>Kapak Görseli</label>
+      {% if article and article.image %}
+      <div class="current-image">
+        <img src="{{ url_for('static', filename='img/articles/' + article.image) }}" alt="">
+        <label style="font-weight:400;"><input type="checkbox" name="remove_image" value="1" style="width:auto;"> Görseli kaldır</label>
+      </div>
+      {% endif %}
+      <input type="file" name="image_file" accept="image/*">
+      <div class="hint">Yeni bir görsel yüklerseniz mevcut görselin yerini alır.</div>
+    </div>
+
+    <div class="form-row">
+      <label for="image_caption">Görsel Alt Yazısı</label>
+      <input type="text" id="image_caption" name="image_caption" value="{{ article.image_caption if article and article.image_caption else '' }}">
+    </div>
+
+    <div class="form-row">
+      <label for="body">Metin</label>
+      <textarea id="body" name="body" rows="22">{{ body_text }}</textarea>
+      <div class="hint">
+        Paragrafları boş satırla ayırın. Ara başlık için satırın başına <code>## </code>,
+        alıntı için <code>&gt; </code>, madde listesi için her satırın başına <code>- </code>,
+        röportaj sorusu/cevabı için <code>Q: soru</code> ve altına <code>A: cevap</code> yazın.
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-red" type="submit">{{ 'Kaydet' if article else 'Yayımla' }}</button>
+      <a class="btn btn-outline" href="{{ url_for('admin.dashboard') }}">Vazgeç</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

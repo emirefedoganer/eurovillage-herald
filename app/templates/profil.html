@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}{{ author.display_name }} | {{ site.name }}{% endblock %}
+{% block extra_head %}
+<meta name="description" content="{{ author.short_bio or (author.display_name + ' - ' + site.name) }}">
+<link rel="canonical" href="{{ url_for('author_profile', slug=author.slug, _external=True) }}">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": {{ author.display_name | tojson }},
+  "url": {{ url_for('author_profile', slug=author.slug, _external=True) | tojson }}
+  {%- if author.profile_image %}, "image": {{ url_for('static', filename='img/authors/' + author.profile_image, _external=True) | tojson }}{% endif -%}
+  {%- if author.short_bio %}, "description": {{ author.short_bio | tojson }}{% endif -%}
+  {%- if author.editorial_role %}, "jobTitle": {{ author.editorial_role | tojson }}{% endif -%}
+}
+</script>
+{% endblock %}
+{% block content %}
+
+<div class="author-profile-page">
+  {% if author.cover_image %}
+  <div class="author-cover" style="background-image:url('{{ url_for('static', filename='img/authors/' + author.cover_image) }}');"></div>
+  {% endif %}
+
+  <div class="author-profile-header {{ 'has-cover' if author.cover_image else '' }}">
+    {% if author.profile_image %}
+    <img class="author-profile-photo" src="{{ url_for('static', filename='img/authors/' + author.profile_image) }}" alt="{{ author.display_name }}">
+    {% else %}
+    <div class="author-profile-photo author-profile-photo-fallback">{{ author.display_name[0] }}</div>
+    {% endif %}
+
+    <div class="author-profile-identity">
+      <h1>{{ author.display_name }}</h1>
+      {% if author.editorial_role %}
+      <div class="author-profile-role {{ 'is-columnist' if author.is_opinion_columnist else '' }}">{{ author.editorial_role }}</div>
+      {% endif %}
+      {% if author.status == 'archived' %}<span class="badge badge-secondary">Eski Katkıda Bulunan</span>{% endif %}
+    </div>
+  </div>
+
+  <div class="author-profile-body">
+    <div class="author-profile-main">
+      {% if author.full_bio or author.short_bio %}
+      <p class="author-profile-bio">{{ author.full_bio or author.short_bio }}</p>
+      {% endif %}
+
+      {% if kose_yazilari %}
+      <section class="author-articles-section">
+        <h2 class="rail-title">Köşe Yazıları</h2>
+        <div class="secondary-grid">
+          {% for a in kose_yazilari %}
+          <article class="story-card {{ '' if a.image else 'story-card--noimg' }}">
+            <span class="kicker">{{ effective_kicker(a) }}</span>
+            <a href="{{ url_for('article_page', slug=a.slug) }}"><h3>{{ a.title }}</h3></a>
+            <p class="dek">{{ a.dek }}</p>
+            <div class="byline">{{ a.date }}</div>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if opinion %}
+      <section class="author-articles-section">
+        <h2 class="rail-title">{{ section_label('gorus') }}</h2>
+        <div class="secondary-grid">
+          {% for a in opinion %}
+          <article class="story-card {{ '' if a.image else 'story-card--noimg' }}">
+            <span class="kicker">{{ effective_kicker(a) }}</span>
+            <a href="{{ url_for('article_page', slug=a.slug) }}"><h3>{{ a.title }}</h3></a>
+            <p class="dek">{{ a.dek }}</p>
+            <div class="byline">{{ a.date }}</div>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if news %}
+      <section class="author-articles-section">
+        <h2 class="rail-title">Haberler</h2>
+        <div class="secondary-grid">
+          {% for a in news[:8] %}
+          <article class="story-card {{ '' if a.image else 'story-card--noimg' }}">
+            <span class="kicker">{{ effective_kicker(a) }}</span>
+            {% if a.image %}<a href="{{ url_for('article_page', slug=a.slug) }}"><img src="{{ url_for('static', filename='img/articles/' + a.image) }}" alt="{{ a.title }}"></a>{% endif %}
+            <a href="{{ url_for('article_page', slug=a.slug) }}"><h3>{{ a.title }}</h3></a>
+            <div class="byline">{{ a.date }}</div>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if ari %}
+      <section class="author-articles-section">
+        <h2 class="rail-title">Arı Magazin</h2>
+        <div class="secondary-grid">
+          {% for a in ari %}
+          <article class="story-card {{ '' if a.image else 'story-card--noimg' }}">
+            <span class="kicker">Arı</span>
+            <a href="{{ url_for('article_page', slug=a.slug) }}"><h3>{{ a.title }}</h3></a>
+            <div class="byline">{{ a.date }}</div>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if not news and not opinion and not kose_yazilari and not ari %}
+      <p class="section-empty">Bu yazarın henüz yayımlanmış bir içeriği yok.</p>
+      {% endif %}
+    </div>
+
+    <aside class="author-profile-sidebar">
+      {% if author.contact_email or author.twitter_handle or author.minecraft_username or author.join_date %}
+      <div class="sidebar-block">
+        <div class="sidebar-title">Bilgiler</div>
+        {% if author.contact_email %}
+        <a class="author-social-row author-social-row-email" href="mailto:{{ author.contact_email }}">
+          <span class="author-social-label">E-posta</span>
+          <span class="author-social-value">{{ author.contact_email }}</span>
+        </a>
+        {% endif %}
+        {% if author.twitter_handle %}
+        <a class="author-social-row" href="https://x.com/{{ author.twitter_handle }}" target="_blank" rel="noopener">
+          <span class="author-social-label">X / Twitter</span>
+          <span class="author-social-value">@{{ author.twitter_handle }}</span>
+        </a>
+        {% endif %}
+        {% if author.minecraft_username %}
+        <div class="author-social-row">
+          <span class="author-social-label">Minecraft</span>
+          <span class="author-social-value">{{ author.minecraft_username }}</span>
+        </div>
+        {% endif %}
+        {% if author.join_date %}
+        <div class="author-social-row">
+          <span class="author-social-label">Katılım</span>
+          <span class="author-social-value">{{ author.join_date }}</span>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if minecraft %}
+      <div class="sidebar-block">
+        <div class="sidebar-title sidebar-title-literal">MINECRAFT KARAKTERİ</div>
+        <div class="minecraft-render-wrap">
+          <img src="{{ minecraft.render_url }}" alt="{{ minecraft.username }} Minecraft karakteri" loading="lazy"
+               data-fallback="https://mc-heads.net/body/{{ minecraft.username }}/300"
+               onerror="if(!this.dataset.triedFallback){this.dataset.triedFallback='1';this.src=this.dataset.fallback;}else{this.closest('.sidebar-block').style.display='none';}">
+          <div class="minecraft-username">{{ minecraft.username }}</div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="sidebar-block">
+        <div class="sidebar-title">Yayın</div>
+        <p style="font-family: var(--font-sans); font-size: 13px; color: var(--gray-500);">
+          {{ total_count }} yayımlanmış içerik.
+        </p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+{% endblock %}

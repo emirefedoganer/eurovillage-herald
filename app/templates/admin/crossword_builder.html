@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}{{ crossword.title }} — Bulmaca Düzenle — {{ site.name }}{% endblock %}
+{% block extra_head %}<script id="xwb-data" type="application/json">{{ {"width": crossword.width, "height": crossword.height, "grid": crossword.grid, "clues": crossword.clues} | tojson }}</script>{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>{{ crossword.title }}</h1>
+    <div class="admin-actions">
+      <span class="badge {{ 'badge-lead' if crossword.status=='published' else 'badge-secondary' }}">{{ crossword.status }}</span>
+      <a class="btn btn-outline" href="{{ url_for('admin.crossword_preview', cid=crossword.id) }}" target="_blank">Ön İzleme</a>
+      <a class="btn btn-outline" href="{{ url_for('admin.crossword_png', cid=crossword.id) }}">PNG İndir</a>
+      <a class="btn btn-outline" href="{{ url_for('admin.crossword_list') }}">← Listeye Dön</a>
+    </div>
+  </div>
+
+  <details class="admin-panel" style="margin-bottom: 20px;">
+    <summary style="cursor:pointer; font-family: var(--font-headline); font-size: 18px;">Bulmaca Bilgileri ve Ayarlar</summary>
+    <form method="post" style="margin-top: 16px;">
+      <div class="form-grid-2">
+        <div class="form-row"><label for="title">Başlık</label><input type="text" id="title" name="title" value="{{ crossword.title }}" required></div>
+        <div class="form-row"><label for="difficulty">Zorluk</label>
+          <select id="difficulty" name="difficulty">
+            {% for d in difficulty_choices %}<option value="{{ d }}" {{ 'selected' if crossword.difficulty==d else '' }}>{{ {'easy':'Kolay','medium':'Orta','hard':'Zor','expert':'Uzman'}[d] }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-row"><label for="publication_date">Yayın Tarihi</label><input type="date" id="publication_date" name="publication_date" value="{{ crossword.publication_date }}"></div>
+        <div class="form-row"><label for="issue">Sayı No</label><input type="text" id="issue" name="issue" value="{{ crossword.issue }}"></div>
+      </div>
+      <div class="form-row"><label for="author">Yazar / Editör</label><input type="text" id="author" name="author" value="{{ crossword.author }}"></div>
+      <div class="form-row"><label for="description">Açıklama</label><textarea id="description" name="description" rows="2">{{ crossword.description }}</textarea></div>
+
+      <div class="xw-build-toolbar" style="margin-top: 6px;">
+        <label><input type="checkbox" name="allow_check_letter" {{ 'checked' if crossword.settings.allow_check_letter else '' }}> Harfi Kontrol Et'e izin ver</label>
+        <label><input type="checkbox" name="allow_check_word" {{ 'checked' if crossword.settings.allow_check_word else '' }}> Kelimeyi Kontrol Et'e izin ver</label>
+        <label><input type="checkbox" name="allow_check_puzzle" {{ 'checked' if crossword.settings.allow_check_puzzle else '' }}> Bulmacayı Kontrol Et'e izin ver</label>
+        <label><input type="checkbox" name="allow_hints" {{ 'checked' if crossword.settings.allow_hints else '' }}> İpucuna izin ver</label>
+        <label><input type="checkbox" name="reveal_answer" {{ 'checked' if crossword.settings.reveal_answer else '' }}> Cevabı Göster'e izin ver</label>
+        <label><input type="checkbox" name="timer_enabled" {{ 'checked' if crossword.settings.timer_enabled else '' }}> Süre sayacı</label>
+      </div>
+      <div class="form-actions"><button class="btn btn-red" type="submit">Bilgileri Kaydet</button></div>
+    </form>
+  </details>
+
+  <div class="admin-panel">
+    <div class="xw-build-layout">
+      <div>
+        <div class="xw-build-toolbar">
+          <button type="button" id="xwb-toggle-block" class="btn btn-outline" disabled>Blok Kare Yap</button>
+          <button type="button" id="xwb-clear" class="btn btn-outline">Izgarayı Temizle</button>
+          <span class="hint">Bir kareye tıklayın, sonra harf yazın. Karenin numaralandırması otomatiktir.</span>
+        </div>
+        <div id="xwb-grid" class="xw-grid" style="max-width: 620px;"></div>
+
+        <div class="xw-build-save-bar">
+          <button type="button" id="xwb-save" class="btn btn-red">Izgara ve İpuçlarını Kaydet</button>
+          <span id="xwb-save-status" class="xw-save-status"></span>
+        </div>
+
+        <form method="post" action="{{ url_for('admin.crossword_set_status', cid=crossword.id) }}" style="margin-top: 18px; display:flex; gap:8px;">
+          {% if crossword.status != 'published' %}
+          <input type="hidden" name="status" value="published"><button class="btn btn-red" type="submit">Yayımla</button>
+          {% else %}
+          <input type="hidden" name="status" value="draft"><button class="btn btn-outline" type="submit">Yayından Kaldır</button>
+          {% endif %}
+        </form>
+        <div class="hint" style="margin-top:8px;">Kaydetmeden yayımlarsanız son kaydedilen ızgara kullanılır — önce "Izgara ve İpuçlarını Kaydet" ile kaydedin.</div>
+      </div>
+
+      <div id="xwb-data-root">
+        <div class="xw-clue-editor">
+          <h3>Soldan Sağa</h3>
+          <div id="xwb-across-editor"></div>
+          <h3>Yukarıdan Aşağıya</h3>
+          <div id="xwb-down-editor"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="xwb-root" data-save-url="{{ url_for('admin.crossword_save_grid', cid=crossword.id) }}"></div>
+</div>
+
+<script src="{{ url_for('static', filename='js/crossword-builder.js') }}"></script>
+{% endblock %}
