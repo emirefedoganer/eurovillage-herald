@@ -104,6 +104,24 @@ if SERVER_NAME:
     app.config["SERVER_NAME"] = SERVER_NAME
     app.config["PREFERRED_URL_SCHEME"] = os.environ.get("PREFERRED_URL_SCHEME", "https")
 
+    class _NormalizeWWWHost:
+        """With SERVER_NAME set, Flask's subdomain matching only matches the
+        bare domain -- www.<SERVER_NAME> is a distinct, unmatched subdomain
+        and 404s on every route. Rather than duplicating every route under
+        subdomain="www", rewrite the Host header to the bare domain before
+        Werkzeug's routing ever sees it, so both hostnames serve identically."""
+        def __init__(self, wsgi_app, canonical_host):
+            self.wsgi_app = wsgi_app
+            self.www_host = "www." + canonical_host
+
+        def __call__(self, environ, start_response):
+            host = environ.get("HTTP_HOST", "")
+            if host == self.www_host or host.startswith(self.www_host + ":"):
+                environ["HTTP_HOST"] = host.replace("www.", "", 1)
+            return self.wsgi_app(environ, start_response)
+
+    app.wsgi_app = _NormalizeWWWHost(app.wsgi_app, SERVER_NAME)
+
 os.makedirs(ARTICLE_IMG_DIR, exist_ok=True)
 os.makedirs(ISSUE_PDF_DIR, exist_ok=True)
 os.makedirs(AUTHOR_IMG_DIR, exist_ok=True)
