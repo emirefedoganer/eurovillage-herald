@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}İletişim Mesajları — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>İletişim Mesajları ({{ total }})</h1>
+  </div>
+
+  <div class="admin-panel">
+    {% if messages %}
+    <table class="admin-table">
+      <thead>
+        <tr><th>Tarih</th><th>Ad Soyad</th><th>E-posta</th><th>Konu</th><th>Mesaj</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for m in messages %}
+        <tr>
+          <td style="white-space:nowrap;">{{ m.date }}</td>
+          <td>{{ m.name }}</td>
+          <td><a href="mailto:{{ m.email }}">{{ m.email }}</a></td>
+          <td>{{ m.subject }}</td>
+          <td style="max-width:320px; white-space:pre-wrap;">{{ m.message }}</td>
+          <td class="admin-actions">
+            <form method="post" action="{{ url_for('admin.message_delete', mid=m.id) }}" onsubmit="return confirm('Bu mesajı silmek istediğinize emin misiniz?');">
+              <input type="hidden" name="sayfa" value="{{ page }}">
+              <button class="btn btn-danger" type="submit">Sil</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if page_count > 1 %}
+    <div class="admin-pagination">
+      <a class="btn btn-outline {{ 'is-disabled' if page <= 1 else '' }}"
+         href="{{ url_for('admin.messages_list', sayfa=page - 1) if page > 1 else '#' }}">← Önceki</a>
+      <span class="admin-pagination-status">Sayfa {{ page }} / {{ page_count }}</span>
+      <a class="btn btn-outline {{ 'is-disabled' if page >= page_count else '' }}"
+         href="{{ url_for('admin.messages_list', sayfa=page + 1) if page < page_count else '#' }}">Sonraki →</a>
+    </div>
+    {% endif %}
+    {% else %}
+    <p style="font-family: var(--font-sans); color: var(--gray-500); margin:0;">Henüz mesaj gelmedi.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

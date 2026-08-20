@@ -13,10 +13,10 @@
     "id": "ef309cf032",
     "email": "eto@eurovillageherald.com",
     "password_hash": "pbkdf2:sha256:1000000$vmdW9pPTmvrrAEef$7db75a18d87a8ba258a471239f0bbec71d738d45bbc4b3d4ebfca8b8adb83b03",
-    "account_role": "author",
+    "account_role": "okur_iliskileri",
     "status": "active",
     "must_change_password": false,
     "created_at": "2026-08-17T20:31:49Z",
-    "updated_at": "2026-08-17T21:31:55Z"
+    "updated_at": "2026-08-20T23:06:39Z"
   }
 ]

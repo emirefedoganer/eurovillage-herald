@@ -413,6 +413,9 @@ body.drawer-open{ overflow: hidden; }
 .admin-table tr:hover{ background: var(--gray-100); }
 .admin-actions{ display: flex; gap: 8px; }
 .admin-actions form{ display: inline; }
+.admin-pagination{ display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 20px; font-family: var(--font-sans); }
+.admin-pagination-status{ font-size: 13px; color: var(--gray-500); }
+.admin-pagination .is-disabled{ opacity: .4; pointer-events: none; }
 .login-card{ max-width: 380px; margin: 60px auto; background: #fff; border: 1px solid var(--gray-300); border-radius: 6px; padding: 32px; }
 .login-card h1{ font-family: var(--font-mast); font-size: 34px; text-align: center; margin: 0 0 4px; }
 .login-card .sub{ text-align: center; color: var(--gray-500); font-size: 13px; margin-bottom: 24px; }

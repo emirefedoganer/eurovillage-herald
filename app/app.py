@@ -177,6 +177,7 @@ def inject_globals():
         "section_label": section_label,
         "is_admin": bool(user),
         "is_master_admin": bool(user and user["account_role"] == "master_admin"),
+        "is_staff": bool(user and user["account_role"] in STAFF_ROLES),
         "current_user": user,
         "current_author": author,
         "author_preview_json": author_preview_json(),
@@ -223,6 +224,28 @@ def master_admin_required(view):
         if user.get("must_change_password") and request.endpoint != "admin.force_change_password":
             return redirect(url_for("admin.force_change_password"))
         if user["account_role"] != "master_admin":
+            abort(403)
+        return view(*args, **kwargs)
+    return wrapped
+
+
+# Roles that may reach the site-wide staff areas (Games, İletişim Mesajları)
+# without holding full Master Admin power (author/account management, site
+# settings, audit log stay master_admin_required only).
+STAFF_ROLES = ("master_admin", "okur_iliskileri")
+ACCOUNT_ROLES = ("author", "okur_iliskileri", "master_admin")
+
+
+def staff_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        user = _resolve_logged_in_user()
+        if not user:
+            session.clear()
+            return redirect(url_for("admin.login", next=request.path))
+        if user.get("must_change_password") and request.endpoint != "admin.force_change_password":
+            return redirect(url_for("admin.force_change_password"))
+        if user["account_role"] not in STAFF_ROLES:
             abort(403)
         return view(*args, **kwargs)
     return wrapped
@@ -708,18 +731,36 @@ def dashboard():
 
     articles = store.all_articles_sorted()
     issues = sorted(store.load_issues(), key=lambda i: i["date"], reverse=True)
-    messages = store.all_messages_sorted()
-    return render_template("admin/dashboard.html", articles=articles, issues=issues, messages=messages, active="dashboard")
+    message_count = len(store.load_messages())
+    return render_template("admin/dashboard.html", articles=articles, issues=issues,
+                            message_count=message_count, active="dashboard")
+
+
+MESSAGES_PER_PAGE = 10
+
+
+@admin_bp.route("/mesajlar")
+@staff_required
+def messages_list():
+    all_messages = store.all_messages_sorted()
+    total = len(all_messages)
+    page_count = max(1, -(-total // MESSAGES_PER_PAGE))  # ceil division
+    page = request.args.get("sayfa", 1, type=int)
+    page = min(max(page, 1), page_count)
+    start = (page - 1) * MESSAGES_PER_PAGE
+    messages = all_messages[start:start + MESSAGES_PER_PAGE]
+    return render_template("admin/messages_list.html", messages=messages, total=total,
+                            page=page, page_count=page_count, active="messages")
 
 
 @admin_bp.route("/mesaj/<mid>/sil", methods=["POST"])
-@master_admin_required
+@staff_required
 def message_delete(mid):
     messages = store.load_messages()
     messages = [m for m in messages if m["id"] != mid]
     store.save_messages(messages)
     flash("Mesaj silindi.", "success")
-    return redirect(url_for("admin.dashboard"))
+    return redirect(url_for("admin.messages_list", sayfa=request.form.get("sayfa", 1)))
 
 
 def text_to_body(body_raw):
@@ -1068,7 +1109,7 @@ def _game_meta_from_form(form, kind):
 
 
 @admin_bp.route("/oyunlar")
-@master_admin_required
+@staff_required
 def games_overview():
     crosswords = store.all_crosswords_sorted()
     sudokus = store.all_sudokus_sorted()
@@ -1082,7 +1123,7 @@ def games_overview():
 # ---- crosswords -----------------------------------------------------------
 
 @admin_bp.route("/oyunlar/bulmaca")
-@master_admin_required
+@staff_required
 def crossword_list():
     crosswords = store.all_crosswords_sorted()
     return render_template("admin/crossword_list.html", crosswords=crosswords,
@@ -1090,7 +1131,7 @@ def crossword_list():
 
 
 @admin_bp.route("/oyunlar/bulmaca/yeni", methods=["GET", "POST"])
-@master_admin_required
+@staff_required
 def crossword_new():
     if request.method == "POST":
         crosswords = store.load_crosswords()
@@ -1133,7 +1174,7 @@ def crossword_new():
 
 
 @admin_bp.route("/oyunlar/bulmaca/olustur", methods=["GET", "POST"])
-@master_admin_required
+@staff_required
 def crossword_generate():
     if request.method == "POST":
         raw = request.form.get("entries", "")
@@ -1194,7 +1235,7 @@ def crossword_generate():
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/duzenle", methods=["GET", "POST"])
-@master_admin_required
+@staff_required
 def crossword_edit(cid):
     crosswords = store.load_crosswords()
     idx = next((i for i, c in enumerate(crosswords) if c["id"] == cid), None)
@@ -1232,7 +1273,7 @@ def crossword_edit(cid):
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/izgara", methods=["POST"])
-@master_admin_required
+@staff_required
 def crossword_save_grid(cid):
     cw = store.get_crossword(cid)
     if not cw:
@@ -1284,7 +1325,7 @@ def crossword_save_grid(cid):
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/durum", methods=["POST"])
-@master_admin_required
+@staff_required
 def crossword_set_status(cid):
     crosswords = store.load_crosswords()
     idx = next((i for i, c in enumerate(crosswords) if c["id"] == cid), None)
@@ -1323,7 +1364,7 @@ def crossword_set_status(cid):
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/kopyala", methods=["POST"])
-@master_admin_required
+@staff_required
 def crossword_duplicate(cid):
     crosswords = store.load_crosswords()
     original = next((c for c in crosswords if c["id"] == cid), None)
@@ -1346,7 +1387,7 @@ def crossword_duplicate(cid):
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/sil", methods=["POST"])
-@master_admin_required
+@staff_required
 def crossword_delete(cid):
     crosswords = store.load_crosswords()
     crosswords = [c for c in crosswords if c["id"] != cid]
@@ -1356,7 +1397,7 @@ def crossword_delete(cid):
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/onizle")
-@master_admin_required
+@staff_required
 def crossword_preview(cid):
     cw = store.get_crossword(cid)
     if not cw:
@@ -1367,7 +1408,7 @@ def crossword_preview(cid):
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/png")
-@master_admin_required
+@staff_required
 def crossword_png(cid):
     cw = store.get_crossword(cid)
     if not cw:
@@ -1389,7 +1430,7 @@ def _parse_sudoku_grid_from_form(form, prefix="cell"):
 
 
 @admin_bp.route("/oyunlar/sudoku")
-@master_admin_required
+@staff_required
 def sudoku_list():
     sudokus = store.all_sudokus_sorted()
     return render_template("admin/sudoku_list.html", sudokus=sudokus,
@@ -1397,7 +1438,7 @@ def sudoku_list():
 
 
 @admin_bp.route("/oyunlar/sudoku/yeni", methods=["GET", "POST"])
-@master_admin_required
+@staff_required
 def sudoku_new():
     if request.method == "POST":
         meta = _game_meta_from_form(request.form, "sudoku")
@@ -1447,7 +1488,7 @@ def _flash_sudoku_validation(result):
 
 
 @admin_bp.route("/oyunlar/sudoku/olustur", methods=["GET", "POST"])
-@master_admin_required
+@staff_required
 def sudoku_generate():
     if request.method == "POST":
         difficulty = request.form.get("difficulty")
@@ -1485,7 +1526,7 @@ def sudoku_generate():
 
 
 @admin_bp.route("/oyunlar/sudoku/<sid>/duzenle", methods=["GET", "POST"])
-@master_admin_required
+@staff_required
 def sudoku_edit(sid):
     sudokus = store.load_sudokus()
     idx = next((i for i, s in enumerate(sudokus) if s["id"] == sid), None)
@@ -1535,7 +1576,7 @@ def sudoku_edit(sid):
 
 
 @admin_bp.route("/oyunlar/sudoku/<sid>/durum", methods=["POST"])
-@master_admin_required
+@staff_required
 def sudoku_set_status(sid):
     sudokus = store.load_sudokus()
     idx = next((i for i, s in enumerate(sudokus) if s["id"] == sid), None)
@@ -1562,7 +1603,7 @@ def sudoku_set_status(sid):
 
 
 @admin_bp.route("/oyunlar/sudoku/<sid>/kopyala", methods=["POST"])
-@master_admin_required
+@staff_required
 def sudoku_duplicate(sid):
     sudokus = store.load_sudokus()
     original = next((s for s in sudokus if s["id"] == sid), None)
@@ -1585,7 +1626,7 @@ def sudoku_duplicate(sid):
 
 
 @admin_bp.route("/oyunlar/sudoku/<sid>/sil", methods=["POST"])
-@master_admin_required
+@staff_required
 def sudoku_delete(sid):
     sudokus = store.load_sudokus()
     sudokus = [s for s in sudokus if s["id"] != sid]
@@ -1595,7 +1636,7 @@ def sudoku_delete(sid):
 
 
 @admin_bp.route("/oyunlar/sudoku/<sid>/onizle")
-@master_admin_required
+@staff_required
 def sudoku_preview(sid):
     sd = store.get_sudoku(sid)
     if not sd:
@@ -1606,7 +1647,7 @@ def sudoku_preview(sid):
 
 
 @admin_bp.route("/oyunlar/sudoku/<sid>/png")
-@master_admin_required
+@staff_required
 def sudoku_png(sid):
     sd = store.get_sudoku(sid)
     if not sd:
@@ -1736,7 +1777,7 @@ def author_new():
             "id": uuid.uuid4().hex[:10],
             "email": email,
             "password_hash": generate_password_hash(temp_password, method="pbkdf2:sha256"),
-            "account_role": request.form.get("account_role") if request.form.get("account_role") in ("author", "master_admin") else "author",
+            "account_role": request.form.get("account_role") if request.form.get("account_role") in ACCOUNT_ROLES else "author",
             "status": "active",
             "must_change_password": True,
             "created_at": now,
@@ -1845,7 +1886,7 @@ def author_edit_master(aid):
                     users[uidx]["email"] = new_email
 
             new_role = form.get("account_role")
-            if new_role in ("author", "master_admin") and new_role != users[uidx]["account_role"]:
+            if new_role in ACCOUNT_ROLES and new_role != users[uidx]["account_role"]:
                 if users[uidx]["account_role"] == "master_admin" and new_role != "master_admin" \
                         and store.count_active_master_admins(exclude_id=users[uidx]["id"]) < 1:
                     flash("Son aktif Master Admin'in rolü değiştirilemez.", "error")

@@ -163,5 +163,43 @@
     "target": "admin@eurovillageherald.com",
     "meta": {},
     "at": "2026-08-17T22:19:20Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "login",
+    "target": "admin@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-20T23:06:39Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "role_changed",
+    "target": "eto@eurovillageherald.com",
+    "meta": {
+      "from": "author",
+      "to": "okur_iliskileri"
+    },
+    "at": "2026-08-20T23:06:39Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "profile_edited_by_admin",
+    "target": "Duke of Akbadain",
+    "meta": {},
+    "at": "2026-08-20T23:06:39Z"
+  },
+  {
+    "actor": "eto@eurovillageherald.com",
+    "action": "login",
+    "target": "eto@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-20T23:06:47Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "login",
+    "target": "admin@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-20T23:08:56Z"
   }
 ]
