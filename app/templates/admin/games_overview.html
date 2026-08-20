@@ -34,7 +34,10 @@
           <td>{{ difficulty_labels.get(c.difficulty, c.difficulty) }}</td>
           <td><span class="badge {{ 'badge-lead' if c.status=='published' else 'badge-secondary' }}">{{ status_labels.get(c.status, c.status) }}</span></td>
           <td>{{ c.updated_at[:10] if c.updated_at else '' }}</td>
-          <td><a class="btn btn-outline" href="{{ url_for('admin.crossword_edit', cid=c.id) }}">Düzenle</a></td>
+          <td class="admin-actions">
+            <a class="btn btn-outline" href="{{ url_for('admin.crossword_edit', cid=c.id) }}">Düzenle</a>
+            <form method="post" action="{{ url_for('admin.crossword_delete', cid=c.id) }}" onsubmit="return confirm('Bu bulmacayı silmek istediğinize emin misiniz?');"><button class="btn btn-danger" type="submit">Sil</button></form>
+          </td>
         </tr>
         {% else %}
         <tr><td colspan="5">Henüz bulmaca yok.</td></tr>
@@ -61,7 +64,10 @@
           <td>{{ difficulty_labels.get(s.difficulty, s.difficulty) }}</td>
           <td><span class="badge {{ 'badge-lead' if s.status=='published' else 'badge-secondary' }}">{{ status_labels.get(s.status, s.status) }}</span></td>
           <td>{{ s.updated_at[:10] if s.updated_at else '' }}</td>
-          <td><a class="btn btn-outline" href="{{ url_for('admin.sudoku_edit', sid=s.id) }}">Düzenle</a></td>
+          <td class="admin-actions">
+            <a class="btn btn-outline" href="{{ url_for('admin.sudoku_edit', sid=s.id) }}">Düzenle</a>
+            <form method="post" action="{{ url_for('admin.sudoku_delete', sid=s.id) }}" onsubmit="return confirm('Bu sudokuyu silmek istediğinize emin misiniz?');"><button class="btn btn-danger" type="submit">Sil</button></form>
+          </td>
         </tr>
         {% else %}
         <tr><td colspan="5">Henüz sudoku yok.</td></tr>
