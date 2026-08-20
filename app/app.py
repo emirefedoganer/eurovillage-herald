@@ -177,7 +177,7 @@ def inject_globals():
         "section_label": section_label,
         "is_admin": bool(user),
         "is_master_admin": bool(user and user["account_role"] == "master_admin"),
-        "is_staff": bool(user and user["account_role"] in STAFF_ROLES),
+        "perms": user_permissions(user),
         "current_user": user,
         "current_author": author,
         "author_preview_json": author_preview_json(),
@@ -229,26 +229,46 @@ def master_admin_required(view):
     return wrapped
 
 
-# Roles that may reach the site-wide staff areas (Games, İletişim Mesajları)
-# without holding full Master Admin power (author/account management, site
-# settings, audit log stay master_admin_required only).
-STAFF_ROLES = ("master_admin", "okur_iliskileri")
-ACCOUNT_ROLES = ("author", "okur_iliskileri", "master_admin")
+# The fixed menu of permissions a custom role can be granted. Deliberately
+# does NOT include author/account management (creating or editing authors,
+# resetting passwords, changing roles) -- that stays hardcoded to
+# master_admin_required everywhere, never configurable, so no role (however
+# it's later edited) can ever grant itself or anyone else that power.
+PERMISSION_CHOICES = [
+    ("games", "Oyunlar"),
+    ("messages", "İletişim Mesajları"),
+    ("site_settings", "Site Ayarları"),
+    ("audit_log", "Denetim Kaydı"),
+]
 
 
-def staff_required(view):
-    @wraps(view)
-    def wrapped(*args, **kwargs):
-        user = _resolve_logged_in_user()
-        if not user:
-            session.clear()
-            return redirect(url_for("admin.login", next=request.path))
-        if user.get("must_change_password") and request.endpoint != "admin.force_change_password":
-            return redirect(url_for("admin.force_change_password"))
-        if user["account_role"] not in STAFF_ROLES:
-            abort(403)
-        return view(*args, **kwargs)
-    return wrapped
+def user_permissions(user):
+    """The set of permission keys this user's role grants. Master Admin is
+    an unconditional bypass (not stored as a real permission list) so it
+    can never be accidentally narrowed by editing role data."""
+    if not user:
+        return set()
+    if user["account_role"] == "master_admin":
+        return {key for key, _ in PERMISSION_CHOICES}
+    role = store.get_role(user["account_role"])
+    return set(role["permissions"]) if role else set()
+
+
+def permission_required(perm):
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            user = _resolve_logged_in_user()
+            if not user:
+                session.clear()
+                return redirect(url_for("admin.login", next=request.path))
+            if user.get("must_change_password") and request.endpoint != "admin.force_change_password":
+                return redirect(url_for("admin.force_change_password"))
+            if perm not in user_permissions(user):
+                abort(403)
+            return view(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
 def allowed_image(filename):
@@ -740,7 +760,7 @@ MESSAGES_PER_PAGE = 10
 
 
 @admin_bp.route("/mesajlar")
-@staff_required
+@permission_required("messages")
 def messages_list():
     all_messages = store.all_messages_sorted()
     total = len(all_messages)
@@ -754,7 +774,7 @@ def messages_list():
 
 
 @admin_bp.route("/mesaj/<mid>/sil", methods=["POST"])
-@staff_required
+@permission_required("messages")
 def message_delete(mid):
     messages = store.load_messages()
     messages = [m for m in messages if m["id"] != mid]
@@ -1109,7 +1129,7 @@ def _game_meta_from_form(form, kind):
 
 
 @admin_bp.route("/oyunlar")
-@staff_required
+@permission_required("games")
 def games_overview():
     crosswords = store.all_crosswords_sorted()
     sudokus = store.all_sudokus_sorted()
@@ -1123,7 +1143,7 @@ def games_overview():
 # ---- crosswords -----------------------------------------------------------
 
 @admin_bp.route("/oyunlar/bulmaca")
-@staff_required
+@permission_required("games")
 def crossword_list():
     crosswords = store.all_crosswords_sorted()
     return render_template("admin/crossword_list.html", crosswords=crosswords,
@@ -1131,7 +1151,7 @@ def crossword_list():
 
 
 @admin_bp.route("/oyunlar/bulmaca/yeni", methods=["GET", "POST"])
-@staff_required
+@permission_required("games")
 def crossword_new():
     if request.method == "POST":
         crosswords = store.load_crosswords()
@@ -1174,7 +1194,7 @@ def crossword_new():
 
 
 @admin_bp.route("/oyunlar/bulmaca/olustur", methods=["GET", "POST"])
-@staff_required
+@permission_required("games")
 def crossword_generate():
     if request.method == "POST":
         raw = request.form.get("entries", "")
@@ -1235,7 +1255,7 @@ def crossword_generate():
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/duzenle", methods=["GET", "POST"])
-@staff_required
+@permission_required("games")
 def crossword_edit(cid):
     crosswords = store.load_crosswords()
     idx = next((i for i, c in enumerate(crosswords) if c["id"] == cid), None)
@@ -1273,7 +1293,7 @@ def crossword_edit(cid):
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/izgara", methods=["POST"])
-@staff_required
+@permission_required("games")
 def crossword_save_grid(cid):
     cw = store.get_crossword(cid)
     if not cw:
@@ -1325,7 +1345,7 @@ def crossword_save_grid(cid):
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/durum", methods=["POST"])
-@staff_required
+@permission_required("games")
 def crossword_set_status(cid):
     crosswords = store.load_crosswords()
     idx = next((i for i, c in enumerate(crosswords) if c["id"] == cid), None)
@@ -1364,7 +1384,7 @@ def crossword_set_status(cid):
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/kopyala", methods=["POST"])
-@staff_required
+@permission_required("games")
 def crossword_duplicate(cid):
     crosswords = store.load_crosswords()
     original = next((c for c in crosswords if c["id"] == cid), None)
@@ -1387,7 +1407,7 @@ def crossword_duplicate(cid):
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/sil", methods=["POST"])
-@staff_required
+@permission_required("games")
 def crossword_delete(cid):
     crosswords = store.load_crosswords()
     crosswords = [c for c in crosswords if c["id"] != cid]
@@ -1397,7 +1417,7 @@ def crossword_delete(cid):
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/onizle")
-@staff_required
+@permission_required("games")
 def crossword_preview(cid):
     cw = store.get_crossword(cid)
     if not cw:
@@ -1408,7 +1428,7 @@ def crossword_preview(cid):
 
 
 @admin_bp.route("/oyunlar/bulmaca/<cid>/png")
-@staff_required
+@permission_required("games")
 def crossword_png(cid):
     cw = store.get_crossword(cid)
     if not cw:
@@ -1430,7 +1450,7 @@ def _parse_sudoku_grid_from_form(form, prefix="cell"):
 
 
 @admin_bp.route("/oyunlar/sudoku")
-@staff_required
+@permission_required("games")
 def sudoku_list():
     sudokus = store.all_sudokus_sorted()
     return render_template("admin/sudoku_list.html", sudokus=sudokus,
@@ -1438,7 +1458,7 @@ def sudoku_list():
 
 
 @admin_bp.route("/oyunlar/sudoku/yeni", methods=["GET", "POST"])
-@staff_required
+@permission_required("games")
 def sudoku_new():
     if request.method == "POST":
         meta = _game_meta_from_form(request.form, "sudoku")
@@ -1488,7 +1508,7 @@ def _flash_sudoku_validation(result):
 
 
 @admin_bp.route("/oyunlar/sudoku/olustur", methods=["GET", "POST"])
-@staff_required
+@permission_required("games")
 def sudoku_generate():
     if request.method == "POST":
         difficulty = request.form.get("difficulty")
@@ -1526,7 +1546,7 @@ def sudoku_generate():
 
 
 @admin_bp.route("/oyunlar/sudoku/<sid>/duzenle", methods=["GET", "POST"])
-@staff_required
+@permission_required("games")
 def sudoku_edit(sid):
     sudokus = store.load_sudokus()
     idx = next((i for i, s in enumerate(sudokus) if s["id"] == sid), None)
@@ -1576,7 +1596,7 @@ def sudoku_edit(sid):
 
 
 @admin_bp.route("/oyunlar/sudoku/<sid>/durum", methods=["POST"])
-@staff_required
+@permission_required("games")
 def sudoku_set_status(sid):
     sudokus = store.load_sudokus()
     idx = next((i for i, s in enumerate(sudokus) if s["id"] == sid), None)
@@ -1603,7 +1623,7 @@ def sudoku_set_status(sid):
 
 
 @admin_bp.route("/oyunlar/sudoku/<sid>/kopyala", methods=["POST"])
-@staff_required
+@permission_required("games")
 def sudoku_duplicate(sid):
     sudokus = store.load_sudokus()
     original = next((s for s in sudokus if s["id"] == sid), None)
@@ -1626,7 +1646,7 @@ def sudoku_duplicate(sid):
 
 
 @admin_bp.route("/oyunlar/sudoku/<sid>/sil", methods=["POST"])
-@staff_required
+@permission_required("games")
 def sudoku_delete(sid):
     sudokus = store.load_sudokus()
     sudokus = [s for s in sudokus if s["id"] != sid]
@@ -1636,7 +1656,7 @@ def sudoku_delete(sid):
 
 
 @admin_bp.route("/oyunlar/sudoku/<sid>/onizle")
-@staff_required
+@permission_required("games")
 def sudoku_preview(sid):
     sd = store.get_sudoku(sid)
     if not sd:
@@ -1647,7 +1667,7 @@ def sudoku_preview(sid):
 
 
 @admin_bp.route("/oyunlar/sudoku/<sid>/png")
-@staff_required
+@permission_required("games")
 def sudoku_png(sid):
     sd = store.get_sudoku(sid)
     if not sd:
@@ -1748,7 +1768,8 @@ def authors_list():
             "article_count": len(store.articles_by_author(a["id"])),
         })
     rows.sort(key=lambda r: r["author"]["display_name"])
-    return render_template("admin/authors_list.html", rows=rows, active="authors")
+    roles_by_id = {r["id"]: r["name"] for r in store.load_roles()}
+    return render_template("admin/authors_list.html", rows=rows, roles_by_id=roles_by_id, active="authors")
 
 
 @admin_bp.route("/yazarlar/yeni", methods=["GET", "POST"])
@@ -1769,7 +1790,7 @@ def author_new():
         if errors:
             for e in errors:
                 flash(e, "error")
-            return render_template("admin/author_new.html", editorial_roles=EDITORIAL_ROLE_CHOICES, form=request.form, active="authors")
+            return render_template("admin/author_new.html", editorial_roles=EDITORIAL_ROLE_CHOICES, roles=store.load_roles(), form=request.form, active="authors")
 
         now = _now_iso()
         temp_password = generate_temp_password()
@@ -1777,7 +1798,7 @@ def author_new():
             "id": uuid.uuid4().hex[:10],
             "email": email,
             "password_hash": generate_password_hash(temp_password, method="pbkdf2:sha256"),
-            "account_role": request.form.get("account_role") if request.form.get("account_role") in ACCOUNT_ROLES else "author",
+            "account_role": request.form.get("account_role") if request.form.get("account_role") in {r["id"] for r in store.load_roles()} else "author",
             "status": "active",
             "must_change_password": True,
             "created_at": now,
@@ -1820,7 +1841,7 @@ def author_new():
 
         return render_template("admin/author_created.html", author=new_author, user=new_user, temp_password=temp_password)
 
-    return render_template("admin/author_new.html", editorial_roles=EDITORIAL_ROLE_CHOICES, form={}, active="authors")
+    return render_template("admin/author_new.html", editorial_roles=EDITORIAL_ROLE_CHOICES, roles=store.load_roles(), form={}, active="authors")
 
 
 @admin_bp.route("/yazarlar/<aid>/duzenle", methods=["GET", "POST"])
@@ -1886,7 +1907,7 @@ def author_edit_master(aid):
                     users[uidx]["email"] = new_email
 
             new_role = form.get("account_role")
-            if new_role in ACCOUNT_ROLES and new_role != users[uidx]["account_role"]:
+            if new_role in {r["id"] for r in store.load_roles()} and new_role != users[uidx]["account_role"]:
                 if users[uidx]["account_role"] == "master_admin" and new_role != "master_admin" \
                         and store.count_active_master_admins(exclude_id=users[uidx]["id"]) < 1:
                     flash("Son aktif Master Admin'in rolü değiştirilemez.", "error")
@@ -1905,7 +1926,7 @@ def author_edit_master(aid):
         return redirect(url_for("admin.author_edit_master", aid=aid))
 
     return render_template("admin/author_edit_master.html", author=author, linked_user=linked_user,
-                            editorial_roles=EDITORIAL_ROLE_CHOICES, active="authors",
+                            editorial_roles=EDITORIAL_ROLE_CHOICES, roles=store.load_roles(), active="authors",
                             article_count=len(store.articles_by_author(aid)))
 
 
@@ -2013,7 +2034,7 @@ def author_delete(aid):
 
 
 @admin_bp.route("/denetim-kaydi")
-@master_admin_required
+@permission_required("audit_log")
 def audit_log_view():
     return render_template("admin/audit_log.html", entries=store.recent_audit_log(), active="audit")
 
@@ -2024,7 +2045,7 @@ LEADERSHIP_ROW_LIMIT = 20
 
 
 @admin_bp.route("/site-ayarlari")
-@master_admin_required
+@permission_required("site_settings")
 def site_settings():
     site = store.load_site()
     return render_template("admin/site_settings.html", site=site,
@@ -2032,7 +2053,7 @@ def site_settings():
 
 
 @admin_bp.route("/site-ayarlari/yayin-bilgileri", methods=["POST"])
-@master_admin_required
+@permission_required("site_settings")
 def site_settings_publication():
     actor = _resolve_logged_in_user()
     site = store.load_site()
@@ -2053,7 +2074,7 @@ def site_settings_publication():
 
 
 @admin_bp.route("/site-ayarlari/gazete-yonetimi", methods=["POST"])
-@master_admin_required
+@permission_required("site_settings")
 def site_settings_leadership():
     actor = _resolve_logged_in_user()
     site = store.load_site()
@@ -2077,7 +2098,7 @@ def site_settings_leadership():
 
 
 @admin_bp.route("/site-ayarlari/iletisim", methods=["POST"])
-@master_admin_required
+@permission_required("site_settings")
 def site_settings_contact():
     actor = _resolve_logged_in_user()
     site = store.load_site()
@@ -2092,6 +2113,96 @@ def site_settings_contact():
     store.append_audit(actor["email"], "site_settings_updated", "İletişim Bilgileri")
     flash("İletişim bilgileri güncellendi.", "success")
     return redirect(url_for("admin.site_settings"))
+
+
+# ----------------------------------------------------------- admin: roles --
+# Role management is itself master_admin_required only, and always will be --
+# a role editable by anyone other than Master Admin could otherwise grant
+# itself more permissions.
+
+@admin_bp.route("/roller")
+@master_admin_required
+def roles_list():
+    roles = store.load_roles()
+    counts = {}
+    for u in store.load_users():
+        counts[u["account_role"]] = counts.get(u["account_role"], 0) + 1
+    return render_template("admin/roles_list.html", roles=roles, counts=counts,
+                            permission_choices=PERMISSION_CHOICES, active="roles")
+
+
+@admin_bp.route("/roller/yeni", methods=["GET", "POST"])
+@master_admin_required
+def role_new():
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        if not name:
+            flash("Rol adı zorunludur.", "error")
+            return render_template("admin/role_form.html", role=None, form=request.form,
+                                    permission_choices=PERMISSION_CHOICES, active="roles")
+
+        roles = store.load_roles()
+        rid = store.unique_role_id(name, {r["id"] for r in roles})
+        perms = [key for key, _ in PERMISSION_CHOICES if request.form.get(f"perm_{key}")]
+        roles.append({"id": rid, "name": name, "permissions": perms, "system": False})
+        store.save_roles(roles)
+
+        actor = _resolve_logged_in_user()
+        store.append_audit(actor["email"], "role_created", name, {"permissions": perms})
+        flash("Rol oluşturuldu.", "success")
+        return redirect(url_for("admin.roles_list"))
+
+    return render_template("admin/role_form.html", role=None, form={},
+                            permission_choices=PERMISSION_CHOICES, active="roles")
+
+
+@admin_bp.route("/roller/<rid>/duzenle", methods=["GET", "POST"])
+@master_admin_required
+def role_edit(rid):
+    roles = store.load_roles()
+    idx = next((i for i, r in enumerate(roles) if r["id"] == rid), None)
+    if idx is None:
+        abort(404)
+    role = roles[idx]
+    if role.get("system"):
+        abort(403)
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip() or role["name"]
+        perms = [key for key, _ in PERMISSION_CHOICES if request.form.get(f"perm_{key}")]
+        role["name"] = name
+        role["permissions"] = perms
+        roles[idx] = role
+        store.save_roles(roles)
+
+        actor = _resolve_logged_in_user()
+        store.append_audit(actor["email"], "role_updated", name, {"permissions": perms})
+        flash("Rol güncellendi.", "success")
+        return redirect(url_for("admin.roles_list"))
+
+    return render_template("admin/role_form.html", role=role, form=role,
+                            permission_choices=PERMISSION_CHOICES, active="roles")
+
+
+@admin_bp.route("/roller/<rid>/sil", methods=["POST"])
+@master_admin_required
+def role_delete(rid):
+    roles = store.load_roles()
+    role = next((r for r in roles if r["id"] == rid), None)
+    if not role or role.get("system"):
+        abort(403)
+
+    in_use = [u for u in store.load_users() if u["account_role"] == rid]
+    if in_use:
+        flash(f"Bu rol {len(in_use)} hesap tarafından kullanılıyor — silmeden önce bu hesapları başka bir role taşıyın.", "error")
+        return redirect(url_for("admin.roles_list"))
+
+    roles = [r for r in roles if r["id"] != rid]
+    store.save_roles(roles)
+    actor = _resolve_logged_in_user()
+    store.append_audit(actor["email"], "role_deleted", role["name"])
+    flash("Rol silindi.", "success")
+    return redirect(url_for("admin.roles_list"))
 
 
 app.register_blueprint(admin_bp)

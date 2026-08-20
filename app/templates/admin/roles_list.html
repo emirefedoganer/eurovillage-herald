@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Roller — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Roller</h1>
+    <a class="btn btn-red" href="{{ url_for('admin.role_new') }}">+ Yeni Rol</a>
+  </div>
+
+  <div class="admin-panel">
+    <p class="hint" style="margin-top:0;">
+      Bir hesap oluştururken veya düzenlerken atanan "Hesap Rolü", buradaki rollerden biridir.
+      "Master Admin" ve "Yazar" sistem rolleridir ve buradan değiştirilemez — yazar/hesap yönetimi
+      (yeni yazar oluşturma, şifre sıfırlama, rol değiştirme) her zaman yalnızca Master Admin'e aittir;
+      hiçbir özel rol bu yetkiyi alamaz.
+    </p>
+    <table class="admin-table">
+      <thead>
+        <tr><th>Rol</th><th>Yetkiler</th><th>Hesap Sayısı</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for r in roles %}
+        <tr>
+          <td>{{ r.name }}{% if r.system %} <span class="badge badge-secondary">Sistem</span>{% endif %}</td>
+          <td>
+            {% if r.id == 'master_admin' %}
+            <span class="badge badge-lead">Tüm yetkiler</span>
+            {% elif r.permissions %}
+              {% for key, label in permission_choices %}
+                {% if key in r.permissions %}<span class="badge badge-secondary">{{ label }}</span>{% endif %}
+              {% endfor %}
+            {% else %}
+            <span style="color:var(--gray-500);">—</span>
+            {% endif %}
+          </td>
+          <td>{{ counts.get(r.id, 0) }}</td>
+          <td class="admin-actions">
+            {% if not r.system %}
+            <a class="btn btn-outline" href="{{ url_for('admin.role_edit', rid=r.id) }}">Düzenle</a>
+            <form method="post" action="{{ url_for('admin.role_delete', rid=r.id) }}" onsubmit="return confirm('Bu rolü silmek istediğinize emin misiniz?');">
+              <button class="btn btn-danger" type="submit">Sil</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

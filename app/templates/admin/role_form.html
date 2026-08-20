@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Rolü Düzenle' if role else 'Yeni Rol' }} — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>{{ 'Rolü Düzenle' if role else 'Yeni Rol' }}</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.roles_list') }}">← Listeye Dön</a>
+  </div>
+
+  <form class="admin-panel" method="post">
+    <div class="form-row">
+      <label for="name">Rol Adı</label>
+      <input type="text" id="name" name="name" required value="{{ form.name or (role.name if role else '') }}" placeholder="ör. Reklam Sorumlusu">
+    </div>
+
+    <div class="form-row">
+      <label>Yetkiler</label>
+      <div class="hint" style="margin-bottom:8px;">
+        Bu role atanan hesapların erişebileceği bölümler. Yazar/hesap yönetimi (Yazarlar, Roller) bu
+        listede yer almaz — bu yetkiler her zaman yalnızca Master Admin'e aittir.
+      </div>
+      {% set current_perms = (role.permissions if role else []) %}
+      {% for key, label in permission_choices %}
+      <label style="display:flex; align-items:center; gap:8px; font-weight:400; margin-bottom:8px;">
+        <input type="checkbox" name="perm_{{ key }}" value="1" style="width:auto;"
+               {{ 'checked' if key in current_perms else '' }}>
+        {{ label }}
+      </label>
+      {% endfor %}
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-red" type="submit">{{ 'Rolü Kaydet' if role else 'Rolü Oluştur' }}</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

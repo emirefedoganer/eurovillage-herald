@@ -15,6 +15,7 @@ SUDOKUS_PATH = os.path.join(DATA_DIR, "sudokus.json")
 USERS_PATH = os.path.join(DATA_DIR, "users.json")
 AUTHORS_PATH = os.path.join(DATA_DIR, "authors.json")
 AUDIT_LOG_PATH = os.path.join(DATA_DIR, "audit_log.json")
+ROLES_PATH = os.path.join(DATA_DIR, "roles.json")
 
 TR_MAP = str.maketrans({
     "ç": "c", "Ç": "c", "ğ": "g", "Ğ": "g", "ı": "i", "I": "i",
@@ -300,6 +301,38 @@ def active_authors():
 
 def unique_author_slug(name, existing_slugs, current_slug=None):
     return unique_slug(name, existing_slugs, current_slug=current_slug)
+
+
+# ---------------------------------------------------------------- roles --
+# Two system roles (master_admin, author) always exist and aren't editable
+# here -- their behavior is load-bearing elsewhere (master-admin lockout
+# protection, the default role for new authors). Anything else is a custom
+# role a Master Admin created, with an explicit, storable set of granted
+# permissions.
+
+def load_roles():
+    return _load(ROLES_PATH, [])
+
+
+def save_roles(roles):
+    _save(ROLES_PATH, roles)
+
+
+def get_role(role_id):
+    for r in load_roles():
+        if r["id"] == role_id:
+            return r
+    return None
+
+
+def unique_role_id(name, existing_ids):
+    base = slugify(name)
+    rid = base
+    n = 2
+    while rid in existing_ids:
+        rid = f"{base}-{n}"
+        n += 1
+    return rid
 
 
 def author_preview(author):

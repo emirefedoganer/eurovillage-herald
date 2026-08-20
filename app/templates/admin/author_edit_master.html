@@ -110,10 +110,11 @@
       <div class="form-row">
         <label for="account_role">Hesap Rolü</label>
         <select id="account_role" name="account_role">
-          <option value="author" {{ 'selected' if linked_user.account_role=='author' else '' }}>Yazar</option>
-          <option value="okur_iliskileri" {{ 'selected' if linked_user.account_role=='okur_iliskileri' else '' }}>Okur İlişkileri (Oyunlar + İletişim Mesajları erişimi)</option>
-          <option value="master_admin" {{ 'selected' if linked_user.account_role=='master_admin' else '' }}>Master Admin</option>
+          {% for r in roles %}
+          <option value="{{ r.id }}" {{ 'selected' if linked_user.account_role==r.id else '' }}>{{ r.name }}</option>
+          {% endfor %}
         </select>
+        <div class="hint">Yeni rol eklemek veya bir rolün yetkilerini değiştirmek için <a href="{{ url_for('admin.roles_list') }}">Roller</a> sayfasına bakın.</div>
       </div>
     </div>
     {% endif %}

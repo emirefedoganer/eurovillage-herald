@@ -1,0 +1,28 @@
+[
+  {
+    "id": "master_admin",
+    "name": "Master Admin",
+    "permissions": [
+      "games",
+      "messages",
+      "site_settings",
+      "audit_log"
+    ],
+    "system": true
+  },
+  {
+    "id": "author",
+    "name": "Yazar",
+    "permissions": [],
+    "system": true
+  },
+  {
+    "id": "okur_iliskileri",
+    "name": "Okur İlişkileri",
+    "permissions": [
+      "games",
+      "messages"
+    ],
+    "system": false
+  }
+]

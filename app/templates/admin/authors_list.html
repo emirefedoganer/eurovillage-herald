@@ -30,7 +30,7 @@
           <td><a href="{{ url_for('author_profile', slug=a.slug) }}" target="_blank">{{ a.display_name }}</a>{% if a.is_opinion_columnist %} <span class="badge badge-secondary">Köşe Yazarı</span>{% endif %}</td>
           <td>{{ u.email if u else '—' }}</td>
           <td>{{ a.editorial_role or '—' }}</td>
-          <td>{{ {'master_admin': 'Master Admin', 'okur_iliskileri': 'Okur İlişkileri'}.get(u.account_role, 'Yazar') if u else 'Yazar' }}</td>
+          <td>{{ roles_by_id.get(u.account_role, 'Yazar') if u else 'Yazar' }}</td>
           <td>
             {% if a.status == 'archived' %}<span class="badge badge-secondary">Arşiv</span>{% endif %}
             {% if u and u.status == 'disabled' %}<span class="badge badge-breaking">Devre Dışı</span>{% elif u %}<span class="badge badge-lead">Aktif</span>{% endif %}

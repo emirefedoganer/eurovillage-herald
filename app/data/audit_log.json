@@ -201,5 +201,95 @@
     "target": "admin@eurovillageherald.com",
     "meta": {},
     "at": "2026-08-20T23:08:56Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "login",
+    "target": "admin@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-20T23:21:34Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "role_created",
+    "target": "Reklam Sorumlusu",
+    "meta": {
+      "permissions": [
+        "site_settings"
+      ]
+    },
+    "at": "2026-08-20T23:21:42Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "author_created",
+    "target": "Test Reklamci <reklam@test.com>",
+    "meta": {
+      "account_role": "reklam-sorumlusu"
+    },
+    "at": "2026-08-20T23:21:59Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "author_created",
+    "target": "Test Reklamci2 <reklam2@test.com>",
+    "meta": {
+      "account_role": "reklam-sorumlusu"
+    },
+    "at": "2026-08-20T23:21:59Z"
+  },
+  {
+    "actor": "reklam2@test.com",
+    "action": "login",
+    "target": "reklam2@test.com",
+    "meta": {},
+    "at": "2026-08-20T23:22:10Z"
+  },
+  {
+    "actor": "reklam2@test.com",
+    "action": "password_set_self",
+    "target": "reklam2@test.com",
+    "meta": {},
+    "at": "2026-08-20T23:22:20Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "role_updated",
+    "target": "Reklam Sorumlusu",
+    "meta": {
+      "permissions": [
+        "games",
+        "site_settings"
+      ]
+    },
+    "at": "2026-08-20T23:22:32Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "author_deleted",
+    "target": "Test Reklamci",
+    "meta": {},
+    "at": "2026-08-20T23:23:09Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "author_deleted",
+    "target": "Test Reklamci2",
+    "meta": {},
+    "at": "2026-08-20T23:23:09Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "role_deleted",
+    "target": "Reklam Sorumlusu",
+    "meta": {},
+    "at": "2026-08-20T23:23:43Z"
+  },
+  {
+    "actor": "admin@eurovillageherald.com",
+    "action": "login",
+    "target": "admin@eurovillageherald.com",
+    "meta": {},
+    "at": "2026-08-20T23:24:00Z"
   }
 ]
