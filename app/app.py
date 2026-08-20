@@ -132,6 +132,24 @@ app.jinja_env.globals["resolve_authors"] = store.resolve_article_authors
 app.jinja_env.globals["article_pullquote"] = store.article_pullquote
 app.jinja_env.globals["article_lead_quote"] = store.article_lead_quote
 
+
+def versioned_static(filename):
+    """A static asset URL with a cache-busting query string based on the
+    file's own mtime. CSS/JS are served from a fixed URL that never changes
+    on its own, so an edge cache (Cloudflare) or a browser has no signal to
+    refetch after a deploy -- this forces a new URL (and therefore a real
+    fetch) exactly when the file itself actually changes, with zero manual
+    cache-purging required on every future deploy."""
+    path = os.path.join(app.static_folder, filename)
+    try:
+        version = int(os.path.getmtime(path))
+    except OSError:
+        version = 0
+    return url_for("static", filename=filename) + f"?v={version}"
+
+
+app.jinja_env.globals["versioned_static"] = versioned_static
+
 KOSE_YAZISI_LABEL = "Köşe Yazısı"
 
 

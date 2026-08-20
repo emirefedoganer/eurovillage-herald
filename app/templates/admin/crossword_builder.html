@@ -85,5 +85,5 @@
   <div id="xwb-root" data-save-url="{{ url_for('admin.crossword_save_grid', cid=crossword.id) }}"></div>
 </div>
 
-<script src="{{ url_for('static', filename='js/crossword-builder.js') }}"></script>
+<script src="{{ versioned_static('js/crossword-builder.js') }}"></script>
 {% endblock %}
