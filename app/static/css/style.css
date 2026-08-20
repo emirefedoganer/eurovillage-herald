@@ -516,16 +516,17 @@ body.drawer-open{ overflow: hidden; }
 .xw-board-wrap{ display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 0; }
 .xw-grid{
   display: grid;
-  grid-template-columns: repeat(var(--xw-cols), 1fr);
-  grid-template-rows: repeat(var(--xw-rows), 1fr);
-  aspect-ratio: var(--xw-cols) / var(--xw-rows);
-  width: 100%; max-width: 560px;
+  --xw-cell: clamp(24px, calc(88vw / var(--xw-cols)), 44px);
+  grid-template-columns: repeat(var(--xw-cols), var(--xw-cell));
+  grid-template-rows: repeat(var(--xw-rows), var(--xw-cell));
+  width: max-content; max-width: 100%;
   background: var(--black); border: 2px solid var(--black); gap: 1px;
+  overflow-x: auto;
 }
 .xw-cell{
   background: #fff; border: none; padding: 0; margin: 0; position: relative;
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-sans); font-weight: 700; font-size: clamp(11px, 3.4vw, 24px);
+  font-family: var(--font-sans); font-weight: 700; font-size: calc(var(--xw-cell) * 0.48);
   color: var(--ink); cursor: pointer; outline-offset: -2px;
 }
 .xw-cell.xw-block{ background: var(--black); cursor: default; }
