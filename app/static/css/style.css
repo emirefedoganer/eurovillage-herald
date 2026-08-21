@@ -513,10 +513,10 @@ body.drawer-open{ overflow: hidden; }
 
 /* ---------- crossword player ---------- */
 .xw-layout{ max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 36px; align-items: start; }
-.xw-board-wrap{ display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 0; }
+.xw-board-wrap{ display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 0; container-type: inline-size; }
 .xw-grid{
   display: grid;
-  --xw-cell: clamp(24px, calc(88vw / var(--xw-cols)), 44px);
+  --xw-cell: clamp(24px, calc(94cqw / var(--xw-cols)), 64px);
   grid-template-columns: repeat(var(--xw-cols), var(--xw-cell));
   grid-template-rows: repeat(var(--xw-rows), var(--xw-cell));
   width: max-content; max-width: 100%;
