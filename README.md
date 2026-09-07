@@ -114,6 +114,50 @@ Gerçek bir sunucuya taşırken:
    ayarlanır (alt alan adları arasında paylaşılmaz) — bu kasıtlıdır ve ek bir güvenlik katmanı
    sağlar.
 
+## Cloudflare Entegrasyonu (Turnstile, R2, Access)
+
+Site üç noktada Cloudflare ile bütünleşecek şekilde hazırlanmıştır; üçü de
+ortam değişkenleri boşken yerel geliştirmede tamamen devre dışıdır, yani
+yerel geliştirme hiçbir ek kuruluma gerek kalmadan eskisi gibi çalışmaya
+devam eder. **Üretimde** (`app/runtime_env.py` -- `APP_ENV=production` ya da
+`SERVER_NAME` tanımlıyken) bu "yapılandırılmamış" durum farklı ele alınır:
+Turnstile eksikse uygulama yine açılır ama her başlangıçta göz ardı
+edilemeyecek bir uyarı basar; R2 *kısmen* (bazı `R2_*` değişkenleri var,
+bazıları yok) yapılandırılmışsa bu bir hata sayılır ve yüklemeler yerel
+diske sessizce düşmek yerine açık bir hatayla reddedilir. Her iki özellik
+için de, kurulum tamamlandıktan sonra sessiz düşmeyi tamamen kapatmak
+isterseniz `TURNSTILE_REQUIRED=true` / `R2_REQUIRED=true` ayarlanabilir
+(detaylar `.env.example`'da).
+
+- **Turnstile ziyaretçi doğrulaması** (`app/turnstile.py`, `app/templates/gate.html`) —
+  `TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY` tanımlandığında genel siteye
+  Managed modda bir Cloudflare Turnstile katmanı eklenir; doğrulama her
+  zaman sunucu tarafında Siteverify ile kontrol edilir ve başarılı
+  ziyaretçiye imzalı, HttpOnly bir çerez verilir (varsayılan 14 gün).
+  Aynı anahtar çifti İletişim formunu da korur (`turnstile.check()`) —
+  yeni bir form eklerken aynı fonksiyonu ve `_macros.html` içindeki
+  `turnstile_widget()` makrosunu kullanmanız yeterlidir.
+- **R2 medya depolama** (`app/storage.py`, `app/uploads.py`) — `R2_*`
+  değişkenleri tanımlandığında makale/yazar görselleri ve gazete
+  PDF'leri/kapakları doğrudan Cloudflare R2'ye yüklenir ve veritabanına
+  (JSON) `matbaa.eurovillageherald.com` altında tam bir URL yazılır; boşken
+  eskisi gibi yerel diske (`static/img/...`, `static/issues/`) kaydedilmeye
+  devam eder. Şablonlar her iki durumu da tek bir `media_url()` yardımcı
+  fonksiyonuyla çözer, bu yüzden eski kayıtlar (düz dosya adı) R2 açıldıktan
+  sonra da kırılmadan çalışır. Mevcut medyayı R2'ye taşımak için
+  `scripts/migrate_media_to_r2.py` betiğine bakın.
+- **Cloudflare Access** (`app/cf_access.py`) — asıl erişim kontrolü
+  Cloudflare panelinden `admin.eurovillageherald.com` üzerine kurulur
+  (bkz. `CLOUDFLARE_SETUP.md`); `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD`
+  tanımlanırsa uygulama ayrıca Access'in isteğe eklediği imzalı kimliği
+  doğrular (savunma derinliği amaçlı, isteğe bağlı). Herald'ın kendi
+  master_admin/author/rol yetkilendirme sistemi bundan tamamen bağımsız
+  ve değişmeden çalışmaya devam eder.
+
+Tüm yeni ortam değişkenlerinin listesi ve nereden alınacakları için
+`.env.example`, Cloudflare panelinde elle yapılması gereken adımlar için
+`CLOUDFLARE_SETUP.md` dosyasına bakın.
+
 ## Oyun Köşesi (Çapraz Bulmaca & Sudoku)
 
 Site, tamamen etkileşimli ve kendi altyapımızda çalışan bir çapraz bulmaca + sudoku sistemi
@@ -149,6 +193,12 @@ app/
   games_engine.py    Bulmaca numaralandırma/yerleştirme + sudoku çözücü/üretici (saf mantık)
   games_export.py    Bulmaca/sudoku için PNG dışa aktarma (Pillow)
   minecraft_service.py  Mojang/Crafatar/mc-heads.net üzerinden Minecraft profil çözümü (cache'li)
+  runtime_env.py     Üretim/geliştirme tespiti (APP_ENV / SERVER_NAME) -- diğer modüllerin sıkılık kararları için
+  turnstile.py       Cloudflare Turnstile sunucu tarafı doğrulama (Siteverify)
+  storage.py         Cloudflare R2 istemcisi (S3 uyumlu API, boto3)
+  uploads.py         Yükleme doğrulama + R2/yerel disk yönlendirme (tüm admin yüklemeleri buradan geçer)
+  cf_access.py       Cloudflare Access imzalı kimlik doğrulama (opsiyonel, savunma derinliği)
+  ratelimit.py        Hassas uç noktalar için basit bellek-içi hız sınırlama
   data/
     articles.json    Tüm makaleler (author_ids ile yazar profillerine bağlanır)
     issues.json      PDF gazete sayıları
@@ -169,7 +219,11 @@ app/
     img/authors/      Yazar profil/kapak fotoğrafları
     img/ari-logo.svg  Arı dergisi resmi logosu (Arı bağlamındaki sayfalarda masthead'i değiştirir)
     fonts/            FrutigerLTStd-Bold.otf — yalnızca "Buraya Bakarlar" başlığı için (lisanslı font)
-    issues/           Yüklenen PDF sayılar
+    issues/           Yüklenen PDF sayılar (yalnızca R2 yapılandırılmamışken kullanılır)
+scripts/
+  migrate_media_to_r2.py  Mevcut yerel medyayı R2'ye taşıyan tek seferlik betik
+.env.example          Tüm ortam değişkenlerinin listesi (yer tutucu değerlerle)
+CLOUDFLARE_SETUP.md    Cloudflare panelinde elle yapılması gereken adımların kontrol listesi
 ```
 
 ## Güvenlik Notu

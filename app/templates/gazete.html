@@ -12,7 +12,7 @@
   {% for i in issues %}
   <div class="issue-card">
     {% if i.cover_image %}
-      <img src="{{ url_for('static', filename='img/articles/' + i.cover_image) }}" alt="{{ i.title }}">
+      <img src="{{ media_url(i.cover_image, 'img/articles') }}" alt="{{ i.title }}">
     {% else %}
       <img src="{{ url_for('static', filename='img/articles/obgis-baskan-konusma.jpg') }}" alt="{{ i.title }}">
     {% endif %}

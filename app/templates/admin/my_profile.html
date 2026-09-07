@@ -27,7 +27,7 @@
         <label>Profil Fotoğrafı</label>
         {% if author.profile_image %}
         <div class="current-image">
-          <img src="{{ url_for('static', filename='img/authors/' + author.profile_image) }}" alt="">
+          <img src="{{ media_url(author.profile_image, 'img/authors') }}" alt="">
           <label style="font-weight:400;"><input type="checkbox" name="remove_profile_image" value="1" style="width:auto;"> Kaldır</label>
         </div>
         {% endif %}
@@ -37,7 +37,7 @@
         <label>Kapak Görseli</label>
         {% if author.cover_image %}
         <div class="current-image">
-          <img src="{{ url_for('static', filename='img/authors/' + author.cover_image) }}" alt="">
+          <img src="{{ media_url(author.cover_image, 'img/authors') }}" alt="">
           <label style="font-weight:400;"><input type="checkbox" name="remove_cover_image" value="1" style="width:auto;"> Kaldır</label>
         </div>
         {% endif %}

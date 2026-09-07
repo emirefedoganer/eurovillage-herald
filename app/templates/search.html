@@ -13,7 +13,7 @@
       <span class="kicker">{{ effective_kicker(a) }}</span>
       {% if a.image %}
       <a href="{{ url_for('article_page', slug=a.slug) }}">
-        <img src="{{ url_for('static', filename='img/articles/' + a.image) }}" alt="{{ a.title }}">
+        <img src="{{ media_url(a.image, 'img/articles') }}" alt="{{ a.title }}">
       </a>
       {% endif %}
       <a href="{{ url_for('article_page', slug=a.slug) }}"><h3>{{ a.title }}</h3></a>

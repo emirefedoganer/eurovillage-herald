@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import turnstile_widget %}
 {% block title %}İletişim — {{ site.name }}{% endblock %}
 {% block content %}
 
@@ -31,6 +32,9 @@
       <div class="form-row">
         <label for="message">Mesajınız</label>
         <textarea id="message" name="message" rows="7" required>{{ form.message if form else '' }}</textarea>
+      </div>
+      <div class="form-row">
+        {{ turnstile_widget() }}
       </div>
       <button class="btn btn-red" type="submit">Mesajı Gönder</button>
     </form>

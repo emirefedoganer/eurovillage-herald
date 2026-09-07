@@ -22,8 +22,8 @@
     <h1>{{ issue.title }}</h1>
     <div class="issue-date">{{ issue.date }}{% if issue.pages %} · {{ issue.pages }} sayfa{% endif %}</div>
     <p style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">{{ issue.description }}</p>
-    <a class="btn btn-outline" style="margin-top: 10px;" href="{{ url_for('static', filename='issues/' + issue.pdf) }}" download>PDF'i İndir</a>
-    <a class="btn btn-outline" style="margin-top: 10px;" href="{{ url_for('static', filename='issues/' + issue.pdf) }}" target="_blank" rel="noopener">Yeni Sekmede Aç</a>
+    <a class="btn btn-outline" style="margin-top: 10px;" href="{{ media_url(issue.pdf, 'issues') }}" download>PDF'i İndir</a>
+    <a class="btn btn-outline" style="margin-top: 10px;" href="{{ media_url(issue.pdf, 'issues') }}" target="_blank" rel="noopener">Yeni Sekmede Aç</a>
 
     {% if others %}
     <div class="sidebar-block" style="margin-top: 30px;">
@@ -42,7 +42,7 @@
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.worker.min.mjs";
 
-const url = {{ url_for('static', filename='issues/' + issue.pdf)|tojson }};
+const url = {{ media_url(issue.pdf, 'issues')|tojson }};
 const canvas = document.getElementById('pdfCanvas');
 const ctx = canvas.getContext('2d');
 const viewport_el = document.getElementById('pdfViewport');

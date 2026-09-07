@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 app/data/.secret_key
 .DS_Store
+.venv/
+.env

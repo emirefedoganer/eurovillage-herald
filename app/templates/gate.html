@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Doğrulanıyor… — {{ site.name }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=PT+Serif:ital,wght@0,400;0,700;1,400&family=Libre+Franklin:ital,wght@0,400;0,600;0,700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23C8102E%22/><text x=%2250%22 y=%2270%22 font-size=%2270%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22Georgia%22>E</text></svg>">
+<style>
+  :root{
+    --red: #c8102e; --black: #131313; --ink: #1a1a1a;
+    --gray-500: #6b6b6b; --gray-200: #e2e2e2; --paper: #fdfdfb;
+    --font-mast: 'UnifrakturCook', 'Luminari', serif;
+    --font-body: 'PT Serif', Georgia, 'Times New Roman', serif;
+    --font-sans: 'Libre Franklin', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin: 0; min-height: 100vh; background: var(--paper); color: var(--ink);
+    font-family: var(--font-body);
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .gate-card{
+    max-width: 460px; width: 100%; text-align: center;
+    background: #fff; border: 1px solid var(--gray-200);
+    border-top: 4px solid var(--red);
+    box-shadow: 0 8px 28px rgba(0,0,0,.08);
+    padding: 40px 32px 36px;
+  }
+  .gate-mast{
+    font-family: var(--font-mast); font-weight: 700; color: var(--black);
+    font-size: clamp(28px, 7vw, 42px); line-height: 1; margin: 0 0 6px;
+  }
+  .gate-tagline{
+    font-family: var(--font-sans); font-size: 11px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--gray-500); margin: 0 0 28px;
+  }
+  .gate-title{
+    font-family: var(--font-sans); font-weight: 700; font-size: 17px;
+    margin: 0 0 10px;
+  }
+  .gate-text{
+    font-size: 15px; line-height: 1.55; color: #333; margin: 0 0 26px;
+  }
+  .gate-widget{ display: flex; justify-content: center; margin-bottom: 6px; min-height: 65px; }
+  .gate-spinner{
+    width: 22px; height: 22px; margin: 20px auto 0;
+    border: 2px solid var(--gray-200); border-top-color: var(--red);
+    border-radius: 50%; animation: gate-spin 0.8s linear infinite;
+  }
+  .gate-spinner[hidden]{ display: none; }
+  @keyframes gate-spin{ to{ transform: rotate(360deg); } }
+  .gate-error{
+    font-family: var(--font-sans); font-size: 13px; font-weight: 600;
+    color: var(--red); background: #fdeceb; border: 1px solid #f3c9c4;
+    padding: 10px 14px; margin: 0 0 20px;
+  }
+  .gate-footer{
+    margin-top: 28px; font-family: var(--font-sans); font-size: 11px;
+    color: var(--gray-500);
+  }
+  noscript p{ font-family: var(--font-sans); font-size: 13px; color: var(--red); }
+</style>
+</head>
+<body>
+  <main class="gate-card">
+    <p class="gate-mast">{{ site.name }}</p>
+    <p class="gate-tagline">{{ site.tagline }}</p>
+    <p class="gate-title">Ziyaretiniz doğrulanıyor</p>
+    <p class="gate-text">
+      Sitemize erişmeden önce, otomatik trafiği ve kötüye kullanımı önlemek
+      için kısa bir güvenlik kontrolü yapıyoruz. Çoğu ziyaretçi için bu
+      işlem herhangi bir etkileşim gerektirmeden birkaç saniye içinde
+      otomatik olarak tamamlanır.
+    </p>
+
+    {% if error %}
+      <p class="gate-error">Doğrulama tamamlanamadı. Lütfen tekrar deneyin.</p>
+    {% endif %}
+
+    <form id="gate-form" method="post" action="{{ url_for('gate_verify') }}">
+      <input type="hidden" name="next" value="{{ next }}">
+      <div class="gate-widget">
+        <div class="cf-turnstile"
+             data-sitekey="{{ site_key }}"
+             data-callback="__eh_gate_verified"
+             data-error-callback="__eh_gate_error"
+             data-theme="light"></div>
+      </div>
+      <div class="gate-spinner" id="gate-spinner" aria-hidden="true"></div>
+    </form>
+
+    <noscript>
+      <p>Devam etmek için tarayıcınızda JavaScript'in etkin olması gerekir.</p>
+    </noscript>
+
+    <p class="gate-footer">The Eurovillage Herald &middot; Güvenlik Doğrulaması</p>
+  </main>
+
+  <script>
+    function __eh_gate_verified(){
+      document.getElementById("gate-spinner").hidden = false;
+      document.getElementById("gate-form").submit();
+    }
+    function __eh_gate_error(){
+      document.getElementById("gate-spinner").hidden = true;
+    }
+  </script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</body>
+</html>

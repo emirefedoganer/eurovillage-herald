@@ -7,12 +7,17 @@ from datetime import datetime
 from functools import wraps
 
 from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, abort, flash, jsonify, send_file, g
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash, generate_password_hash
-from werkzeug.utils import secure_filename
 
+import cf_access
 import store
 import games_engine as ge
 import games_export
+import ratelimit
+import storage
+import turnstile
+import uploads
 from minecraft_service import MinecraftProfileService
 from sections import SECTIONS, SECTION_ORDER, section_label
 
@@ -21,8 +26,6 @@ ARTICLE_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "articles")
 ISSUE_PDF_DIR = os.path.join(BASE_DIR, "static", "issues")
 AUTHOR_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "authors")
 SECRET_PATH = os.path.join(BASE_DIR, "data", ".secret_key")
-
-ALLOWED_IMAGE_EXT = {"jpg", "jpeg", "png", "webp", "gif"}
 
 TWITTER_HANDLE_RE = re.compile(r"^[A-Za-z0-9_]{1,15}$")
 MINECRAFT_USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{3,16}$")
@@ -100,6 +103,21 @@ def get_or_create_secret():
 app = Flask(__name__, subdomain_matching=True)
 app.secret_key = get_or_create_secret()
 
+# Upper bound on any request body Flask will even start reading (covers the
+# largest allowed upload, PDF editions -- see uploads.py for the per-file-type
+# limits actually enforced). Rejects oversized requests before they're fully
+# received rather than after.
+app.config["MAX_CONTENT_LENGTH"] = int(
+    max(uploads.MAX_IMAGE_MB, uploads.MAX_PDF_MB) * 1024 * 1024
+) + (1024 * 1024)
+
+# SameSite=Lax on every cookie the app sets (session + the visitor-gate
+# cookie in this file) regardless of environment; Secure only in production
+# (SERVER_NAME set implies HTTPS -- see PREFERRED_URL_SCHEME above), since a
+# Secure cookie can't be set at all over plain-http local development.
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = bool(SERVER_NAME)
+
 if SERVER_NAME:
     app.config["SERVER_NAME"] = SERVER_NAME
     app.config["PREFERRED_URL_SCHEME"] = os.environ.get("PREFERRED_URL_SCHEME", "https")
@@ -149,6 +167,24 @@ def versioned_static(filename):
 
 
 app.jinja_env.globals["versioned_static"] = versioned_static
+
+
+def media_url(value, legacy_subdir, external=False):
+    """Renders any stored image/PDF reference regardless of where it lives:
+    a full R2 (matbaa.eurovillageherald.com) URL is returned as-is; a bare
+    legacy filename (from before R2 was configured, or from a deployment
+    that still hasn't set it up) falls back to the local static path exactly
+    as it always has. This is what lets old records keep working unchanged
+    after R2 is introduced, with no data migration required."""
+    if not value:
+        return None
+    if value.startswith("http://") or value.startswith("https://"):
+        return value
+    return url_for("static", filename=f"{legacy_subdir}/{value}", _external=external)
+
+
+app.jinja_env.globals["media_url"] = media_url
+app.jinja_env.globals["turnstile_site_key"] = turnstile.SITE_KEY if turnstile.ENABLED else None
 
 KOSE_YAZISI_LABEL = "Köşe Yazısı"
 
@@ -287,10 +323,6 @@ def permission_required(perm):
             return view(*args, **kwargs)
         return wrapped
     return decorator
-
-
-def allowed_image(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_IMAGE_EXT
 
 
 DIFFICULTY_LABELS = {"easy": "Kolay", "medium": "Orta", "hard": "Zor", "expert": "Uzman"}
@@ -645,6 +677,8 @@ def iletisim():
         message = request.form.get("message", "").strip()
 
         errors = []
+        if not ratelimit.allow(f"contact:{request.remote_addr}", max_hits=5, window_seconds=600):
+            errors.append("Çok fazla mesaj gönderildi. Lütfen bir süre sonra tekrar deneyin.")
         if not name:
             errors.append("Ad Soyad alanı zorunludur.")
         if not email or "@" not in email:
@@ -653,6 +687,7 @@ def iletisim():
             errors.append("Lütfen bir konu seçin.")
         if not message:
             errors.append("Mesaj alanı zorunludur.")
+        turnstile.check(errors, request.form, remote_ip=request.remote_addr)
 
         if errors:
             for e in errors:
@@ -719,6 +754,87 @@ def forbidden(e):
     return render_template("403.html"), 403
 
 
+# ------------------------------------------------------- visitor gate (Turnstile) --
+# A once-per-visit(-ish) Cloudflare Turnstile check in front of the public
+# site only -- never the admin panel, which Cloudflare Access protects
+# separately (see cf_access.py / README). Entirely inactive unless
+# TURNSTILE_SITE_KEY + TURNSTILE_SECRET_KEY are set, so it never affects
+# local development or a deployment that hasn't configured Turnstile yet.
+
+GATE_COOKIE_NAME = "eh_verified"
+GATE_COOKIE_SALT = "turnstile-gate"
+GATE_COOKIE_MAX_AGE = int(os.environ.get("TURNSTILE_COOKIE_DAYS", "14")) * 86400
+
+
+def _gate_serializer():
+    return URLSafeTimedSerializer(app.secret_key, salt=GATE_COOKIE_SALT)
+
+
+def _gate_is_verified():
+    cookie = request.cookies.get(GATE_COOKIE_NAME)
+    if not cookie:
+        return False
+    try:
+        _gate_serializer().loads(cookie, max_age=GATE_COOKIE_MAX_AGE)
+        return True
+    except (BadSignature, SignatureExpired):
+        return False
+
+
+def _gate_set_cookie(resp):
+    token = _gate_serializer().dumps({"v": 1})
+    resp.set_cookie(
+        GATE_COOKIE_NAME, token,
+        max_age=GATE_COOKIE_MAX_AGE,
+        httponly=True,
+        secure=bool(SERVER_NAME),
+        samesite="Lax",
+    )
+    return resp
+
+
+def _gate_safe_next(raw):
+    """Only ever redirect back to a same-site relative path -- rejects
+    absolute/protocol-relative URLs to avoid an open-redirect via `next`."""
+    if raw and raw.startswith("/") and not raw.startswith("//") and "\\" not in raw:
+        return raw
+    return "/"
+
+
+def _gate_current_path():
+    path = request.path
+    if request.query_string:
+        path += "?" + request.query_string.decode("utf-8", "ignore")
+    return path
+
+
+@app.before_request
+def enforce_visitor_gate():
+    if not turnstile.ENABLED:
+        return None
+    if request.blueprint == "admin":
+        return None
+    if request.endpoint in ("static", "gate_verify") or request.endpoint is None:
+        return None
+    if _gate_is_verified():
+        return None
+    return render_template(
+        "gate.html", site_key=turnstile.SITE_KEY, next=_gate_current_path(), error=False,
+    ), 200
+
+
+@app.route("/dogrulama/kontrol", methods=["POST"])
+def gate_verify():
+    next_url = _gate_safe_next(request.form.get("next", ""))
+    if not ratelimit.allow(f"gate:{request.remote_addr}", max_hits=20, window_seconds=300):
+        return render_template("gate.html", site_key=turnstile.SITE_KEY, next=next_url, error=True), 429
+    token = request.form.get(turnstile.FIELD_NAME, "")
+    if not turnstile.verify(token, remote_ip=request.remote_addr):
+        return render_template("gate.html", site_key=turnstile.SITE_KEY, next=next_url, error=True), 401
+    resp = redirect(next_url)
+    return _gate_set_cookie(resp)
+
+
 # ----------------------------------------------------------------- admin --
 # Isolated in its own Blueprint so it can be mounted on a separate subdomain
 # (admin.<SERVER_NAME>) in production instead of living under the public site.
@@ -732,9 +848,26 @@ admin_bp = Blueprint(
 )
 
 
+@admin_bp.before_request
+def verify_cloudflare_access():
+    """Defense-in-depth only: Cloudflare Access (configured in the Cloudflare
+    dashboard, not here) is what actually blocks unauthorized requests to
+    admin.eurovillageherald.com before they ever reach this app. When
+    CF_ACCESS_TEAM_DOMAIN/CF_ACCESS_AUD are set we additionally verify the
+    signed identity Access attaches to the request and reject anything
+    without one -- but this never grants any authorization by itself; the
+    Herald's own login_required/master_admin_required/permission_required
+    checks below still decide what a signed-in account may do."""
+    if cf_access.ENABLED and not cf_access.verified_identity(request):
+        abort(403)
+
+
 @admin_bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
+        if not ratelimit.allow(f"login:{request.remote_addr}", max_hits=10, window_seconds=300):
+            flash("Çok fazla giriş denemesi yapıldı. Lütfen birkaç dakika sonra tekrar deneyin.", "error")
+            return render_template("admin/login.html"), 429
         email = request.form.get("email", "").strip()
         password = request.form.get("password", "")
         user = store.get_user_by_email(email)
@@ -743,7 +876,9 @@ def login():
         if user and user.get("status") == "active" and check_password_hash(user.get("password_hash", ""), password):
             session.clear()
             session["user_id"] = user["id"]
-            store.append_audit(user["email"], "login", user["email"])
+            cf_identity = cf_access.verified_identity(request)
+            audit_meta = {"cf_access_email": cf_identity} if cf_identity else None
+            store.append_audit(user["email"], "login", user["email"], audit_meta)
             if user.get("must_change_password"):
                 return redirect(url_for("admin.force_change_password"))
             next_url = request.args.get("next") or url_for("admin.dashboard")
@@ -902,11 +1037,12 @@ def article_new():
         data["author"] = ", ".join(store.get_author(aid)["display_name"] for aid in author_ids) if author_ids else "Eurovillage Herald"
 
         file = request.files.get("image_file")
-        if file and file.filename and allowed_image(file.filename):
-            ext = file.filename.rsplit(".", 1)[1].lower()
-            fname = secure_filename(f"{slug}.{ext}")
-            file.save(os.path.join(ARTICLE_IMG_DIR, fname))
-            data["image"] = fname
+        if file and file.filename:
+            image_value, upload_error = uploads.save_article_image(file, slug, data.get("section"), ARTICLE_IMG_DIR)
+            if upload_error:
+                flash(upload_error, "error")
+            else:
+                data["image"] = image_value
 
         articles.append(data)
         store.save_articles(articles)
@@ -951,12 +1087,15 @@ def article_edit(slug):
         ) or article.get("author", "Eurovillage Herald")
 
         file = request.files.get("image_file")
-        if file and file.filename and allowed_image(file.filename):
-            ext = file.filename.rsplit(".", 1)[1].lower()
-            fname = secure_filename(f"{new_slug}.{ext}")
-            file.save(os.path.join(ARTICLE_IMG_DIR, fname))
-            data["image"] = fname
+        if file and file.filename:
+            image_value, upload_error = uploads.save_article_image(file, new_slug, data.get("section"), ARTICLE_IMG_DIR)
+            if upload_error:
+                flash(upload_error, "error")
+            else:
+                uploads.delete_stored(article.get("image"))
+                data["image"] = image_value
         elif request.form.get("remove_image"):
+            uploads.delete_stored(article.get("image"))
             data["image"] = None
 
         articles[idx] = data
@@ -979,6 +1118,7 @@ def article_delete(slug):
         abort(404)
     if not _can_edit_article(user, article):
         abort(403)
+    uploads.delete_stored(article.get("image"))
     articles = [a for a in articles if a["slug"] != slug]
     store.save_articles(articles)
     flash("Makale silindi.", "success")
@@ -996,8 +1136,9 @@ def issue_new():
         description = request.form.get("description", "").strip()
 
         pdf_file = request.files.get("pdf_file")
-        if not pdf_file or not pdf_file.filename.lower().endswith(".pdf"):
-            flash("Lütfen geçerli bir PDF dosyası yükleyin.", "error")
+        pdf_error = uploads.validate_pdf(pdf_file)
+        if pdf_error:
+            flash(pdf_error, "error")
             return render_template("admin/edit_issue.html", issue=None)
 
         issue_id = store.slugify(title or f"sayi-{no}")
@@ -1008,16 +1149,17 @@ def issue_new():
             issue_id = f"{base_id}-{n}"
             n += 1
 
-        fname = secure_filename(f"{issue_id}.pdf")
-        pdf_file.save(os.path.join(ISSUE_PDF_DIR, fname))
+        pdf_value, pdf_error = uploads.save_issue_pdf(pdf_file, issue_id, date, ISSUE_PDF_DIR)
+        if pdf_error:
+            flash(pdf_error, "error")
+            return render_template("admin/edit_issue.html", issue=None)
 
         cover_image = None
         cover_file = request.files.get("cover_file")
-        if cover_file and cover_file.filename and allowed_image(cover_file.filename):
-            ext = cover_file.filename.rsplit(".", 1)[1].lower()
-            cover_name = secure_filename(f"{issue_id}-kapak.{ext}")
-            cover_file.save(os.path.join(ARTICLE_IMG_DIR, cover_name))
-            cover_image = cover_name
+        if cover_file and cover_file.filename:
+            cover_image, cover_error = uploads.save_issue_cover(cover_file, issue_id, date, ARTICLE_IMG_DIR)
+            if cover_error:
+                flash(cover_error, "error")
 
         issues.append({
             "id": issue_id,
@@ -1026,7 +1168,7 @@ def issue_new():
             "date": date,
             "description": description,
             "cover_image": cover_image,
-            "pdf": fname,
+            "pdf": pdf_value,
             "pages": None,
         })
         store.save_issues(issues)
@@ -1040,6 +1182,10 @@ def issue_new():
 @master_admin_required
 def issue_delete(issue_id):
     issues = store.load_issues()
+    issue = next((i for i in issues if i["id"] == issue_id), None)
+    if issue:
+        uploads.delete_stored(issue.get("pdf"))
+        uploads.delete_stored(issue.get("cover_image"))
     issues = [i for i in issues if i["id"] != issue_id]
     store.save_issues(issues)
     flash("Sayı silindi.", "success")
@@ -1704,14 +1850,16 @@ EDITORIAL_ROLE_CHOICES = [
 ]
 
 
-def _save_author_image(author_id, field_name, subdir_prefix):
+def _save_author_image(author, field_name, subdir_prefix):
     file = request.files.get(field_name)
-    if not (file and file.filename and allowed_image(file.filename)):
+    if not (file and file.filename):
         return None
-    ext = file.filename.rsplit(".", 1)[1].lower()
-    fname = secure_filename(f"{author_id}-{subdir_prefix}-{uuid.uuid4().hex[:6]}.{ext}")
-    file.save(os.path.join(AUTHOR_IMG_DIR, fname))
-    return fname
+    value, error = uploads.save_author_image(file, author["id"], subdir_prefix, AUTHOR_IMG_DIR)
+    if error:
+        flash(error, "error")
+        return None
+    uploads.delete_stored(author.get(field_name))
+    return value
 
 
 def _apply_self_service_fields(author, form, files):
@@ -1736,13 +1884,13 @@ def _apply_self_service_fields(author, form, files):
     else:
         author["contact_email"] = contact_email
 
-    new_profile_img = _save_author_image(author["id"], "profile_image", "profil")
+    new_profile_img = _save_author_image(author, "profile_image", "profil")
     if new_profile_img:
         author["profile_image"] = new_profile_img
     elif form.get("remove_profile_image"):
         author["profile_image"] = None
 
-    new_cover_img = _save_author_image(author["id"], "cover_image", "kapak")
+    new_cover_img = _save_author_image(author, "cover_image", "kapak")
     if new_cover_img:
         author["cover_image"] = new_cover_img
     elif form.get("remove_cover_image"):
@@ -1849,8 +1997,8 @@ def author_new():
             "created_at": now,
             "updated_at": now,
         }
-        new_author["profile_image"] = _save_author_image(new_author["id"], "profile_image", "profil")
-        new_author["cover_image"] = _save_author_image(new_author["id"], "cover_image", "kapak")
+        new_author["profile_image"] = _save_author_image(new_author, "profile_image", "profil")
+        new_author["cover_image"] = _save_author_image(new_author, "cover_image", "kapak")
         authors.append(new_author)
         store.save_authors(authors)
 
@@ -1897,12 +2045,12 @@ def author_edit_master(aid):
         author["contact_email"] = sanitize_contact_email(form.get("contact_email", ""))
         author["join_date"] = form.get("join_date") or author.get("join_date")
 
-        new_profile_img = _save_author_image(author["id"], "profile_image", "profil")
+        new_profile_img = _save_author_image(author, "profile_image", "profil")
         if new_profile_img:
             author["profile_image"] = new_profile_img
         elif form.get("remove_profile_image"):
             author["profile_image"] = None
-        new_cover_img = _save_author_image(author["id"], "cover_image", "kapak")
+        new_cover_img = _save_author_image(author, "cover_image", "kapak")
         if new_cover_img:
             author["cover_image"] = new_cover_img
         elif form.get("remove_cover_image"):

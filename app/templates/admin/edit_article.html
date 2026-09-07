@@ -91,7 +91,7 @@
       <label>Kapak Görseli</label>
       {% if article and article.image %}
       <div class="current-image">
-        <img src="{{ url_for('static', filename='img/articles/' + article.image) }}" alt="">
+        <img src="{{ media_url(article.image, 'img/articles') }}" alt="">
         <label style="font-weight:400;"><input type="checkbox" name="remove_image" value="1" style="width:auto;"> Görseli kaldır</label>
       </div>
       {% endif %}

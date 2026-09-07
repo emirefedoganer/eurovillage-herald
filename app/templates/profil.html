@@ -9,7 +9,7 @@
   "@type": "Person",
   "name": {{ author.display_name | tojson }},
   "url": {{ url_for('author_profile', slug=author.slug, _external=True) | tojson }}
-  {%- if author.profile_image %}, "image": {{ url_for('static', filename='img/authors/' + author.profile_image, _external=True) | tojson }}{% endif -%}
+  {%- if author.profile_image %}, "image": {{ media_url(author.profile_image, 'img/authors', external=True) | tojson }}{% endif -%}
   {%- if author.short_bio %}, "description": {{ author.short_bio | tojson }}{% endif -%}
   {%- if author.editorial_role %}, "jobTitle": {{ author.editorial_role | tojson }}{% endif -%}
 }
@@ -19,12 +19,12 @@
 
 <div class="author-profile-page">
   {% if author.cover_image %}
-  <div class="author-cover" style="background-image:url('{{ url_for('static', filename='img/authors/' + author.cover_image) }}');"></div>
+  <div class="author-cover" style="background-image:url('{{ media_url(author.cover_image, 'img/authors') }}');"></div>
   {% endif %}
 
   <div class="author-profile-header {{ 'has-cover' if author.cover_image else '' }}">
     {% if author.profile_image %}
-    <img class="author-profile-photo" src="{{ url_for('static', filename='img/authors/' + author.profile_image) }}" alt="{{ author.display_name }}">
+    <img class="author-profile-photo" src="{{ media_url(author.profile_image, 'img/authors') }}" alt="{{ author.display_name }}">
     {% else %}
     <div class="author-profile-photo author-profile-photo-fallback">{{ author.display_name[0] }}</div>
     {% endif %}
@@ -83,7 +83,7 @@
           {% for a in news[:8] %}
           <article class="story-card {{ '' if a.image else 'story-card--noimg' }}">
             <span class="kicker">{{ effective_kicker(a) }}</span>
-            {% if a.image %}<a href="{{ url_for('article_page', slug=a.slug) }}"><img src="{{ url_for('static', filename='img/articles/' + a.image) }}" alt="{{ a.title }}"></a>{% endif %}
+            {% if a.image %}<a href="{{ url_for('article_page', slug=a.slug) }}"><img src="{{ media_url(a.image, 'img/articles') }}" alt="{{ a.title }}"></a>{% endif %}
             <a href="{{ url_for('article_page', slug=a.slug) }}"><h3>{{ a.title }}</h3></a>
             <div class="byline">{{ a.date }}</div>
           </article>
