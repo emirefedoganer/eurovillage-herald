@@ -1,0 +1,32 @@
+[
+  {
+    "id": "d82f61dc76",
+    "linked_author_id": "cc86566c9a",
+    "linked_user_id": "ffa3dceb09",
+    "display_name": "Emir the Composer",
+    "role_title": "Genel Yayın Yönetmeni",
+    "bio": "The Eurovillage Herald'ın kurucu ortağı ve tek muhabiri. Eurovillage'ın 30. vatandaşı ve Manifest Mahallesi'nin ilk sakini. Gazetenin ilk sayısındaki haberlerin, röportajların ve tasarımın tamamını tek başına üretti.",
+    "display_order": 1,
+    "active": true,
+    "image_override": null,
+    "created_at": "2026-09-07T22:16:31Z",
+    "updated_at": "2026-09-07T22:16:31Z",
+    "created_by": "system",
+    "updated_by": "system"
+  },
+  {
+    "id": "099c1349b5",
+    "linked_author_id": "b7add231ce",
+    "linked_user_id": "ef309cf032",
+    "display_name": "Duke of Akbadain",
+    "role_title": "Okur İlişkileri",
+    "bio": "Gazetenin kurucu ortaklarından. Okur şikayetlerini ve iletişimini yönetir — kendisiyle ilgili haberlere itiraz başvuruları da bu departmana yapılabilir.",
+    "display_order": 2,
+    "active": true,
+    "image_override": null,
+    "created_at": "2026-09-07T22:16:31Z",
+    "updated_at": "2026-09-07T22:16:31Z",
+    "created_by": "system",
+    "updated_by": "system"
+  }
+]

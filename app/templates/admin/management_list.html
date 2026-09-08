@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Gazete Yönetimi — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Gazete Yönetimi</h1>
+    <div class="admin-actions">
+      <a class="btn btn-outline" href="{{ url_for('kurumsal') }}" target="_blank">Sayfayı Gör</a>
+      <a class="btn btn-red" href="{{ url_for('admin.management_new') }}">+ Üye Ekle</a>
+    </div>
+  </div>
+
+  <p class="hint">
+    Buraya eklenen kişiler, Yazarlar sisteminden bağımsızdır — bir yazar/editör/admin olmak
+    otomatik olarak buraya eklenmez. Bir üyeyi kaldırmak yalnızca bu listeden çıkarır; hesabını,
+    yazar profilini veya yazma yetkisini etkilemez.
+  </p>
+
+  <div class="admin-panel">
+    <table class="admin-table">
+      <thead><tr><th>Sıra</th><th>Ad</th><th>Unvan</th><th>Bağlı Profil</th><th>Durum</th><th></th></tr></thead>
+      <tbody>
+        {% for e in entries %}
+        {% set author = authors_by_id.get(e.linked_author_id) %}
+        <tr>
+          <td>
+            <form method="post" action="{{ url_for('admin.management_move_up', mid=e.id) }}" style="display:inline;"><button class="btn btn-outline" type="submit" {{ 'disabled' if loop.first else '' }}>↑</button></form>
+            <form method="post" action="{{ url_for('admin.management_move_down', mid=e.id) }}" style="display:inline;"><button class="btn btn-outline" type="submit" {{ 'disabled' if loop.last else '' }}>↓</button></form>
+          </td>
+          <td>{{ e.display_name }}</td>
+          <td>{{ e.role_title }}</td>
+          <td>
+            {% if author %}<a href="{{ url_for('author_profile', slug=author.slug) }}" target="_blank">{{ author.display_name }} →</a>
+            {% else %}<span class="hint">Bağlı profil yok</span>{% endif %}
+          </td>
+          <td><span class="badge {{ 'badge-lead' if e.active else 'badge-secondary' }}">{{ 'Aktif' if e.active else 'Pasif' }}</span></td>
+          <td class="admin-actions">
+            <a class="btn btn-outline" href="{{ url_for('admin.management_edit', mid=e.id) }}">Düzenle</a>
+            <form method="post" action="{{ url_for('admin.management_toggle_active', mid=e.id) }}">
+              <button class="btn btn-outline" type="submit">{{ 'Pasifleştir' if e.active else 'Aktifleştir' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('admin.management_delete', mid=e.id) }}" onsubmit="return confirm('Bu üyeyi Gazete Yönetimi\'nden kaldırmak istediğinize emin misiniz? (Hesabı/yazar profili etkilenmez.)');">
+              <button class="btn btn-danger" type="submit">Kaldır</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">Henüz üye yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

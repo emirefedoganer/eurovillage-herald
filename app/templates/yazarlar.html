@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "_macros.html" import author_avatar %}
+{% block title %}Yazarlar — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="leadership-intro">
+  <span class="kicker">Kadro</span>
+  <h1>Yazarlar</h1>
+  <p>{{ site.name }}'da haber, röportaj ve görüş yazıları üreten yazar kadromuzla tanışın.</p>
+</div>
+
+{% if authors %}
+<div class="writers-grid">
+  {% for a in authors %}
+  <a class="writer-card" href="{{ url_for('author_profile', slug=a.slug) }}" data-author-id="{{ a.id }}">
+    {{ author_avatar(a, size=64, css_class="writer-card-avatar") }}
+    <div class="writer-card-name">{{ a.display_name }}</div>
+    {% if a.editorial_role %}<div class="writer-card-role">{{ a.editorial_role }}</div>{% endif %}
+    {% if a.short_bio %}<p class="writer-card-bio">{{ a.short_bio }}</p>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p class="section-empty">Henüz yazar bulunmuyor.</p>
+{% endif %}
+
+{% endblock %}

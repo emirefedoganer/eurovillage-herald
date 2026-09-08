@@ -61,63 +61,12 @@
     <h2 style="font-family: var(--font-headline); font-size: 22px; margin: 0 0 4px;">Gazete Yönetimi</h2>
     <p class="hint" style="margin-bottom: 18px;">
       "Gazete Yönetimi" sayfasında (<a href="{{ url_for('kurumsal') }}" target="_blank">/gazete-yonetimi</a>)
-      görünen ekip kartları. Bir ismin, aktif bir Yazar profiliyle aynı Görünen Ad'a sahip olması
-      durumunda kart otomatik olarak o yazarın profiline bağlanır. Boş bırakılan satırlar kaydedilmez.
+      görünen ekip artık ayrı, Master Admin'e özel bir sayfadan yönetiliyor -- sıradan bir Yazar/Editör
+      hesabının erişemeyeceği şekilde.
     </p>
-    <form method="post" action="{{ url_for('admin.site_settings_leadership') }}">
-      {% for person in site.leadership %}
-      <div class="leadership-row">
-        <div class="form-grid-2">
-          <div class="form-row">
-            <label for="name_{{ loop.index0 }}">Ad Soyad</label>
-            <input type="text" id="name_{{ loop.index0 }}" name="name_{{ loop.index0 }}" value="{{ person.name }}">
-          </div>
-          <div class="form-row">
-            <label for="initials_{{ loop.index0 }}">Baş Harfler <span class="hint">(fotoğraf yoksa)</span></label>
-            <input type="text" id="initials_{{ loop.index0 }}" name="initials_{{ loop.index0 }}" value="{{ person.initials }}" maxlength="3">
-          </div>
-        </div>
-        <div class="form-row">
-          <label for="roles_{{ loop.index0 }}">Unvanlar <span class="hint">(virgülle ayırın)</span></label>
-          <input type="text" id="roles_{{ loop.index0 }}" name="roles_{{ loop.index0 }}" value="{{ person.roles|join(', ') }}">
-        </div>
-        <div class="form-row">
-          <label for="bio_{{ loop.index0 }}">Biyografi</label>
-          <textarea id="bio_{{ loop.index0 }}" name="bio_{{ loop.index0 }}" rows="2">{{ person.bio }}</textarea>
-        </div>
-      </div>
-      <hr style="border: none; border-top: 1px solid var(--gray-200); margin: 18px 0;">
-      {% endfor %}
-
-      {% for i in range(2) %}
-      {% set idx = site.leadership|length + i %}
-      <div class="leadership-row">
-        <div class="form-grid-2">
-          <div class="form-row">
-            <label for="name_{{ idx }}">Ad Soyad <span class="hint">(yeni üye eklemek için doldurun)</span></label>
-            <input type="text" id="name_{{ idx }}" name="name_{{ idx }}" value="">
-          </div>
-          <div class="form-row">
-            <label for="initials_{{ idx }}">Baş Harfler</label>
-            <input type="text" id="initials_{{ idx }}" name="initials_{{ idx }}" value="" maxlength="3">
-          </div>
-        </div>
-        <div class="form-row">
-          <label for="roles_{{ idx }}">Unvanlar <span class="hint">(virgülle ayırın)</span></label>
-          <input type="text" id="roles_{{ idx }}" name="roles_{{ idx }}" value="">
-        </div>
-        <div class="form-row">
-          <label for="bio_{{ idx }}">Biyografi</label>
-          <textarea id="bio_{{ idx }}" name="bio_{{ idx }}" rows="2"></textarea>
-        </div>
-      </div>
-      {% if not loop.last %}<hr style="border: none; border-top: 1px solid var(--gray-200); margin: 18px 0;">{% endif %}
-      {% endfor %}
-
-      <div class="form-actions">
-        <button class="btn btn-red" type="submit">Gazete Yönetimini Kaydet</button>
-      </div>
-    </form>
+    {% if is_master_admin %}
+    <a class="btn btn-red" href="{{ url_for('admin.management_list') }}">Gazete Yönetimini Düzenle</a>
+    {% endif %}
   </div>
 
   <div class="admin-panel">

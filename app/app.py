@@ -29,6 +29,7 @@ ARTICLE_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "articles")
 ISSUE_PDF_DIR = os.path.join(BASE_DIR, "static", "issues")
 AUTHOR_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "authors")
 AD_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "ads")
+MANAGEMENT_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "management")
 SECRET_PATH = os.path.join(BASE_DIR, "data", ".secret_key")
 
 TWITTER_HANDLE_RE = re.compile(r"^[A-Za-z0-9_]{1,15}$")
@@ -148,6 +149,7 @@ os.makedirs(ARTICLE_IMG_DIR, exist_ok=True)
 os.makedirs(ISSUE_PDF_DIR, exist_ok=True)
 os.makedirs(AUTHOR_IMG_DIR, exist_ok=True)
 os.makedirs(AD_IMG_DIR, exist_ok=True)
+os.makedirs(MANAGEMENT_IMG_DIR, exist_ok=True)
 
 # Available to every template without each view having to pre-resolve authors
 # for every article it passes along (cards, river items, related lists...).
@@ -651,10 +653,22 @@ def hakkimizda():
     return render_template("hakkimizda.html")
 
 
+@app.route("/yazarlar")
+def yazarlar():
+    """The public writer directory -- deliberately independent of Gazete
+    Yönetimi (see kurumsal() below): every active author appears here
+    regardless of masthead membership, and this list is generated straight
+    from the live author store, so a profile edit/deactivation is reflected
+    immediately with no separate data to keep in sync."""
+    authors = sorted(store.active_authors(), key=lambda a: a["display_name"].lower())
+    return render_template("yazarlar.html", authors=authors)
+
+
 @app.route("/gazete-yonetimi")
 def kurumsal():
-    authors_by_name = {a["display_name"]: a for a in store.load_authors()}
-    return render_template("kurumsal.html", authors_by_name=authors_by_name)
+    authors_by_id = {a["id"]: a for a in store.load_authors()}
+    entries = store.active_management_entries()
+    return render_template("kurumsal.html", entries=entries, authors_by_id=authors_by_id)
 
 
 @app.route("/gazete")
@@ -2229,10 +2243,207 @@ def audit_log_view():
     return render_template("admin/audit_log.html", entries=store.recent_audit_log(), active="audit")
 
 
+# ------------------------------------------------ admin: newspaper management --
+# Gazete Yönetimi (the public masthead) -- master_admin only, deliberately
+# NOT a permission_required() custom-role permission. Being a writer,
+# editor, or even holding another admin permission never implies newspaper-
+# management membership; only a master_admin may add someone here, exactly
+# like author/role management above.
+
+def _management_form_to_dict(form, existing=None):
+    errors = []
+    display_name = form.get("display_name", "").strip()[:120]
+    role_title = form.get("role_title", "").strip()[:120]
+    bio = form.get("bio", "").strip()[:2000]
+    linked_author_id = form.get("linked_author_id") or None
+    if linked_author_id and not store.get_author(linked_author_id):
+        linked_author_id = None
+
+    if not display_name:
+        errors.append("Ad Soyad zorunludur.")
+    if not role_title:
+        errors.append("Gazete Yönetimi unvanı zorunludur.")
+
+    try:
+        display_order = int(form.get("display_order", "0") or "0")
+    except ValueError:
+        display_order = 0
+
+    linked_author = store.get_author(linked_author_id) if linked_author_id else None
+    data = {
+        "linked_author_id": linked_author_id,
+        "linked_user_id": linked_author.get("user_id") if linked_author else None,
+        "display_name": display_name,
+        "role_title": role_title,
+        "bio": bio,
+        "display_order": display_order,
+        # Active/inactive is deliberately not a form field here -- it's
+        # toggled only via the dedicated /durum route below, so editing an
+        # entry's name/role/bio can never accidentally flip it off.
+        "active": existing.get("active", True) if existing else True,
+    }
+    return data, errors
+
+
+@admin_bp.route("/gazete-yonetimi")
+@master_admin_required
+def management_list():
+    entries = sorted(store.load_management(), key=lambda e: e.get("display_order", 0))
+    authors_by_id = {a["id"]: a for a in store.load_authors()}
+    return render_template("admin/management_list.html", entries=entries, authors_by_id=authors_by_id, active="management")
+
+
+@admin_bp.route("/gazete-yonetimi/yeni", methods=["GET", "POST"])
+@master_admin_required
+def management_new():
+    actor = _resolve_logged_in_user()
+    authors = store.load_authors()
+    if request.method == "POST":
+        data, errors = _management_form_to_dict(request.form)
+        if errors:
+            for e in errors:
+                flash(e, "error")
+            return render_template("admin/management_form.html", entry=None, form=request.form,
+                                    authors=authors, active="management")
+
+        now = _now_iso()
+        data.update({
+            "id": uuid.uuid4().hex[:10], "image_override": None,
+            "created_at": now, "updated_at": now,
+            "created_by": actor["email"], "updated_by": actor["email"],
+        })
+
+        file = request.files.get("image_file")
+        if file and file.filename:
+            image_value, upload_error = uploads.save_management_image(file, data["id"], MANAGEMENT_IMG_DIR)
+            if upload_error:
+                flash(upload_error, "error")
+            else:
+                data["image_override"] = image_value
+
+        entries = store.load_management()
+        entries.append(data)
+        store.save_management(entries)
+        store.append_audit(actor["email"], "management_member_added", data["display_name"], {"role_title": data["role_title"]})
+        flash("Gazete Yönetimi üyesi eklendi.", "success")
+        return redirect(url_for("admin.management_list"))
+
+    return render_template("admin/management_form.html", entry=None, form={}, authors=authors, active="management")
+
+
+@admin_bp.route("/gazete-yonetimi/<mid>/duzenle", methods=["GET", "POST"])
+@master_admin_required
+def management_edit(mid):
+    actor = _resolve_logged_in_user()
+    entries = store.load_management()
+    idx = next((i for i, e in enumerate(entries) if e["id"] == mid), None)
+    if idx is None:
+        abort(404)
+    entry = entries[idx]
+    authors = store.load_authors()
+
+    if request.method == "POST":
+        data, errors = _management_form_to_dict(request.form, existing=entry)
+        if errors:
+            for e in errors:
+                flash(e, "error")
+            return render_template("admin/management_form.html", entry=entry, form=request.form,
+                                    authors=authors, active="management")
+
+        data["id"] = mid
+        data["image_override"] = entry.get("image_override")
+        data["created_at"] = entry.get("created_at")
+        data["created_by"] = entry.get("created_by")
+        data["updated_at"] = _now_iso()
+        data["updated_by"] = actor["email"]
+
+        file = request.files.get("image_file")
+        if file and file.filename:
+            image_value, upload_error = uploads.save_management_image(file, mid, MANAGEMENT_IMG_DIR)
+            if upload_error:
+                flash(upload_error, "error")
+            else:
+                uploads.delete_stored(entry.get("image_override"))
+                data["image_override"] = image_value
+        elif request.form.get("remove_image"):
+            uploads.delete_stored(entry.get("image_override"))
+            data["image_override"] = None
+
+        entries[idx] = data
+        store.save_management(entries)
+        store.append_audit(actor["email"], "management_member_edited", data["display_name"], {"role_title": data["role_title"]})
+        flash("Gazete Yönetimi üyesi güncellendi.", "success")
+        return redirect(url_for("admin.management_list"))
+
+    return render_template("admin/management_form.html", entry=entry, form=entry, authors=authors, active="management")
+
+
+@admin_bp.route("/gazete-yonetimi/<mid>/durum", methods=["POST"])
+@master_admin_required
+def management_toggle_active(mid):
+    actor = _resolve_logged_in_user()
+    entries = store.load_management()
+    idx = next((i for i, e in enumerate(entries) if e["id"] == mid), None)
+    if idx is None:
+        abort(404)
+    entries[idx]["active"] = not entries[idx].get("active")
+    entries[idx]["updated_at"] = _now_iso()
+    entries[idx]["updated_by"] = actor["email"]
+    store.save_management(entries)
+    action = "management_member_activated" if entries[idx]["active"] else "management_member_deactivated"
+    store.append_audit(actor["email"], action, entries[idx]["display_name"])
+    flash("Durum güncellendi.", "success")
+    return redirect(url_for("admin.management_list"))
+
+
+@admin_bp.route("/gazete-yonetimi/<mid>/sil", methods=["POST"])
+@master_admin_required
+def management_delete(mid):
+    """Removes the masthead entry only -- never touches the linked author
+    profile, its user account, or writer permissions. Those live in
+    completely separate files and are never written by this route."""
+    actor = _resolve_logged_in_user()
+    entries = store.load_management()
+    entry = next((e for e in entries if e["id"] == mid), None)
+    if not entry:
+        abort(404)
+    uploads.delete_stored(entry.get("image_override"))
+    entries = [e for e in entries if e["id"] != mid]
+    store.save_management(entries)
+    store.append_audit(actor["email"], "management_member_removed", entry["display_name"])
+    flash("Gazete Yönetimi üyesi kaldırıldı (hesabı/yazar profili etkilenmedi).", "success")
+    return redirect(url_for("admin.management_list"))
+
+
+@admin_bp.route("/gazete-yonetimi/<mid>/yukari", methods=["POST"])
+@master_admin_required
+def management_move_up(mid):
+    return _management_reorder(mid, -1)
+
+
+@admin_bp.route("/gazete-yonetimi/<mid>/asagi", methods=["POST"])
+@master_admin_required
+def management_move_down(mid):
+    return _management_reorder(mid, 1)
+
+
+def _management_reorder(mid, direction):
+    actor = _resolve_logged_in_user()
+    entries = sorted(store.load_management(), key=lambda e: e.get("display_order", 0))
+    idx = next((i for i, e in enumerate(entries) if e["id"] == mid), None)
+    if idx is None:
+        abort(404)
+    swap_idx = idx + direction
+    if 0 <= swap_idx < len(entries):
+        entries[idx]["display_order"], entries[swap_idx]["display_order"] = (
+            entries[swap_idx]["display_order"], entries[idx]["display_order"],
+        )
+        store.save_management(entries)
+        store.append_audit(actor["email"], "management_reordered", entries[idx]["display_name"])
+    return redirect(url_for("admin.management_list"))
+
+
 # --------------------------------------------------------- admin: settings --
-
-LEADERSHIP_ROW_LIMIT = 20
-
 
 @admin_bp.route("/site-ayarlari")
 @permission_required("site_settings")
@@ -2260,30 +2471,6 @@ def site_settings_publication():
     store.save_site(site)
     store.append_audit(actor["email"], "site_settings_updated", "Yayın Bilgileri")
     flash("Yayın bilgileri güncellendi.", "success")
-    return redirect(url_for("admin.site_settings"))
-
-
-@admin_bp.route("/site-ayarlari/gazete-yonetimi", methods=["POST"])
-@permission_required("site_settings")
-def site_settings_leadership():
-    actor = _resolve_logged_in_user()
-    site = store.load_site()
-    leadership = []
-    for i in range(LEADERSHIP_ROW_LIMIT):
-        name = request.form.get(f"name_{i}", "").strip()
-        if not name:
-            continue
-        initials = request.form.get(f"initials_{i}", "").strip()[:3].upper()
-        if not initials:
-            initials = "".join(w[0] for w in name.split()[:2]).upper()
-        roles = [r.strip() for r in request.form.get(f"roles_{i}", "").split(",") if r.strip()]
-        bio = request.form.get(f"bio_{i}", "").strip()
-        leadership.append({"name": name, "initials": initials, "roles": roles, "bio": bio})
-
-    site["leadership"] = leadership
-    store.save_site(site)
-    store.append_audit(actor["email"], "site_settings_updated", "Gazete Yönetimi")
-    flash("Gazete Yönetimi ekibi güncellendi.", "success")
     return redirect(url_for("admin.site_settings"))
 
 

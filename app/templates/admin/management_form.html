@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Üyeyi Düzenle' if entry else 'Yeni Üye' }} — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>{{ 'Gazete Yönetimi Üyesini Düzenle' if entry else 'Yeni Gazete Yönetimi Üyesi' }}</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.management_list') }}">← Listeye Dön</a>
+  </div>
+
+  <form class="admin-panel" method="post" enctype="multipart/form-data">
+    <div class="form-row">
+      <label for="linked_author_id">Bağlı Yazar Profili (opsiyonel)</label>
+      <select id="linked_author_id" name="linked_author_id">
+        <option value="">— Yok (bağımsız üye) —</option>
+        {% for a in authors %}
+        <option value="{{ a.id }}" {{ 'selected' if form and form.linked_author_id == a.id else '' }}>{{ a.display_name }}</option>
+        {% endfor %}
+      </select>
+      <div class="hint">
+        Seçilirse, isme tıklandığında bu yazarın herkese açık profiline gidilir ve profil
+        fotoğrafı (aşağıda ayrı bir görsel yüklenmediyse) otomatik kullanılır. Bu, o kişiyi
+        Yazar yapmaz veya Yazar hesabını değiştirmez -- yalnızca görüntü amaçlı bir bağlantıdır.
+      </div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="display_name">Ad Soyad</label>
+        <input type="text" id="display_name" name="display_name" required maxlength="120"
+               value="{{ form.display_name if form else '' }}">
+      </div>
+      <div class="form-row">
+        <label for="role_title">Gazete Yönetimi Unvanı</label>
+        <input type="text" id="role_title" name="role_title" required maxlength="120"
+               value="{{ form.role_title if form else '' }}" placeholder="ör. Genel Yayın Yönetmeni">
+        <div class="hint">Bu, kişinin (varsa) editoryal unvanından farklı, yalnızca bu sayfada görünen unvandır.</div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="bio">Biyografi</label>
+      <textarea id="bio" name="bio" rows="3" maxlength="2000">{{ form.bio if form else '' }}</textarea>
+    </div>
+
+    <div class="form-row">
+      <label for="display_order">Sıra</label>
+      <input type="number" id="display_order" name="display_order" value="{{ form.display_order if form else (entry.display_order if entry else 99) }}" style="max-width:120px;">
+      <div class="hint">Küçük sayı önce görünür. Listeden ↑/↓ ile de değiştirebilirsiniz.</div>
+    </div>
+
+    <div class="form-row">
+      <label>Fotoğraf (opsiyonel)</label>
+      {% if entry and entry.image_override %}
+      <div class="current-image">
+        <img src="{{ media_url(entry.image_override, 'img/management') }}" alt="" style="max-width:140px;">
+        <label style="font-weight:400;"><input type="checkbox" name="remove_image" value="1" style="width:auto;"> Görseli kaldır</label>
+      </div>
+      {% endif %}
+      <input type="file" name="image_file" accept="image/*">
+      <div class="hint">Boş bırakılırsa ve bir yazar profiline bağlıysa, o profilin fotoğrafı kullanılır.</div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-red" type="submit">{{ 'Kaydet' if entry else 'Üyeyi Ekle' }}</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

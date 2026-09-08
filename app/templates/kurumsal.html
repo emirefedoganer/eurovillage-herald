@@ -11,25 +11,31 @@
   </div>
 
   <div class="leadership-grid">
-    {% for person in site.leadership %}
-    {% set matched = authors_by_name.get(person.name) %}
+    {% for entry in entries %}
+    {% set matched = authors_by_id.get(entry.linked_author_id) %}
+    {% set photo = entry.image_override or (matched.profile_image if matched else None) %}
+    {% set initials = entry.display_name.split() | map('first') | list | join('') | upper %}
     <div class="leadership-card">
-      {% if matched and matched.profile_image %}
-      {{ author_avatar(matched, size=108, css_class="leadership-avatar-photo") }}
+      {% if photo %}
+      <img class="leadership-avatar-photo" src="{{ media_url(photo, 'img/management' if entry.image_override else 'img/authors') }}" alt="{{ entry.display_name }}" style="width:108px;height:108px;border-radius:50%;object-fit:cover;">
       {% else %}
-      <div class="leadership-avatar">{{ person.initials }}</div>
+      <div class="leadership-avatar">{{ initials }}</div>
       {% endif %}
       {% if matched %}
-      <h2><a href="{{ url_for('author_profile', slug=matched.slug) }}" class="author-link" data-author-id="{{ matched.id }}">{{ person.name }}</a></h2>
+      <h2><a href="{{ url_for('author_profile', slug=matched.slug) }}" class="author-link" data-author-id="{{ matched.id }}">{{ entry.display_name }}</a></h2>
       {% else %}
-      <h2>{{ person.name }}</h2>
+      <h2>{{ entry.display_name }}</h2>
       {% endif %}
-      <div class="leadership-roles">{{ person.roles|join(' · ') }}</div>
-      <p class="leadership-bio">{{ person.bio }}</p>
+      <div class="leadership-roles">{{ entry.role_title }}</div>
+      {% if entry.bio %}<p class="leadership-bio">{{ entry.bio }}</p>{% endif %}
       {% if matched %}<a class="btn btn-outline" style="margin-top:10px;" href="{{ url_for('author_profile', slug=matched.slug) }}">Yazar Profilini Gör</a>{% endif %}
     </div>
     {% endfor %}
   </div>
+
+  <p style="text-align:center; font-family: var(--font-sans); font-size: 13px; color: var(--gray-500); margin-top: -18px;">
+    Gazetemizin tüm yazar kadrosunu görmek için <a href="{{ url_for('yazarlar') }}">Yazarlar</a> sayfamızı ziyaret edebilirsiniz.
+  </p>
 
   <div class="leadership-info">
     <span class="kicker">Yayın Bilgileri</span>

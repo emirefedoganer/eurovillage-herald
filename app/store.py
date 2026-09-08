@@ -19,6 +19,7 @@ AUDIT_LOG_PATH = os.path.join(DATA_DIR, "audit_log.json")
 ROLES_PATH = os.path.join(DATA_DIR, "roles.json")
 ADS_PATH = os.path.join(DATA_DIR, "ads.json")
 AD_PLACEMENTS_PATH = os.path.join(DATA_DIR, "ad_placements.json")
+MANAGEMENT_PATH = os.path.join(DATA_DIR, "newspaper_management.json")
 
 TR_MAP = str.maketrans({
     "ç": "c", "Ç": "c", "ğ": "g", "Ğ": "g", "ı": "i", "I": "i",
@@ -507,3 +508,64 @@ def find_placement(slot, scope, section=None, content_type=None, content_id=None
         if scope == "global":
             return p
     return None
+
+
+# --------------------------------------------------- newspaper management --
+# Gazete Yönetimi (the public masthead/leadership page) is a deliberately
+# separate concept from the author system: being a writer, editor, or
+# admin never automatically puts someone here -- a master_admin has to add
+# them explicitly. An entry may optionally point at an existing author
+# profile (linked_author_id) purely for display (photo/link reuse); it is
+# never the other way around, and deleting an entry here never touches the
+# author/user records it happens to reference.
+
+def load_management():
+    """Self-seeds the two senior entries that predate this structured model
+    (previously free-text in site.json's `leadership`) the first time this
+    file doesn't exist yet, so a fresh deploy of this feature never starts
+    with an empty masthead or silently drops them."""
+    if not os.path.exists(MANAGEMENT_PATH):
+        seeded = _seed_management_entries()
+        _save(MANAGEMENT_PATH, seeded)
+        return seeded
+    return _load(MANAGEMENT_PATH, [])
+
+
+def _seed_management_entries():
+    site = load_site()
+    legacy_by_name = {p["name"]: p for p in (site.get("leadership") or [])}
+    authors_by_name = {a["display_name"]: a for a in load_authors()}
+    now = _audit_timestamp()
+    seeds = [("Emir the Composer", "Genel Yayın Yönetmeni"), ("Duke of Akbadain", "Okur İlişkileri")]
+    entries = []
+    for order, (name, role_title) in enumerate(seeds, start=1):
+        author = authors_by_name.get(name)
+        entries.append({
+            "id": uuid.uuid4().hex[:10],
+            "linked_author_id": author["id"] if author else None,
+            "linked_user_id": author.get("user_id") if author else None,
+            "display_name": name,
+            "role_title": role_title,
+            "bio": legacy_by_name.get(name, {}).get("bio", ""),
+            "display_order": order,
+            "active": True,
+            "image_override": None,
+            "created_at": now, "updated_at": now,
+            "created_by": "system", "updated_by": "system",
+        })
+    return entries
+
+
+def save_management(entries):
+    _save(MANAGEMENT_PATH, entries)
+
+
+def get_management_entry(entry_id):
+    return _by_id(load_management(), entry_id)
+
+
+def active_management_entries():
+    return sorted(
+        [e for e in load_management() if e.get("active")],
+        key=lambda e: e.get("display_order", 0),
+    )
