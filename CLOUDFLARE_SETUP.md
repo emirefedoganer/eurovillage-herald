@@ -72,6 +72,34 @@ guarantee against ever silently falling back again.
    uploads never silently fall back to local disk again, even during a
    future R2 outage or an accidentally-unset variable.
 
+## 2b. A private bucket for reader-tip images (recommended)
+
+Reader-submitted contact-form tip images are stored under an `okur-ihbarlari/`
+prefix and the app never generates or shows a public URL for them — admins
+view them only through an authenticated proxy route. **But** that alone is
+not real confidentiality: R2 custom domains serve any object in the bucket
+by key with no access check by default, so if these images share the public
+bucket from step 2, anyone who obtained the exact object key could still
+fetch it directly through `matbaa.eurovillageherald.com`, bypassing the
+admin-only proxy. To close that gap:
+
+1. Cloudflare dashboard → **R2** → **Create bucket** again — a second one,
+   e.g. `eurovillage-herald-tips`.
+2. **Do not** connect any custom domain to this bucket. That omission is
+   the entire point: with no custom domain, the only way to reach an
+   object in it is the S3 API with your account's R2 credentials, which
+   only this application's backend has.
+3. Your existing API token (from step 2) may already have access if it
+   wasn't scoped to a single bucket; if it was, create a second token (or
+   widen the existing one) with Object Read & Write on this new bucket too.
+4. Set `R2_PRIVATE_BUCKET_NAME` on Railway to this bucket's name. No other
+   new variables are needed — it reuses the same account/credentials/
+   endpoint as the public bucket.
+5. Until this is set, the app prints a startup warning explaining that tip
+   images are only as private as "nobody happens to guess the URL", which
+   is an honest description of the risk, not a real guarantee — set this
+   variable when you're ready to close it.
+
 ## 3. Access (admin panel)
 
 1. Zero Trust dashboard → **Access** → **Applications** → **Add an

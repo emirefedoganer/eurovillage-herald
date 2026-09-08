@@ -166,11 +166,40 @@ def get_issue(issue_id):
 
 
 def load_messages():
-    return _load(MESSAGES_PATH, [])
+    """Self-heals messages written before the tip/category/status extension
+    -- gives every record a category, status, images list, and follow-up
+    flag if it doesn't already have one, so an old plain contact message
+    (or one already sitting in production before this deploy) still
+    displays and behaves correctly rather than raising on a missing key."""
+    messages = _load(MESSAGES_PATH, [])
+    changed = False
+    for m in messages:
+        if "status" not in m:
+            m["status"] = "new"
+            changed = True
+        if "category" not in m:
+            m["category"] = m.get("subject", "Diğer")
+            changed = True
+        if "images" not in m:
+            m["images"] = []
+            changed = True
+        if "follow_up_consent" not in m:
+            m["follow_up_consent"] = False
+            changed = True
+        if "id" not in m:
+            m["id"] = uuid.uuid4().hex[:10]
+            changed = True
+    if changed:
+        _save(MESSAGES_PATH, messages)
+    return messages
 
 
 def save_messages(messages):
     _save(MESSAGES_PATH, messages)
+
+
+def get_message(mid):
+    return _by_id(load_messages(), mid)
 
 
 def all_messages_sorted():

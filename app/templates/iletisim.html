@@ -11,28 +11,47 @@
   </div>
 
   <div class="contact-grid">
-    <form class="contact-form" method="post">
+    <form class="contact-form" method="post" enctype="multipart/form-data">
       <div class="form-row">
-        <label for="name">Ad Soyad</label>
-        <input type="text" id="name" name="name" required value="{{ form.name if form else '' }}">
-      </div>
-      <div class="form-row">
-        <label for="email">E-posta</label>
-        <input type="email" id="email" name="email" required value="{{ form.email if form else '' }}">
-      </div>
-      <div class="form-row">
-        <label for="subject">Konu</label>
-        <select id="subject" name="subject" required>
-          <option value="" disabled {{ '' if form and form.subject else 'selected' }}>Bir konu seçin</option>
+        <label for="category">Kategori</label>
+        <select id="category" name="category" required>
+          <option value="" disabled {{ '' if form and form.category else 'selected' }}>Bir kategori seçin</option>
           {% for s in subjects %}
-          <option value="{{ s }}" {{ 'selected' if form and form.subject == s else '' }}>{{ s }}</option>
+          <option value="{{ s }}" {{ 'selected' if form and form.category == s else '' }}>{{ s }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="form-row">
         <label for="message">Mesajınız</label>
-        <textarea id="message" name="message" rows="7" required>{{ form.message if form else '' }}</textarea>
+        <textarea id="message" name="message" rows="7" required maxlength="4000">{{ form.message if form else '' }}</textarea>
       </div>
+
+      <div class="form-row">
+        <label for="images">Görsel Ekle (opsiyonel)</label>
+        <input type="file" id="images" name="images" accept="image/jpeg,image/png,image/webp" multiple>
+        <div class="hint">En fazla {{ max_tip_images }} görsel — JPEG, PNG veya WebP.</div>
+      </div>
+
+      <p class="hint" style="margin: 4px 0 0;">
+        Ad Soyad ve e-posta alanları isteğe bağlıdır — isterseniz anonim gönderebilirsiniz.
+      </p>
+      <div class="form-row">
+        <label for="name">Ad Soyad (opsiyonel)</label>
+        <input type="text" id="name" name="name" maxlength="120" value="{{ form.name if form else '' }}">
+      </div>
+      <div class="form-row">
+        <label for="email">E-posta (opsiyonel)</label>
+        <input type="email" id="email" name="email" maxlength="200" value="{{ form.email if form else '' }}">
+      </div>
+      <div class="form-row">
+        <label class="checkbox-row" style="font-weight:400;">
+          <input type="checkbox" id="follow_up_consent" name="follow_up_consent" value="1" style="width:auto;"
+            {{ 'checked' if form and form.follow_up_consent else '' }}>
+          Bu ihbar hakkında benimle iletişime geçebilirsiniz.
+        </label>
+        <div class="hint">Yalnızca yukarıda bir e-posta adresi verdiyseniz anlamlıdır.</div>
+      </div>
+
       <div class="form-row">
         {{ turnstile_widget() }}
       </div>
@@ -41,11 +60,11 @@
 
     <aside class="contact-directory">
       <div class="sidebar-title">İletişim Bilgileri</div>
-      {% for person in site.leadership %}
-      {% set matched = authors_by_name.get(person.name) %}
+      {% for entry in management_entries %}
+      {% set matched = authors_by_id.get(entry.linked_author_id) %}
       <div class="contact-dept">
-        <div class="contact-dept-role">{{ person.roles|join(' · ') }}</div>
-        <div class="contact-dept-name">{{ person.name }}</div>
+        <div class="contact-dept-role">{{ entry.role_title }}</div>
+        <div class="contact-dept-name">{{ entry.display_name }}</div>
         {% if matched and matched.contact_email %}
         <a class="contact-dept-email" href="mailto:{{ matched.contact_email }}">{{ matched.contact_email }}</a>
         {% endif %}

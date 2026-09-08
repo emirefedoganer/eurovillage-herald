@@ -6,6 +6,7 @@ validation, filename sanitization and the "R2 if configured, else local
 disk" decision live in exactly one place instead of being repeated per
 route. See storage.py for the R2 client itself.
 """
+import io
 import os
 import re
 import sys
@@ -17,6 +18,11 @@ from werkzeug.utils import secure_filename
 import runtime_env
 import storage
 
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
 ALLOWED_IMAGE_EXT = {"jpg", "jpeg", "png", "webp", "gif"}
 ALLOWED_PDF_EXT = {"pdf"}
 
@@ -27,6 +33,18 @@ IMAGE_CONTENT_TYPES = {
     "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
     "webp": "image/webp", "gif": "image/gif",
 }
+
+# Reader-submitted tip images specifically: a narrower, safety-first raster
+# allowlist (no GIF, and deliberately no SVG -- an XML format Pillow can't
+# even decode, which rejects it for free). Decided by actually decoding the
+# bytes with Pillow, not by trusting the extension or a client-sent MIME
+# type, and always re-encoded before storage -- see validate_and_reencode_
+# tip_image() -- which is what strips EXIF/GPS metadata as a side effect of
+# a plain re-save.
+TIP_ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
+TIP_FORMAT_EXT = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}
+TIP_FORMAT_CONTENT_TYPE = {"JPEG": "image/jpeg", "PNG": "image/png", "WEBP": "image/webp"}
+MAX_TIP_IMAGES = int(os.environ.get("MAX_TIP_IMAGES", "4"))
 
 
 def ext_of(filename):
@@ -138,6 +156,38 @@ def save_author_image(file, author_id, subdir_prefix, local_dir):
     return _store(file, object_key, local_dir, fname, IMAGE_CONTENT_TYPES.get(ext))
 
 
+def save_ad_image(file, ad_id, local_dir):
+    """Advertisement creative image. Keyed by ad id + a fresh uuid suffix
+    (rather than overwriting a fixed key like article images do) so that
+    replacing an ad's image doesn't require also deleting the old R2
+    object before the new one becomes visible everywhere the ad renders --
+    the caller (app.py) explicitly deletes the previous stored value via
+    delete_stored() after a successful new upload, same pattern as author
+    images."""
+    err = validate_image(file)
+    if err or not file or not file.filename:
+        return None, err
+    ext = ext_of(file.filename)
+    unique = uuid.uuid4().hex[:6]
+    fname = f"{ad_id}-{unique}.{ext}"
+    object_key = f"gorseller/reklamlar/{fname}"
+    return _store(file, object_key, local_dir, fname, IMAGE_CONTENT_TYPES.get(ext))
+
+
+def save_management_image(file, entry_id, local_dir):
+    """Optional photo override for a Gazete Yönetimi entry -- independent
+    of that person's author profile photo (they may not have one, or the
+    masthead may deliberately want a different picture)."""
+    err = validate_image(file)
+    if err or not file or not file.filename:
+        return None, err
+    ext = ext_of(file.filename)
+    unique = uuid.uuid4().hex[:6]
+    fname = f"{entry_id}-{unique}.{ext}"
+    object_key = f"gorseller/yonetim/{fname}"
+    return _store(file, object_key, local_dir, fname, IMAGE_CONTENT_TYPES.get(ext))
+
+
 def issue_date_parts(date_str):
     try:
         dt = datetime.strptime((date_str or "")[:10], "%Y-%m-%d")
@@ -172,3 +222,127 @@ def delete_stored(value):
     a legacy local filename is silently ignored (nothing to clean up)."""
     if value and re.match(r"^https?://", value):
         storage.delete_url_if_ours(value)
+
+
+# ------------------------------------------------------- reader tip images --
+# Deliberately separate from every function above: these are private,
+# untrusted, visitor-submitted images, stored under their own R2 prefix
+# (okur-ihbarlari/), never assigned a public URL, and never routed through
+# _store()/storage.upload_fileobj (the public-media path). See storage.py's
+# upload_private_fileobj/get_private_object and app.py's authenticated
+# admin proxy route for how they're written and read back.
+
+def validate_and_reencode_tip_image(file):
+    """Decodes the upload with Pillow -- rejecting anything Pillow can't
+    parse as one of TIP_ALLOWED_FORMATS, which is what actually rejects
+    SVG/HTML/executables/mislabeled files by real content, not just by
+    extension -- then re-encodes it to a fresh buffer. Returns
+    (buffer, ext, content_type, error); re-encoding is also what strips
+    EXIF/GPS, since Pillow never carries EXIF over on a plain re-save."""
+    if not file or not file.filename:
+        return None, None, None, None
+    if Image is None:
+        return None, None, None, "Görsel işleme şu anda kullanılamıyor."
+    if _file_size(file) > MAX_IMAGE_MB * 1024 * 1024:
+        return None, None, None, f"Görsel çok büyük (limit {MAX_IMAGE_MB:g} MB)."
+
+    try:
+        file.stream.seek(0)
+        Image.open(file.stream).verify()
+        file.stream.seek(0)
+        img = Image.open(file.stream)
+        img.load()
+    except Exception:
+        return None, None, None, "Desteklenmeyen veya bozuk görsel dosyası."
+
+    fmt = (img.format or "").upper()
+    if fmt not in TIP_ALLOWED_FORMATS:
+        return None, None, None, "Yalnızca JPEG, PNG veya WebP görseller kabul edilir."
+
+    if fmt == "JPEG" and img.mode not in ("RGB", "L"):
+        img = img.convert("RGB")
+
+    buffer = io.BytesIO()
+    save_kwargs = {"quality": 88} if fmt in ("JPEG", "WEBP") else {}
+    img.save(buffer, format=fmt, **save_kwargs)
+    buffer.seek(0)
+    return buffer, TIP_FORMAT_EXT[fmt], TIP_FORMAT_CONTENT_TYPE[fmt], None
+
+
+def save_tip_image(file, local_dir):
+    """Validates + re-encodes a reader-submitted tip image (see above),
+    then stores it under okur-ihbarlari/YYYY/MM/<uuid>.<ext> -- a
+    cryptographically random key, never the submitter's filename. Returns
+    (object_key, content_type, sanitized_original_filename, error). The
+    caller must never turn `object_key` into a public URL -- read it back
+    only via storage.get_private_object() / the admin proxy route."""
+    buffer, ext, content_type, error = validate_and_reencode_tip_image(file)
+    original_name = secure_filename(file.filename)[:120] if file and file.filename else None
+    if error or not buffer:
+        return None, None, original_name, error
+
+    now = datetime.utcnow()
+    object_key = f"okur-ihbarlari/{now.year:04d}/{now.month:02d}/{uuid.uuid4().hex}.{ext}"
+
+    if storage.ENABLED:
+        # Once R2 is on at all, a reader tip is EITHER stored in the
+        # dedicated private bucket OR the submission fails cleanly --
+        # never the public media bucket, in any environment. This is
+        # deliberately not conditioned on IS_PRODUCTION: falling back to
+        # public storage would defeat the entire point of this feature
+        # anywhere, not just in production.
+        if not storage.PRIVATE_BUCKET_CONFIGURED:
+            print(
+                f"[uploads] okur ihbarı reddedildi: R2_PRIVATE_BUCKET_NAME tanımlı değil "
+                f"(nesne herkese açık bucket'a yazılmayacaktı: {object_key})", file=sys.stderr,
+            )
+            return None, None, original_name, "Görsel depolama şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
+        try:
+            storage.upload_private_fileobj(buffer, object_key, content_type=content_type)
+        except Exception as exc:
+            print(f"[uploads] okur ihbarı yükleme hatası ({object_key}): {exc}", file=sys.stderr)
+            return None, None, original_name, "Görsel yüklenemedi. Lütfen tekrar deneyin."
+        return object_key, content_type, original_name, None
+
+    if runtime_env.IS_PRODUCTION and (storage.PARTIALLY_CONFIGURED or storage.REQUIRED):
+        return None, None, original_name, "Görsel depolama şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
+
+    # Local-dev fallback -- only reachable when R2 isn't configured at all
+    # (storage.ENABLED is False). Intentionally OUTSIDE app/static/, so
+    # Flask's automatic static route can never accidentally serve these
+    # publicly. Read back the same way via read_tip_image() below.
+    local_path = os.path.join(local_dir, *object_key.split("/")[1:])
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+    with open(local_path, "wb") as f:
+        f.write(buffer.read())
+    return object_key, content_type, original_name, None
+
+
+def read_tip_image(object_key, local_dir):
+    """Returns (file_like_or_bytes, content_type) for a stored tip image,
+    trying R2 first (if configured) then the local-dev fallback directory.
+    (None, None) if not found anywhere. Used only by the authenticated
+    admin proxy route in app.py -- never reachable by an unauthenticated
+    request."""
+    if not object_key:
+        return None, None
+    if storage.ENABLED:
+        return storage.get_private_object(object_key)
+    local_path = os.path.join(local_dir, *object_key.split("/")[1:])
+    if os.path.exists(local_path):
+        ext = ext_of(local_path)
+        return open(local_path, "rb"), IMAGE_CONTENT_TYPES.get(ext, "application/octet-stream")
+    return None, None
+
+
+def delete_tip_image(object_key, local_dir):
+    if not object_key:
+        return
+    if storage.ENABLED:
+        storage.delete_private_object(object_key)
+        return
+    local_path = os.path.join(local_dir, *object_key.split("/")[1:])
+    try:
+        os.remove(local_path)
+    except OSError:
+        pass

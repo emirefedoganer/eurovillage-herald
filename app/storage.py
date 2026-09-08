@@ -29,6 +29,26 @@ R2_ENDPOINT_URL = (
     or (f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else "")
 )
 
+# Optional separate bucket for private, non-public objects (reader-tip
+# images -- see uploads.save_tip_image). If unset, private uploads fall
+# back to the SAME bucket as public media, under their own okur-ihbarlari/
+# prefix -- which keeps them out of every public listing/search/feed the
+# application controls, but does NOT make them cryptographically private:
+# if that bucket's custom domain (R2_PUBLIC_BASE_URL) serves any object by
+# key with no access check, as R2 custom domains do by default, then an
+# object under this prefix is still fetchable by anyone who has (or
+# guesses) its exact key. A real privacy guarantee requires a bucket with
+# no public custom domain connected at all -- set R2_PRIVATE_BUCKET_NAME
+# to one once you've created it (see CLOUDFLARE_SETUP.md). The application
+# never exposes these objects' URLs to the browser either way -- admins
+# only ever see them through an authenticated proxy route that fetches the
+# bytes server-side -- but that proxy is defense in depth, not the only
+# thing standing between the object and the public internet, unless this
+# is set.
+R2_PRIVATE_BUCKET_NAME = os.environ.get("R2_PRIVATE_BUCKET_NAME", "").strip()
+PRIVATE_BUCKET_CONFIGURED = bool(R2_PRIVATE_BUCKET_NAME)
+_EFFECTIVE_PRIVATE_BUCKET = R2_PRIVATE_BUCKET_NAME or R2_BUCKET_NAME
+
 _R2_VALUES = {
     "R2_ACCOUNT_ID": R2_ACCOUNT_ID, "R2_ACCESS_KEY_ID": R2_ACCESS_KEY_ID,
     "R2_SECRET_ACCESS_KEY": R2_SECRET_ACCESS_KEY, "R2_BUCKET_NAME": R2_BUCKET_NAME,
@@ -84,6 +104,17 @@ if runtime_env.IS_PRODUCTION:
                 "Kurulumdan sonra sessiz düşmeyi tamamen engellemek isterseniz",
                 "R2_REQUIRED=true ayarlayabilirsiniz.",
             ])
+    if ENABLED and not PRIVATE_BUCKET_CONFIGURED:
+        _startup_warning([
+            "GİZLİLİK UYARISI: R2_PRIVATE_BUCKET_NAME tanımlanmamış.",
+            "Okur ihbarı (tip) görselleri, herkese açık matbaa.eurovillageherald.com",
+            "alan adına bağlı OLAN AYNI R2 bucket'ında ('okur-ihbarlari/' öneki altında)",
+            "saklanacak. Uygulama bu görsellerin URL'sini asla herkese göstermez, ama",
+            "nesne anahtarını bilen biri onu yine de doğrudan o alan adı üzerinden",
+            "çekebilir -- bu, kriptografik olarak GERÇEK bir gizlilik DEĞİLDİR.",
+            "Gerçek gizlilik için özel alan adı bağlanmamış ayrı bir R2 bucket'ı",
+            "oluşturup R2_PRIVATE_BUCKET_NAME ile tanımlayın (bkz. CLOUDFLARE_SETUP.md).",
+        ])
 
 _client = None
 
@@ -150,7 +181,75 @@ def delete_object(object_key):
         pass
 
 
+def object_exists(object_key):
+    """True if `object_key` exists in the bucket right now. Never raises --
+    returns False for a missing object, an access/network error, or R2 not
+    being configured at all. Used by the media migration tool's --verify
+    mode to confirm a "migrated" reference still actually resolves."""
+    if not ENABLED or not object_key:
+        return False
+    try:
+        _get_client().head_object(Bucket=R2_BUCKET_NAME, Key=object_key)
+        return True
+    except Exception:
+        return False
+
+
 def delete_url_if_ours(url):
     key = key_from_url(url)
     if key:
         delete_object(key)
+
+
+# ------------------------------------------------------- private objects --
+# Reader-tip images. Deliberately no public_url()-style helper here -- a
+# private object's key is NEVER turned into a URL handed to a browser.
+# Admins view them only through an authenticated proxy route that calls
+# get_private_object() and streams the bytes itself. See the module
+# docstring's note on R2_PRIVATE_BUCKET_NAME for what this can and can't
+# actually guarantee.
+
+def upload_private_fileobj(fileobj, object_key, content_type=None):
+    """Hard guard, independent of whatever the caller already checked:
+    this never writes to the public bucket. If R2_PRIVATE_BUCKET_NAME
+    isn't set, _EFFECTIVE_PRIVATE_BUCKET would otherwise equal the public
+    bucket -- refusing here (rather than silently proceeding) is what
+    makes "no public fallback for private uploads" true even if a future
+    caller forgets to check PRIVATE_BUCKET_CONFIGURED first."""
+    if not ENABLED:
+        raise RuntimeError("R2 depolama yapılandırılmamış.")
+    if not PRIVATE_BUCKET_CONFIGURED:
+        raise RuntimeError(
+            "R2_PRIVATE_BUCKET_NAME tanımlanmamış -- özel/gizli bir yükleme, "
+            "herkese açık medya bucket'ına asla yazılmaz."
+        )
+    extra = {"CacheControl": "private, no-store"}
+    if content_type:
+        extra["ContentType"] = content_type
+    try:
+        fileobj.seek(0)
+    except (AttributeError, OSError):
+        pass
+    _get_client().upload_fileobj(fileobj, _EFFECTIVE_PRIVATE_BUCKET, object_key, ExtraArgs=extra)
+
+
+def get_private_object(object_key):
+    """Fetches an object from the private bucket via a direct S3 GetObject
+    call -- never through a public URL. Returns (body_stream, content_type)
+    or (None, None) if missing, unreachable, or R2 isn't configured."""
+    if not ENABLED or not object_key:
+        return None, None
+    try:
+        resp = _get_client().get_object(Bucket=_EFFECTIVE_PRIVATE_BUCKET, Key=object_key)
+        return resp["Body"], resp.get("ContentType")
+    except Exception:
+        return None, None
+
+
+def delete_private_object(object_key):
+    if not ENABLED or not object_key:
+        return
+    try:
+        _get_client().delete_object(Bucket=_EFFECTIVE_PRIVATE_BUCKET, Key=object_key)
+    except Exception:
+        pass

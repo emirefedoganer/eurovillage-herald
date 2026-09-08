@@ -13,16 +13,45 @@
     {% if messages %}
     <table class="admin-table">
       <thead>
-        <tr><th>Tarih</th><th>Ad Soyad</th><th>E-posta</th><th>Konu</th><th>Mesaj</th><th></th></tr>
+        <tr><th>Tarih</th><th>Kategori</th><th>Gönderen</th><th>Mesaj</th><th>Görseller</th><th>Durum</th><th></th></tr>
       </thead>
       <tbody>
         {% for m in messages %}
         <tr>
           <td style="white-space:nowrap;">{{ m.date }}</td>
-          <td>{{ m.name }}</td>
-          <td><a href="mailto:{{ m.email }}">{{ m.email }}</a></td>
-          <td>{{ m.subject }}</td>
-          <td style="max-width:320px; white-space:pre-wrap;">{{ m.message }}</td>
+          <td>{{ m.category or m.subject }}</td>
+          <td>
+            {% if m.name or m.email %}
+              {{ m.name or '(isim verilmedi)' }}<br>
+              {% if m.email %}<a href="mailto:{{ m.email }}">{{ m.email }}</a>{% endif %}
+              {% if m.follow_up_consent %}<div class="hint">✓ İletişime geçilebilir</div>{% endif %}
+            {% else %}
+              <span class="hint">Anonim gönderim</span>
+            {% endif %}
+          </td>
+          <td style="max-width:280px; white-space:pre-wrap;">{{ m.message }}</td>
+          <td>
+            {% if m.images %}
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              {% for img in m.images %}
+              <a href="{{ url_for('admin.message_image', mid=m.id, idx=loop.index0) }}" target="_blank" rel="noopener">
+                <img src="{{ url_for('admin.message_image', mid=m.id, idx=loop.index0) }}" alt=""
+                     style="width:56px;height:56px;object-fit:cover;border-radius:4px;border:1px solid var(--gray-200);">
+              </a>
+              {% endfor %}
+            </div>
+            {% else %}<span class="hint">—</span>{% endif %}
+          </td>
+          <td>
+            <form method="post" action="{{ url_for('admin.message_set_status', mid=m.id) }}">
+              <input type="hidden" name="sayfa" value="{{ page }}">
+              <select name="status" onchange="this.form.submit()">
+                {% for key, label in status_labels.items() %}
+                <option value="{{ key }}" {{ 'selected' if m.status == key else '' }}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </td>
           <td class="admin-actions">
             <form method="post" action="{{ url_for('admin.message_delete', mid=m.id) }}" onsubmit="return confirm('Bu mesajı silmek istediğinize emin misiniz?');">
               <input type="hidden" name="sayfa" value="{{ page }}">

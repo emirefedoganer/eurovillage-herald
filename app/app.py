@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from functools import wraps
 
-from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, abort, flash, jsonify, send_file, g
+from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, abort, flash, jsonify, send_file, Response, g
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -30,6 +30,11 @@ ISSUE_PDF_DIR = os.path.join(BASE_DIR, "static", "issues")
 AUTHOR_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "authors")
 AD_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "ads")
 MANAGEMENT_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "management")
+# Reader-tip images' local-dev fallback -- deliberately OUTSIDE static/, so
+# Flask's automatic /static/<path> route can never serve one of these
+# directly. In production these go to R2 under okur-ihbarlari/ instead
+# (see uploads.save_tip_image / storage.py's private-object functions).
+TIP_IMG_DIR = os.path.join(BASE_DIR, "private_uploads", "okur_ihbarlari")
 SECRET_PATH = os.path.join(BASE_DIR, "data", ".secret_key")
 
 TWITTER_HANDLE_RE = re.compile(r"^[A-Za-z0-9_]{1,15}$")
@@ -79,13 +84,17 @@ def generate_temp_password():
     return "".join(secrets.choice(alphabet) for _ in range(12))
 
 CONTACT_SUBJECTS = [
-    "Haber İhbarı",
-    "Okur Şikayeti / Görüşü",
-    "Basın Bülteni Gönder",
-    "Reklam ve İş Birliği",
+    "İhbar",
     "Düzeltme Talebi",
+    "Okur Görüşü",
+    "Teknik Sorun",
     "Diğer",
 ]
+
+MESSAGE_STATUS_LABELS = {
+    "new": "Yeni", "reviewing": "İnceleniyor", "replied": "Yanıtlandı", "archived": "Arşivlendi",
+}
+MESSAGE_STATUS_ORDER = ["new", "reviewing", "replied", "archived"]
 
 # In production, set SERVER_NAME (e.g. "eurovillageherald.com") as an environment
 # variable. When set, the admin panel is served ONLY from admin.<SERVER_NAME> and is
@@ -109,11 +118,12 @@ app = Flask(__name__, subdomain_matching=True)
 app.secret_key = get_or_create_secret()
 
 # Upper bound on any request body Flask will even start reading (covers the
-# largest allowed upload, PDF editions -- see uploads.py for the per-file-type
-# limits actually enforced). Rejects oversized requests before they're fully
+# largest allowed upload -- either a single PDF edition, or a multi-image
+# reader tip submission -- see uploads.py for the per-file-type limits
+# actually enforced). Rejects oversized requests before they're fully
 # received rather than after.
 app.config["MAX_CONTENT_LENGTH"] = int(
-    max(uploads.MAX_IMAGE_MB, uploads.MAX_PDF_MB) * 1024 * 1024
+    max(uploads.MAX_IMAGE_MB * uploads.MAX_TIP_IMAGES, uploads.MAX_PDF_MB) * 1024 * 1024
 ) + (1024 * 1024)
 
 # SameSite=Lax on every cookie the app sets (session + the visitor-gate
@@ -150,6 +160,7 @@ os.makedirs(ISSUE_PDF_DIR, exist_ok=True)
 os.makedirs(AUTHOR_IMG_DIR, exist_ok=True)
 os.makedirs(AD_IMG_DIR, exist_ok=True)
 os.makedirs(MANAGEMENT_IMG_DIR, exist_ok=True)
+os.makedirs(TIP_IMG_DIR, exist_ok=True)
 
 # Available to every template without each view having to pre-resolve authors
 # for every article it passes along (cards, river items, related lists...).
@@ -193,6 +204,7 @@ def media_url(value, legacy_subdir, external=False):
 app.jinja_env.globals["media_url"] = media_url
 app.jinja_env.globals["turnstile_site_key"] = turnstile.SITE_KEY if turnstile.ENABLED else None
 app.jinja_env.globals["ad_slot"] = ads.ad_slot
+app.jinja_env.globals["max_tip_images"] = uploads.MAX_TIP_IMAGES
 
 KOSE_YAZISI_LABEL = "Köşe Yazısı"
 
@@ -704,48 +716,74 @@ def search():
 def iletisim():
     contact_settings = store.load_site().get("contact") or {}
     subjects = contact_settings.get("subjects") or CONTACT_SUBJECTS
-    authors_by_name = {a["display_name"]: a for a in store.active_authors()}
+    authors_by_id = {a["id"]: a for a in store.active_authors()}
+    management_entries = store.active_management_entries()
 
     if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        email = request.form.get("email", "").strip()
-        subject = request.form.get("subject", "").strip()
-        message = request.form.get("message", "").strip()
+        # Name and email are deliberately optional -- a reader submitting a
+        # sensitive tip may reasonably want to stay anonymous. Consent to
+        # follow-up is tracked separately and is never implied by simply
+        # supplying contact info.
+        name = request.form.get("name", "").strip()[:120] or None
+        email = request.form.get("email", "").strip()[:200] or None
+        category = request.form.get("category", "").strip()
+        message = request.form.get("message", "").strip()[:4000]
+        follow_up_consent = bool(request.form.get("follow_up_consent")) and bool(email)
 
         errors = []
         if not ratelimit.allow(f"contact:{request.remote_addr}", max_hits=5, window_seconds=600):
             errors.append("Çok fazla mesaj gönderildi. Lütfen bir süre sonra tekrar deneyin.")
-        if not name:
-            errors.append("Ad Soyad alanı zorunludur.")
-        if not email or "@" not in email:
-            errors.append("Geçerli bir e-posta adresi girin.")
-        if subject not in subjects:
-            errors.append("Lütfen bir konu seçin.")
+        if email and "@" not in email:
+            errors.append("Geçerli bir e-posta adresi girin ya da e-posta alanını boş bırakın.")
+        if category not in subjects:
+            errors.append("Lütfen bir kategori seçin.")
         if not message:
             errors.append("Mesaj alanı zorunludur.")
         turnstile.check(errors, request.form, remote_ip=request.remote_addr)
 
+        images_meta = []
+        files = [f for f in request.files.getlist("images") if f and f.filename][:uploads.MAX_TIP_IMAGES]
+        if len(request.files.getlist("images")) > uploads.MAX_TIP_IMAGES:
+            errors.append(f"En fazla {uploads.MAX_TIP_IMAGES} görsel ekleyebilirsiniz.")
+        if not errors:
+            for f in files:
+                object_key, content_type, original_name, upload_error = uploads.save_tip_image(f, TIP_IMG_DIR)
+                if upload_error:
+                    errors.append(upload_error)
+                    continue
+                if object_key:
+                    images_meta.append({
+                        "key": object_key, "content_type": content_type, "original_filename": original_name,
+                    })
+
         if errors:
+            for uploaded in images_meta:
+                uploads.delete_tip_image(uploaded["key"], TIP_IMG_DIR)
             for e in errors:
                 flash(e, "error")
             return render_template("iletisim.html", subjects=subjects, contact=contact_settings,
-                                    authors_by_name=authors_by_name, form=request.form)
+                                    authors_by_id=authors_by_id, management_entries=management_entries,
+                                    form=request.form)
 
         messages = store.load_messages()
         messages.append({
             "id": uuid.uuid4().hex[:10],
             "name": name,
             "email": email,
-            "subject": subject,
+            "category": category,
+            "subject": category,  # kept for compatibility with any older reader of this field
             "message": message,
+            "follow_up_consent": follow_up_consent,
+            "images": images_meta,
+            "status": "new",
             "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
         })
         store.save_messages(messages)
-        flash("Mesajınız için teşekkürler! Okur İlişkileri departmanımız (Duke of Akbadain) en kısa sürede size dönüş yapacaktır.", "success")
+        flash("Mesajınız için teşekkürler! Okur İlişkileri departmanımız en kısa sürede inceleyecektir.", "success")
         return redirect(url_for("iletisim"))
 
     return render_template("iletisim.html", subjects=subjects, contact=contact_settings,
-                            authors_by_name=authors_by_name, form={})
+                            authors_by_id=authors_by_id, management_entries=management_entries, form={})
 
 
 @app.route("/profil/<slug>")
@@ -959,17 +997,68 @@ def messages_list():
     start = (page - 1) * MESSAGES_PER_PAGE
     messages = all_messages[start:start + MESSAGES_PER_PAGE]
     return render_template("admin/messages_list.html", messages=messages, total=total,
-                            page=page, page_count=page_count, active="messages")
+                            page=page, page_count=page_count, status_labels=MESSAGE_STATUS_LABELS,
+                            active="messages")
 
 
 @admin_bp.route("/mesaj/<mid>/sil", methods=["POST"])
 @permission_required("messages")
 def message_delete(mid):
     messages = store.load_messages()
+    message = next((m for m in messages if m["id"] == mid), None)
+    if message:
+        for img in message.get("images") or []:
+            uploads.delete_tip_image(img["key"], TIP_IMG_DIR)
     messages = [m for m in messages if m["id"] != mid]
     store.save_messages(messages)
     flash("Mesaj silindi.", "success")
     return redirect(url_for("admin.messages_list", sayfa=request.form.get("sayfa", 1)))
+
+
+@admin_bp.route("/mesaj/<mid>/durum", methods=["POST"])
+@permission_required("messages")
+def message_set_status(mid):
+    """The reader-message status workflow (Yeni/İnceleniyor/Yanıtlandı/
+    Arşivlendi) -- reuses the message's own `status` field rather than a
+    second parallel state system; never deletes the message."""
+    actor = _resolve_logged_in_user()
+    messages = store.load_messages()
+    idx = next((i for i, m in enumerate(messages) if m["id"] == mid), None)
+    if idx is None:
+        abort(404)
+    new_status = request.form.get("status", "")
+    if new_status not in MESSAGE_STATUS_LABELS:
+        abort(400)
+    messages[idx]["status"] = new_status
+    messages[idx]["status_updated_at"] = _now_iso()
+    messages[idx]["status_updated_by"] = actor["email"]
+    store.save_messages(messages)
+    store.append_audit(actor["email"], "reader_message_status_changed", mid, {"status": new_status})
+    flash("Mesaj durumu güncellendi.", "success")
+    return redirect(url_for("admin.messages_list", sayfa=request.form.get("sayfa", 1)))
+
+
+@admin_bp.route("/mesaj/<mid>/gorsel/<int:idx>")
+@permission_required("messages")
+def message_image(mid, idx):
+    """The ONLY way a reader-tip image is ever shown to anyone: fetched
+    server-side (from R2 or the local-dev fallback) and streamed through
+    this authenticated, permission-checked route. No public URL for these
+    objects is ever generated or handed to a browser -- see uploads.py /
+    storage.py's private-object functions for the read path itself, and
+    their docstrings for what this can and cannot guarantee about the
+    underlying storage."""
+    message = store.get_message(mid)
+    images = (message or {}).get("images") or []
+    if not message or idx < 0 or idx >= len(images):
+        abort(404)
+    object_key = images[idx]["key"]
+    body, content_type = uploads.read_tip_image(object_key, TIP_IMG_DIR)
+    if not body:
+        abort(404)
+    data = body.read() if hasattr(body, "read") else body
+    return Response(data, mimetype=content_type or "application/octet-stream",
+                     headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
 
 
 def text_to_body(body_raw):

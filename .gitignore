@@ -3,4 +3,5 @@ __pycache__/
 app/data/.secret_key
 .DS_Store
 .venv/
+app/private_uploads/
 .env

@@ -47,11 +47,10 @@
     "intro_text": "Bir haber ihbarınız mı var? Bir düzeltme mi talep ediyorsunuz? Yoksa yalnızca bir okur görüşünüzü mü paylaşmak istiyorsunuz? The Eurovillage Herald olarak Eurovillage halkını dinliyoruz.",
     "note": "Tüm mesajlar doğrudan gazetemizin Okur İlişkileri departmanına iletilir.",
     "subjects": [
-      "Haber İhbarı",
-      "Okur Şikayeti / Görüşü",
-      "Basın Bülteni Gönder",
-      "Reklam ve İş Birliği",
+      "İhbar",
       "Düzeltme Talebi",
+      "Okur Görüşü",
+      "Teknik Sorun",
       "Diğer"
     ]
   }
