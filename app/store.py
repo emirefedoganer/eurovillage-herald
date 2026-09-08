@@ -49,25 +49,83 @@ def _save(path, data):
 
 
 def load_articles():
-    """Loads articles, self-healing a missing `id` field on the way in.
+    """Loads articles, self-healing two things on the way in:
 
-    Articles have historically only had `slug` as an identifier, but slugs
-    are mutable (editing an article's title regenerates it via
-    unique_slug()). Ad placements need a stable reference to "this specific
-    article" that survives a slug change, so every article gets a
-    permanent, never-reassigned `id` the first time it's loaded after this
-    field was introduced. This runs on every load but only ever writes once
-    per article -- after the first backfill, every article already has an
-    id and this becomes a no-op scan."""
+    1. A missing `id` -- articles historically only had `slug` as an
+       identifier, but slugs are mutable (editing an article's title
+       regenerates it). Ad placements and preview links need a stable
+       reference that survives a slug change.
+    2. A missing `status` -- defaults every pre-existing article to
+       "published" (their only meaningful prior state), and flips any
+       "scheduled" article whose publish_at has passed to "published".
+
+    That second point is the entire restart-safety story for scheduled
+    publishing: there is no timer, in-memory or otherwise. Every single
+    read re-evaluates "is publish_at due yet?" against the wall clock and
+    persists the flip the moment it's true, so a Railway restart at 08:55
+    for an article scheduled at 09:00 changes nothing -- the very next
+    request after 09:00 (from anyone, on any route that loads articles)
+    normalizes it. This runs on every load but only ever writes when
+    something actually changed, so it's a no-op scan the rest of the time.
+    """
     articles = _load(ARTICLES_PATH, [])
     changed = False
+    now = _utcnow()
     for a in articles:
         if not a.get("id"):
             a["id"] = uuid.uuid4().hex[:10]
             changed = True
+        if not a.get("status"):
+            a["status"] = "published"
+            changed = True
+        if a.get("status") == "scheduled":
+            publish_at = _parse_iso(a.get("publish_at"))
+            if publish_at and publish_at <= now:
+                a["status"] = "published"
+                changed = True
     if changed:
         _save(ARTICLES_PATH, articles)
     return articles
+
+
+def _utcnow():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc)
+
+
+def _parse_iso(value):
+    from datetime import datetime
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def is_article_public(article, now=None):
+    """The single place that decides whether an article is visible to an
+    ordinary visitor right now. "published" always is; "scheduled" is only
+    once its publish_at has passed (in practice load_articles() already
+    normalizes a due "scheduled" article to "published" on every read, so
+    this mainly matters for the brief window on the same read where the
+    normalization loop and a filter loop haven't both run yet -- see
+    public_articles()). "draft" never is."""
+    status = article.get("status", "published")
+    if status == "published":
+        return True
+    if status == "scheduled":
+        publish_at = _parse_iso(article.get("publish_at"))
+        return bool(publish_at and publish_at <= (now or _utcnow()))
+    return False
+
+
+def public_articles(articles):
+    """Filters an already-loaded article list down to what a visitor may
+    see. Callers on the public side pass their list through this; admin
+    callers don't, so editors keep seeing drafts/scheduled items to manage."""
+    now = _utcnow()
+    return [a for a in articles if is_article_public(a, now)]
 
 
 def save_articles(articles):
@@ -90,9 +148,11 @@ def save_site(site):
     _save(SITE_PATH, site)
 
 
-def get_article(slug):
+def get_article(slug, published_only=False):
     for a in load_articles():
         if a["slug"] == slug:
+            if published_only and not is_article_public(a):
+                return None
             return a
     return None
 
@@ -110,6 +170,31 @@ def get_article_by_id(article_id):
         if a.get("id") == article_id:
             return a
     return None
+
+
+def get_article_by_preview_token(token):
+    """Looks up the one article (if any) whose current preview token hash
+    matches `token`, and only if that token hasn't expired. Deliberately
+    ignores publish status -- previewing a draft/scheduled article by its
+    token is the entire point. Returns None for a missing, wrong, expired,
+    or revoked token, indistinguishable from each other to the caller (so
+    the preview route can't be used to probe which case it is)."""
+    if not token:
+        return None
+    token_hash = hash_preview_token(token)
+    now = _utcnow()
+    for a in load_articles():
+        if a.get("preview_token_hash") == token_hash:
+            expires_at = _parse_iso(a.get("preview_token_expires_at"))
+            if expires_at and expires_at <= now:
+                return None
+            return a
+    return None
+
+
+def hash_preview_token(token):
+    import hashlib
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def unique_slug(title, existing_slugs, current_slug=None):
@@ -144,16 +229,20 @@ def article_lead_quote(article):
     return None
 
 
-def articles_by_section(section, exclude_slug=None, limit=None):
+def articles_by_section(section, exclude_slug=None, limit=None, published_only=False):
     items = [a for a in load_articles() if a["section"] == section and a["slug"] != exclude_slug]
+    if published_only:
+        items = public_articles(items)
     items.sort(key=lambda a: a["date"], reverse=True)
     if limit:
         items = items[:limit]
     return items
 
 
-def all_articles_sorted():
+def all_articles_sorted(published_only=False):
     items = load_articles()
+    if published_only:
+        items = public_articles(items)
     items.sort(key=lambda a: a["date"], reverse=True)
     return items
 
@@ -444,11 +533,13 @@ def resolve_article_authors(article):
     return []
 
 
-def articles_by_author(author_id, exclude_slug=None):
+def articles_by_author(author_id, exclude_slug=None, published_only=False):
     items = [
         a for a in load_articles()
         if author_id in (a.get("author_ids") or []) and a.get("slug") != exclude_slug
     ]
+    if published_only:
+        items = public_articles(items)
     items.sort(key=lambda a: a["date"], reverse=True)
     return items
 

@@ -40,6 +40,23 @@
       </div>
     </div>
 
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="publish_state">Yayın Durumu</label>
+        <select id="publish_state" name="publish_state">
+          <option value="draft" {{ 'selected' if article and article.status == 'draft' else '' }}>Taslak</option>
+          <option value="scheduled" {{ 'selected' if article and article.status == 'scheduled' else '' }}>Zamanlanmış</option>
+          <option value="published" {{ 'selected' if not article or article.status == 'published' or not article.status else '' }}>Yayında</option>
+        </select>
+      </div>
+      <div class="form-row" id="publish_at-row">
+        <label for="publish_at">Yayın Tarihi/Saati ({{ editorial_timezone_name }})</label>
+        <input type="datetime-local" id="publish_at" name="publish_at"
+               value="{{ to_editorial_input(article.publish_at) if article else '' }}">
+        <div class="hint">Bu saat geldiğinde makale otomatik olarak yayımlanır — saat {{ editorial_timezone_name }} yerel saatidir (sunucuda UTC olarak saklanır).</div>
+      </div>
+    </div>
+
     <div class="form-row">
       <label>Yazar(lar)</label>
       {% if is_master %}
@@ -119,6 +136,66 @@
       <a class="btn btn-outline" href="{{ url_for('admin.dashboard') }}">Vazgeç</a>
     </div>
   </form>
+
+  {% if article and article.status != 'published' %}
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); margin-top:0;">Önizleme Bağlantısı</h2>
+    <p class="hint" style="margin-top:0;">
+      Herald hesabı olmayan biriyle bu taslağı/zamanlanmış makaleyi paylaşmak için güvenli bir
+      bağlantı oluşturun. Makale bu bağlantı üzerinden görüntülenebilir ama herkese açık kalmaz.
+    </p>
+    {% if article.preview_token_hash %}
+    <p>
+      <strong>Aktif bir önizleme bağlantısı var</strong>
+      (oluşturuldu: {{ article.preview_token_created_at[:16].replace('T',' ') if article.preview_token_created_at else '' }},
+      {% if article.preview_token_expires_at %}bitiş: {{ article.preview_token_expires_at[:16].replace('T',' ') }} UTC{% else %}süresiz{% endif %}).
+      Bağlantının kendisi güvenlik nedeniyle yalnızca oluşturulduğu anda gösterilir — kaybettiyseniz yenisini oluşturun.
+    </p>
+    <form method="post" action="{{ url_for('admin.article_preview_revoke', slug=article.slug) }}" style="display:inline;" onsubmit="return confirm('Bu önizleme bağlantısını iptal etmek istediğinize emin misiniz?');">
+      <button class="btn btn-danger" type="submit">Bağlantıyı İptal Et</button>
+    </form>
+    {% else %}
+    <p>Şu anda aktif bir önizleme bağlantısı yok.</p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('admin.article_preview_generate', slug=article.slug) }}" style="margin-top:14px;">
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label for="expiry">Geçerlilik Süresi</label>
+          <select id="expiry" name="expiry">
+            <option value="24h">24 saat</option>
+            <option value="7d">7 gün</option>
+            <option value="custom">Özel</option>
+            <option value="none">Süresiz</option>
+          </select>
+        </div>
+        <div class="form-row" id="custom_expiry-row" hidden>
+          <label for="custom_expiry">Özel Bitiş Tarihi/Saati (UTC)</label>
+          <input type="datetime-local" id="custom_expiry" name="custom_expiry">
+        </div>
+      </div>
+      <button class="btn btn-outline" type="submit">{{ 'Yeni Bağlantı Oluştur' if article.preview_token_hash else 'Önizleme Bağlantısı Oluştur' }}</button>
+    </form>
+  </div>
+  {% endif %}
 </div>
+
+<script>
+(function () {
+  var publishState = document.getElementById("publish_state");
+  var publishAtRow = document.getElementById("publish_at-row");
+  function syncPublishAt() {
+    if (publishState && publishAtRow) publishAtRow.hidden = publishState.value !== "scheduled";
+  }
+  if (publishState) { publishState.addEventListener("change", syncPublishAt); syncPublishAt(); }
+
+  var expiry = document.getElementById("expiry");
+  var customRow = document.getElementById("custom_expiry-row");
+  function syncExpiry() {
+    if (expiry && customRow) customRow.hidden = expiry.value !== "custom";
+  }
+  if (expiry) { expiry.addEventListener("change", syncExpiry); syncExpiry(); }
+})();
+</script>
 
 {% endblock %}

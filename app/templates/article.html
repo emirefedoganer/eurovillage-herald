@@ -1,8 +1,21 @@
 {% extends "base.html" %}
 {% from "_macros.html" import author_byline, author_avatar %}
 {% block title %}{{ article.title }} — {{ site.name }}{% endblock %}
-{% block extra_head %}<meta name="description" content="{{ article.dek }}">{% endblock %}
+{% block extra_head %}
+<meta name="description" content="{{ article.dek }}">
+{% if is_preview %}<meta name="robots" content="noindex, nofollow">{% endif %}
+{% endblock %}
 {% block content %}
+
+{% if is_preview %}
+<div class="preview-banner">
+  {% if article.status == 'scheduled' %}
+  Bu bir ÖNİZLEMEdir — makale {{ to_editorial_display(article.publish_at) }} ({{ editorial_timezone_name }}) tarihinde otomatik yayımlanacak şekilde zamanlanmış. Henüz herkese açık değil.
+  {% else %}
+  Bu bir ÖNİZLEMEdir — makale henüz TASLAK durumunda ve herkese açık değil.
+  {% endif %}
+</div>
+{% endif %}
 
 <article>
   <div class="article-head {{ 'article-head-opinion' if columnist else '' }}">

@@ -23,13 +23,24 @@
     <h2 style="font-family: var(--font-headline); margin-top:0;">Makaleler ({{ articles|length }})</h2>
     <table class="admin-table">
       <thead>
-        <tr><th>Başlık</th><th>Bölüm</th><th>Tarih</th><th>Etiket</th><th></th></tr>
+        <tr><th>Başlık</th><th>Bölüm</th><th>Durum</th><th>Tarih</th><th>Etiket</th><th></th></tr>
       </thead>
       <tbody>
         {% for a in articles %}
         <tr>
-          <td><a href="{{ url_for('article_page', slug=a.slug) }}" target="_blank">{{ a.title }}</a></td>
+          <td>
+            {% if not a.status or a.status == 'published' %}
+            <a href="{{ url_for('article_page', slug=a.slug) }}" target="_blank">{{ a.title }}</a>
+            {% else %}
+            {{ a.title }}
+            {% endif %}
+          </td>
           <td>{{ section_label(a.section) }}</td>
+          <td>
+            {% if a.status == 'draft' %}<span class="badge badge-secondary">Taslak</span>
+            {% elif a.status == 'scheduled' %}<span class="badge badge-secondary">Zamanlanmış — {{ to_editorial_display(a.publish_at) }} ({{ editorial_timezone_name }})</span>
+            {% else %}<span class="badge badge-lead">Yayında</span>{% endif %}
+          </td>
           <td>{{ a.date }}</td>
           <td>
             {% if a.featured == 'lead' %}<span class="badge badge-lead">Manşet</span>{% endif %}
@@ -44,7 +55,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="5">Henüz makale yok.</td></tr>
+        <tr><td colspan="6">Henüz makale yok.</td></tr>
         {% endfor %}
       </tbody>
     </table>

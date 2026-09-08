@@ -76,14 +76,14 @@
 
     <div class="form-grid-2">
       <div class="form-row">
-        <label for="start_at">Başlangıç Tarihi/Saati (opsiyonel)</label>
+        <label for="start_at">Başlangıç Tarihi/Saati — {{ editorial_timezone_name }} (opsiyonel)</label>
         <input type="datetime-local" id="start_at" name="start_at"
-               value="{{ (form.start_at or '')[:16] if form else '' }}">
+               value="{{ to_editorial_input(form.start_at) if form else '' }}">
       </div>
       <div class="form-row">
-        <label for="end_at">Bitiş Tarihi/Saati (opsiyonel)</label>
+        <label for="end_at">Bitiş Tarihi/Saati — {{ editorial_timezone_name }} (opsiyonel)</label>
         <input type="datetime-local" id="end_at" name="end_at"
-               value="{{ (form.end_at or '')[:16] if form else '' }}">
+               value="{{ to_editorial_input(form.end_at) if form else '' }}">
       </div>
     </div>
     <div class="hint" style="margin: -10px 0 16px;">Boş bırakılırsa o sınır uygulanmaz (ör. bitiş tarihi olmadan reklam süresiz aktif kalır).</div>

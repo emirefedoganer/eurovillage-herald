@@ -34,7 +34,7 @@
         <tr>
           <td>{{ ad.internal_name }}</td>
           <td>{{ ad.sponsor_name }}</td>
-          <td>{{ ad.end_at[:16].replace('T',' ') if ad.end_at else '' }}</td>
+          <td>{{ to_editorial_display(ad.end_at) }}{% if ad.end_at %} ({{ editorial_timezone_name }}){% endif %}</td>
           <td class="admin-actions">
             <a class="btn btn-outline" href="{{ url_for('admin.ad_edit', aid=ad.id) }}">Düzenle</a>
           </td>

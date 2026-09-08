@@ -63,7 +63,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "8f08fc9970"
+    "id": "8f08fc9970",
+    "status": "published"
   },
   {
     "slug": "demokrasinin-kara-gunu-darbe-girisimi",
@@ -176,7 +177,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "b147687b7e"
+    "id": "b147687b7e",
+    "status": "published"
   },
   {
     "slug": "akbadaina-sanal-mesruiyet",
@@ -225,7 +227,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "57e63df227"
+    "id": "57e63df227",
+    "status": "published"
   },
   {
     "slug": "manifestin-ilk-ev-sahibi",
@@ -266,7 +269,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "7936fbf2c9"
+    "id": "7936fbf2c9",
+    "status": "published"
   },
   {
     "slug": "demokrasi-tek-sesli-bir-mars-degildir",
@@ -320,7 +324,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "8d7c54642a"
+    "id": "8d7c54642a",
+    "status": "published"
   },
   {
     "slug": "buyuksehirden-yeni-donem-yeni-slogan",
@@ -423,7 +428,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "3cc6e2f8b0"
+    "id": "3cc6e2f8b0",
+    "status": "published"
   },
   {
     "slug": "obgis-ile-roportaj",
@@ -521,7 +527,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "5dc3698297"
+    "id": "5dc3698297",
+    "status": "published"
   },
   {
     "slug": "secim-haritasi-neden-yaniltiyor",
@@ -611,7 +618,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "2f8559a2b5"
+    "id": "2f8559a2b5",
+    "status": "published"
   },
   {
     "section": "sehir",
@@ -645,7 +653,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "e5e69733ef"
+    "id": "e5e69733ef",
+    "status": "published"
   },
   {
     "slug": "etc-musikforum-yeni-kultur-odagi",
@@ -754,7 +763,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "82fb532d7c"
+    "id": "82fb532d7c",
+    "status": "published"
   },
   {
     "slug": "kanyon-istasyonu-acildi",
@@ -795,7 +805,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "e590ccf329"
+    "id": "e590ccf329",
+    "status": "published"
   },
   {
     "slug": "nikah-salonu-acildi",
@@ -827,7 +838,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "546c881a20"
+    "id": "546c881a20",
+    "status": "published"
   },
   {
     "slug": "iki-yeni-tunel-acildi",
@@ -860,7 +872,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "71346368e8"
+    "id": "71346368e8",
+    "status": "published"
   },
   {
     "slug": "ayni-anda-3-metro-basarisi",
@@ -893,7 +906,8 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "607e0cacbc"
+    "id": "607e0cacbc",
+    "status": "published"
   },
   {
     "slug": "en-iyi-ev-yarismasi",
@@ -948,6 +962,7 @@
     "author_ids": [
       "cc86566c9a"
     ],
-    "id": "d0b899970f"
+    "id": "d0b899970f",
+    "status": "published"
   }
 ]

@@ -20,10 +20,18 @@
       <tbody>
         {% for a in articles %}
         <tr>
-          <td><a href="{{ url_for('article_page', slug=a.slug) }}" target="_blank">{{ a.title }}</a></td>
+          <td>
+            {% if not a.status or a.status == 'published' %}
+            <a href="{{ url_for('article_page', slug=a.slug) }}" target="_blank">{{ a.title }}</a>
+            {% else %}
+            {{ a.title }}
+            {% endif %}
+          </td>
           <td>{{ section_label(a.section) }}</td>
           <td>{{ a.date }}</td>
           <td>
+            {% if a.status == 'draft' %}<span class="badge badge-secondary">Taslak</span>{% endif %}
+            {% if a.status == 'scheduled' %}<span class="badge badge-secondary">Zamanlanmış</span>{% endif %}
             {% if a.featured == 'lead' %}<span class="badge badge-lead">Manşet</span>{% endif %}
             {% if a.featured == 'secondary' %}<span class="badge badge-secondary">Öne Çıkan</span>{% endif %}
           </td>

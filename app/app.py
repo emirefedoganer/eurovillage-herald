@@ -3,7 +3,7 @@ import re
 import secrets
 import string
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, abort, flash, jsonify, send_file, Response, g
@@ -12,6 +12,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 import ads
 import cf_access
+import editorial_tz
 import store
 import games_engine as ge
 import games_export
@@ -205,6 +206,9 @@ app.jinja_env.globals["media_url"] = media_url
 app.jinja_env.globals["turnstile_site_key"] = turnstile.SITE_KEY if turnstile.ENABLED else None
 app.jinja_env.globals["ad_slot"] = ads.ad_slot
 app.jinja_env.globals["max_tip_images"] = uploads.MAX_TIP_IMAGES
+app.jinja_env.globals["editorial_timezone_name"] = editorial_tz.EDITORIAL_TIMEZONE_NAME
+app.jinja_env.globals["to_editorial_input"] = editorial_tz.utc_iso_to_local_input
+app.jinja_env.globals["to_editorial_display"] = editorial_tz.utc_iso_to_local_display
 
 KOSE_YAZISI_LABEL = "Köşe Yazısı"
 
@@ -412,11 +416,11 @@ def home():
     # Only ordinary Herald news (MAIN_SECTIONS) is eligible for the main
     # feed -- Arı Magazin and Oyun Köşesi articles have their own dedicated
     # pages and must never surface here as if they were ordinary news.
-    articles = [a for a in store.all_articles_sorted() if a.get("section") in MAIN_SECTIONS]
+    articles = [a for a in store.all_articles_sorted(published_only=True) if a.get("section") in MAIN_SECTIONS]
     lead = next((a for a in articles if a.get("featured") == "lead"), articles[0] if articles else None)
     secondary = [a for a in articles if a is not lead and a.get("featured") == "secondary"][:6]
     rest = [a for a in articles if a is not lead and a not in secondary]
-    opinion = store.articles_by_section("gorus", limit=3)
+    opinion = store.articles_by_section("gorus", limit=3, published_only=True)
     published_crosswords = store.published_crosswords()
     published_sudokus = store.published_sudokus()
     return render_template(
@@ -441,16 +445,16 @@ def section_page(section):
         return redirect(url_for(SPECIAL_SECTION_ROUTES[section]), code=301)
     if section not in MAIN_SECTIONS:
         abort(404)
-    articles = store.articles_by_section(section)
+    articles = store.articles_by_section(section, published_only=True)
     return render_template("section.html", section=section, articles=articles)
 
 
-@app.route("/makale/<slug>")
-def article_page(slug):
-    article = store.get_article(slug)
-    if not article:
-        abort(404)
-    related = store.articles_by_section(article["section"], exclude_slug=slug, limit=4)
+def _render_article(article, is_preview=False):
+    """Shared by the real article page and the token-based preview route --
+    `related` always goes through published_only=True regardless of which
+    caller this is, so a preview of a draft never leaks OTHER unpublished
+    articles into its "related" rail."""
+    related = store.articles_by_section(article["section"], exclude_slug=article["slug"], limit=4, published_only=True)
     article_authors = store.resolve_article_authors(article)
     columnist = article_authors[0] if (
         article["section"] == "gorus" and article_authors
@@ -458,12 +462,35 @@ def article_page(slug):
     ) else None
     if article["section"] == "magazin":
         g.publication_context = "ari"
-    return render_template("article.html", article=article, related=related, article_authors=article_authors, columnist=columnist)
+    return render_template("article.html", article=article, related=related, article_authors=article_authors,
+                            columnist=columnist, is_preview=is_preview)
+
+
+@app.route("/makale/<slug>")
+def article_page(slug):
+    article = store.get_article(slug, published_only=True)
+    if not article:
+        abort(404)
+    return _render_article(article)
+
+
+@app.route("/preview/<token>")
+def article_preview(token):
+    """Lets someone without a Herald account view one specific unpublished
+    (draft or scheduled) article, via a high-entropy token that is never
+    guessable and never grants any admin capability -- store.py only ever
+    matches it against a sha256 hash, never a stored plaintext. A token
+    for a published article still works (harmless -- it's already public),
+    but there's normally no reason to generate one for that case."""
+    article = store.get_article_by_preview_token(token)
+    if not article:
+        abort(404)
+    return _render_article(article, is_preview=True)
 
 
 @app.route("/oyun-kosesi")
 def oyun_kosesi():
-    articles = store.articles_by_section("oyun")
+    articles = store.articles_by_section("oyun", published_only=True)
     crosswords = store.published_crosswords()[:4]
     sudokus = store.published_sudokus()[:4]
     return render_template(
@@ -654,7 +681,7 @@ def magazin():
     # always rendered a static "no content yet" placeholder regardless of
     # how many articles had section="magazin" -- they were never broken,
     # just never looked up here.
-    articles = store.articles_by_section("magazin")
+    articles = store.articles_by_section("magazin", published_only=True)
     lead = next((a for a in articles if a.get("featured") == "lead"), articles[0] if articles else None)
     rest = [a for a in articles if a is not lead]
     return render_template("magazin.html", lead=lead, rest=rest)
@@ -703,7 +730,7 @@ def search():
     q = request.args.get("q", "").strip().lower()
     results = []
     if q:
-        for a in store.all_articles_sorted():
+        for a in store.all_articles_sorted(published_only=True):
             haystack = " ".join([
                 a.get("title", ""), a.get("dek", ""), " ".join(a.get("tags", []))
             ]).lower()
@@ -794,7 +821,7 @@ def author_profile(slug):
     if is_redirect:
         return redirect(url_for("author_profile", slug=author["slug"]), code=301)
 
-    articles = store.articles_by_author(author["id"])
+    articles = store.articles_by_author(author["id"], published_only=True)
     gorus_articles = [a for a in articles if a["section"] == "gorus"]
     ari = [a for a in articles if a["section"] == "magazin"]
     news = [a for a in articles if a["section"] not in ("gorus", "magazin")]
@@ -1123,7 +1150,50 @@ def _article_form_to_dict(form, existing=None):
         "tags": tags,
         "body": body,
     }
+    _apply_publish_state(data, form, existing)
     return data
+
+
+PUBLISH_STATE_LABELS = {"draft": "Taslak", "scheduled": "Zamanlanmış", "published": "Yayında"}
+
+
+def _apply_publish_state(data, form, existing=None):
+    """Draft / Scheduled / Published from the article form's single
+    publish_state select. A "scheduled" choice with no usable publish_at
+    falls back to Draft rather than silently going live immediately --
+    an editor who picks "Scheduled" and forgets the date/time almost
+    certainly did not mean "publish this right now"."""
+    choice = form.get("publish_state", "published")
+    if choice == "draft":
+        data["status"] = "draft"
+        data["publish_at"] = None
+    elif choice == "scheduled":
+        # The form field is a plain datetime-local value with no timezone
+        # of its own -- interpreted as EDITORIAL_TIMEZONE wall-clock time
+        # (shown next to the field), converted to UTC for storage here.
+        publish_at = editorial_tz.local_input_to_utc_iso(form.get("publish_at", ""))
+        if publish_at:
+            data["status"] = "scheduled"
+            data["publish_at"] = publish_at
+        else:
+            data["status"] = "draft"
+            data["publish_at"] = None
+    else:
+        data["status"] = "published"
+        data["publish_at"] = None
+    # A publish schedule change/cancellation is intentionally invalidating
+    # a stale preview link is NOT required by itself -- the token still
+    # only ever grants a look at this one article regardless of its
+    # status -- so existing preview_token fields are preserved here and
+    # only ever touched by the dedicated preview-link routes below.
+    if existing:
+        data["preview_token_hash"] = existing.get("preview_token_hash")
+        data["preview_token_expires_at"] = existing.get("preview_token_expires_at")
+        data["preview_token_created_at"] = existing.get("preview_token_created_at")
+    else:
+        data["preview_token_hash"] = None
+        data["preview_token_expires_at"] = None
+        data["preview_token_created_at"] = None
 
 
 def _can_edit_article(user, article):
@@ -1172,12 +1242,14 @@ def article_new():
 
         articles.append(data)
         store.save_articles(articles)
-        flash("Makale yayımlandı.", "success")
+        if data["status"] == "scheduled":
+            store.append_audit(user["email"], "article_scheduled", data["title"], {"publish_at": data["publish_at"]})
+        flash(_publish_flash_message(data), "success")
         return redirect(url_for("admin.dashboard"))
 
     authors = store.active_authors() if is_master else ([current_author] if current_author else [])
     return render_template("admin/edit_article.html", article=None, sections=SECTIONS, body_text="",
-                            authors=authors, is_master=is_master)
+                            authors=authors, is_master=is_master, publish_state_labels=PUBLISH_STATE_LABELS)
 
 
 @admin_bp.route("/makale/<slug>/duzenle", methods=["GET", "POST"])
@@ -1227,12 +1299,39 @@ def article_edit(slug):
 
         articles[idx] = data
         store.save_articles(articles)
-        flash("Makale güncellendi.", "success")
+        _audit_schedule_change(user["email"], article, data)
+        flash(_publish_flash_message(data, updated=True), "success")
         return redirect(url_for("admin.dashboard"))
 
     authors = store.active_authors() if is_master else store.resolve_article_authors(article)
     return render_template("admin/edit_article.html", article=article, sections=SECTIONS,
-                            body_text=body_to_text(article.get("body")), authors=authors, is_master=is_master)
+                            body_text=body_to_text(article.get("body")), authors=authors, is_master=is_master,
+                            publish_state_labels=PUBLISH_STATE_LABELS)
+
+
+def _publish_flash_message(data, updated=False):
+    verb = "güncellendi" if updated else "kaydedildi"
+    if data["status"] == "draft":
+        return f"Makale taslak olarak {verb}."
+    if data["status"] == "scheduled":
+        when = editorial_tz.utc_iso_to_local_display(data.get("publish_at"))
+        return f"Makale {when} ({editorial_tz.EDITORIAL_TIMEZONE_NAME}) tarihinde otomatik yayımlanacak şekilde zamanlandı."
+    return f"Makale yayımlandı." if not updated else "Makale güncellendi ve yayında."
+
+
+def _audit_schedule_change(actor_email, before, after):
+    """Logs only the scheduling-relevant transitions, onto the existing
+    editorial audit log -- not every routine article edit (which has never
+    been audited here and isn't part of what was asked)."""
+    was_scheduled = before.get("status") == "scheduled"
+    now_scheduled = after.get("status") == "scheduled"
+    if not was_scheduled and now_scheduled:
+        store.append_audit(actor_email, "article_scheduled", after["title"], {"publish_at": after.get("publish_at")})
+    elif was_scheduled and now_scheduled and before.get("publish_at") != after.get("publish_at"):
+        store.append_audit(actor_email, "article_schedule_modified", after["title"],
+                            {"from": before.get("publish_at"), "to": after.get("publish_at")})
+    elif was_scheduled and not now_scheduled:
+        store.append_audit(actor_email, "article_schedule_cancelled", after["title"], {"new_status": after["status"]})
 
 
 @admin_bp.route("/makale/<slug>/sil", methods=["POST"])
@@ -1250,6 +1349,75 @@ def article_delete(slug):
     store.save_articles(articles)
     flash("Makale silindi.", "success")
     return redirect(url_for("admin.dashboard"))
+
+
+PREVIEW_EXPIRY_CHOICES = {"24h": "24 saat", "7d": "7 gün", "custom": "Özel", "none": "Süresiz"}
+
+
+def _preview_expires_at(choice, custom_value):
+    """Turns a PREVIEW_EXPIRY_CHOICES key into a stored expires_at, or None
+    for no expiry. An unusable "custom" value falls back to 24h rather than
+    silently granting a link that never expires."""
+    now = datetime.now(timezone.utc)
+    if choice == "24h":
+        return (now + timedelta(hours=24)).isoformat().replace("+00:00", "Z")
+    if choice == "7d":
+        return (now + timedelta(days=7)).isoformat().replace("+00:00", "Z")
+    if choice == "custom":
+        normalized = _normalize_dt_input(custom_value)
+        return normalized or (now + timedelta(hours=24)).isoformat().replace("+00:00", "Z")
+    return None  # "none" -- no expiry
+
+
+@admin_bp.route("/makale/<slug>/onizleme/olustur", methods=["POST"])
+@login_required
+def article_preview_generate(slug):
+    user = _resolve_logged_in_user()
+    articles = store.load_articles()
+    idx = next((i for i, a in enumerate(articles) if a["slug"] == slug), None)
+    if idx is None:
+        abort(404)
+    article = articles[idx]
+    if not _can_edit_article(user, article):
+        abort(403)
+
+    token = secrets.token_urlsafe(32)
+    expires_at = _preview_expires_at(request.form.get("expiry", "24h"), request.form.get("custom_expiry", ""))
+
+    articles[idx]["preview_token_hash"] = store.hash_preview_token(token)
+    articles[idx]["preview_token_expires_at"] = expires_at
+    articles[idx]["preview_token_created_at"] = _now_iso()
+    store.save_articles(articles)
+    store.append_audit(user["email"], "article_preview_link_generated", article["title"],
+                        {"expires_at": expires_at})
+
+    preview_url = url_for("article_preview", token=token, _external=True)
+    flash(
+        "Önizleme bağlantısı oluşturuldu — bu bağlantı yalnızca şimdi gösterilir, "
+        f"kaydedin: {preview_url}",
+        "success",
+    )
+    return redirect(url_for("admin.article_edit", slug=slug))
+
+
+@admin_bp.route("/makale/<slug>/onizleme/iptal", methods=["POST"])
+@login_required
+def article_preview_revoke(slug):
+    user = _resolve_logged_in_user()
+    articles = store.load_articles()
+    idx = next((i for i, a in enumerate(articles) if a["slug"] == slug), None)
+    if idx is None:
+        abort(404)
+    article = articles[idx]
+    if not _can_edit_article(user, article):
+        abort(403)
+    articles[idx]["preview_token_hash"] = None
+    articles[idx]["preview_token_expires_at"] = None
+    articles[idx]["preview_token_created_at"] = None
+    store.save_articles(articles)
+    store.append_audit(user["email"], "article_preview_link_revoked", article["title"])
+    flash("Önizleme bağlantısı iptal edildi.", "success")
+    return redirect(url_for("admin.article_edit", slug=slug))
 
 
 @admin_bp.route("/sayi/yeni", methods=["GET", "POST"])
@@ -2714,8 +2882,10 @@ def _ad_form_to_dict(form):
         "destination_url": destination_url,
         "priority": priority,
         "status": "active" if form.get("status") == "active" else "inactive",
-        "start_at": _normalize_dt_input(form.get("start_at", "")),
-        "end_at": _normalize_dt_input(form.get("end_at", "")),
+        # Same EDITORIAL_TIMEZONE interpretation as article scheduling --
+        # see editorial_tz.py. Stored in UTC either way.
+        "start_at": editorial_tz.local_input_to_utc_iso(form.get("start_at", "")),
+        "end_at": editorial_tz.local_input_to_utc_iso(form.get("end_at", "")),
     }
     return data, errors
 
