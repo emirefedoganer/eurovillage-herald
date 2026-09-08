@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Reklamı Düzenle' if ad else 'Yeni Reklam' }} — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>{{ 'Reklamı Düzenle' if ad else 'Yeni Reklam' }}</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.ads_list') }}">← Listeye Dön</a>
+  </div>
+
+  <form class="admin-panel" method="post" enctype="multipart/form-data">
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="internal_name">Dahili İsim</label>
+        <input type="text" id="internal_name" name="internal_name" required maxlength="120"
+               value="{{ form.internal_name if form else '' }}" placeholder="ör. Eurovillage Mall — Sonbahar Kampanyası">
+        <div class="hint">Yalnızca yönetim panelinde görünür, ziyaretçiler görmez.</div>
+      </div>
+      <div class="form-row">
+        <label for="sponsor_name">Sponsor / Reklam Veren</label>
+        <input type="text" id="sponsor_name" name="sponsor_name" required maxlength="80"
+               value="{{ form.sponsor_name if form else '' }}">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="headline">Başlık</label>
+      <input type="text" id="headline" name="headline" required maxlength="120"
+             value="{{ form.headline if form else '' }}">
+    </div>
+
+    <div class="form-row">
+      <label for="body">Metin (opsiyonel)</label>
+      <textarea id="body" name="body" rows="2" maxlength="400">{{ form.body if form else '' }}</textarea>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="cta_text">CTA Metni (opsiyonel)</label>
+        <input type="text" id="cta_text" name="cta_text" maxlength="40" value="{{ form.cta_text if form else '' }}" placeholder="ör. Şimdi Keşfet">
+      </div>
+      <div class="form-row">
+        <label for="destination_url">Hedef URL</label>
+        <input type="url" id="destination_url" name="destination_url" required
+               value="{{ form.destination_url if form else '' }}" placeholder="https://...">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="image_file">Görsel</label>
+      {% if ad and ad.image %}
+      <div style="margin-bottom:8px;">
+        <img src="{{ media_url(ad.image, 'img/ads') }}" alt="" style="max-width:220px;display:block;margin-bottom:6px;">
+        <label style="font-weight:400;"><input type="checkbox" name="remove_image" value="1" style="width:auto;"> Görseli kaldır</label>
+      </div>
+      {% endif %}
+      <input type="file" id="image_file" name="image_file" accept="image/*">
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="status">Durum</label>
+        <select id="status" name="status">
+          <option value="active" {{ 'selected' if form and form.status == 'active' else '' }}>Aktif</option>
+          <option value="inactive" {{ 'selected' if not form or form.status != 'active' else '' }}>Pasif</option>
+        </select>
+        <div class="hint">Pasif reklamlar hiçbir slotta gösterilmez, tarih aralığı ne olursa olsun.</div>
+      </div>
+      <div class="form-row">
+        <label for="priority">Öncelik (opsiyonel)</label>
+        <input type="number" id="priority" name="priority" value="{{ form.priority if form else 0 }}">
+      </div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="start_at">Başlangıç Tarihi/Saati (opsiyonel)</label>
+        <input type="datetime-local" id="start_at" name="start_at"
+               value="{{ (form.start_at or '')[:16] if form else '' }}">
+      </div>
+      <div class="form-row">
+        <label for="end_at">Bitiş Tarihi/Saati (opsiyonel)</label>
+        <input type="datetime-local" id="end_at" name="end_at"
+               value="{{ (form.end_at or '')[:16] if form else '' }}">
+      </div>
+    </div>
+    <div class="hint" style="margin: -10px 0 16px;">Boş bırakılırsa o sınır uygulanmaz (ör. bitiş tarihi olmadan reklam süresiz aktif kalır).</div>
+
+    <div class="form-actions">
+      <button class="btn btn-red" type="submit">{{ 'Kaydet' if ad else 'Reklamı Oluştur' }}</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

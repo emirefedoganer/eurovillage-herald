@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Reklamlar — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Reklamlar</h1>
+    <div class="admin-actions">
+      <a class="btn btn-outline" href="{{ url_for('admin.placements_list') }}">Yerleşimler</a>
+      <a class="btn btn-red" href="{{ url_for('admin.ad_new') }}">+ Yeni Reklam</a>
+    </div>
+  </div>
+
+  <div class="admin-stat-grid">
+    <div class="admin-stat-card"><span class="n">{{ stats.counts.active }}</span><span class="l">Aktif Reklam</span></div>
+    <div class="admin-stat-card"><span class="n">{{ stats.counts.scheduled }}</span><span class="l">Zamanlanmış</span></div>
+    <div class="admin-stat-card"><span class="n">{{ stats.counts.expired }}</span><span class="l">Süresi Dolmuş</span></div>
+    <div class="admin-stat-card"><span class="n">{{ stats.counts.inactive }}</span><span class="l">Pasif</span></div>
+    <div class="admin-stat-card"><span class="n">{{ stats.total_placements }}</span><span class="l">Aktif Yerleşim</span></div>
+    <div class="admin-stat-card"><span class="n">{{ stats.total_ads }}</span><span class="l">Toplam Reklam</span></div>
+  </div>
+
+  <div class="admin-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <h2 style="font-family: var(--font-headline); margin:0;">Yakında Süresi Dolacaklar (7 gün)</h2>
+      <a class="btn btn-outline" href="{{ url_for('admin.ads_list') }}">Tüm Reklamlar</a>
+    </div>
+    <table class="admin-table">
+      <thead><tr><th>Dahili İsim</th><th>Sponsor</th><th>Bitiş</th><th></th></tr></thead>
+      <tbody>
+        {% for ad in stats.expiring_soon %}
+        <tr>
+          <td>{{ ad.internal_name }}</td>
+          <td>{{ ad.sponsor_name }}</td>
+          <td>{{ ad.end_at[:16].replace('T',' ') if ad.end_at else '' }}</td>
+          <td class="admin-actions">
+            <a class="btn btn-outline" href="{{ url_for('admin.ad_edit', aid=ad.id) }}">Düzenle</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">Önümüzdeki 7 gün içinde süresi dolacak reklam yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

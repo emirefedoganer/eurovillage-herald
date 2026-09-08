@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Reklamlar — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Tüm Reklamlar</h1>
+    <div class="admin-actions">
+      <a class="btn btn-outline" href="{{ url_for('admin.ads_dashboard') }}">← Panele Dön</a>
+      <a class="btn btn-red" href="{{ url_for('admin.ad_new') }}">+ Yeni Reklam</a>
+    </div>
+  </div>
+
+  <div class="admin-panel">
+    <table class="admin-table">
+      <thead><tr><th>Dahili İsim</th><th>Sponsor</th><th>Durum</th><th>Kullanıldığı Yer</th><th>Güncellendi</th><th></th></tr></thead>
+      <tbody>
+        {% for ad in ads_list %}
+        {% set status = ad_status(ad) %}
+        <tr>
+          <td>{{ ad.internal_name }}</td>
+          <td>{{ ad.sponsor_name }}</td>
+          <td>
+            <span class="badge {{ 'badge-lead' if status=='active' else ('badge-breaking' if status=='expired' else 'badge-secondary') }}">
+              {{ status_labels.get(status, status) }}
+            </span>
+          </td>
+          <td>
+            {% set n = placement_counts.get(ad.id, 0) %}
+            {% if n %}<a href="{{ url_for('admin.placements_list', ad_id=ad.id) }}">{{ n }} yerleşim</a>{% else %}—{% endif %}
+          </td>
+          <td>{{ ad.updated_at[:10] if ad.updated_at else '' }}</td>
+          <td class="admin-actions">
+            <a class="btn btn-outline" href="{{ url_for('admin.ad_preview', aid=ad.id) }}">Önizle</a>
+            <a class="btn btn-outline" href="{{ url_for('admin.ad_edit', aid=ad.id) }}">Düzenle</a>
+            <form method="post" action="{{ url_for('admin.ad_toggle_status', aid=ad.id) }}">
+              <button class="btn btn-outline" type="submit">{{ 'Pasifleştir' if ad.status == 'active' else 'Aktifleştir' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('admin.ad_delete', aid=ad.id) }}" onsubmit="return confirm('Bu reklamı ve ona bağlı tüm yerleşimleri silmek istediğinize emin misiniz?');">
+              <button class="btn btn-danger" type="submit">Sil</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">Henüz reklam yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

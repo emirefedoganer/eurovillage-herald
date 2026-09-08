@@ -8,7 +8,8 @@
 </div>
 
 {% if articles %}
-<div class="section-list">
+{% set sidebar_ad = ad_slot('section.sidebar_top', section=section) %}
+<div class="section-list {{ '' if sidebar_ad else 'section-list--full' }}">
   <div>
     {% for a in articles %}
     <article class="story-card {{ '' if a.image else 'story-card--noimg' }}" style="margin-bottom: 30px;">
@@ -24,16 +25,11 @@
     </article>
     {% endfor %}
   </div>
+  {% if sidebar_ad %}
   <aside class="sidebar">
-    <div class="ad-box sidebar-block">
-      <span class="ad-label">Reklam</span>
-      <div class="ad-body">
-        <div class="ad-title ad-title-frutiger">Buraya Bakarlar</div>
-        <div class="ad-sub">Bu alana reklam vermek için bizimle iletişime geçebilirsiniz.</div>
-        <div class="ad-handle">@dukeofakbadain</div>
-      </div>
-    </div>
+    <div class="sidebar-block">{{ sidebar_ad }}</div>
   </aside>
+  {% endif %}
 </div>
 {% else %}
 <p class="section-empty">Bu bölümde henüz yayımlanmış bir haber bulunmuyor.</p>

@@ -3,6 +3,8 @@
 {% block title %}{{ site.name }} — {{ site.tagline }}{% endblock %}
 {% block content %}
 
+{{ ad_slot('homepage.top', section='homepage') }}
+
 <div class="front-grid">
   <div>
     {% if lead %}
@@ -38,6 +40,8 @@
     </div>
     {% endif %}
 
+    {{ ad_slot('homepage.after_news_4', section='homepage') }}
+
     {% if rest %}
     <div class="river">
       <h2 class="rail-title">Diğer Haberler</h2>
@@ -62,14 +66,8 @@
   </div>
 
   <aside class="sidebar">
-    <div class="ad-box sidebar-block">
-      <span class="ad-label">Reklam</span>
-      <div class="ad-body">
-        <div class="ad-title ad-title-frutiger">Buraya Bakarlar</div>
-        <div class="ad-sub">Bu alana reklam vermek için bizimle iletişime geçebilirsiniz.</div>
-        <div class="ad-handle">@dukeofakbadain</div>
-      </div>
-    </div>
+    {% set sidebar_ad = ad_slot('homepage.sidebar_top', section='homepage') %}
+    {% if sidebar_ad %}<div class="sidebar-block">{{ sidebar_ad }}</div>{% endif %}
 
     {% if opinion %}
     <div class="sidebar-block">
@@ -139,5 +137,7 @@
     </div>
   </aside>
 </div>
+
+{{ ad_slot('homepage.bottom', section='homepage') }}
 
 {% endblock %}

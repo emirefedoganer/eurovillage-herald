@@ -2,6 +2,7 @@ import json
 import os
 import re
 import unicodedata
+import uuid
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -16,6 +17,8 @@ USERS_PATH = os.path.join(DATA_DIR, "users.json")
 AUTHORS_PATH = os.path.join(DATA_DIR, "authors.json")
 AUDIT_LOG_PATH = os.path.join(DATA_DIR, "audit_log.json")
 ROLES_PATH = os.path.join(DATA_DIR, "roles.json")
+ADS_PATH = os.path.join(DATA_DIR, "ads.json")
+AD_PLACEMENTS_PATH = os.path.join(DATA_DIR, "ad_placements.json")
 
 TR_MAP = str.maketrans({
     "ç": "c", "Ç": "c", "ğ": "g", "Ğ": "g", "ı": "i", "I": "i",
@@ -45,7 +48,25 @@ def _save(path, data):
 
 
 def load_articles():
-    return _load(ARTICLES_PATH, [])
+    """Loads articles, self-healing a missing `id` field on the way in.
+
+    Articles have historically only had `slug` as an identifier, but slugs
+    are mutable (editing an article's title regenerates it via
+    unique_slug()). Ad placements need a stable reference to "this specific
+    article" that survives a slug change, so every article gets a
+    permanent, never-reassigned `id` the first time it's loaded after this
+    field was introduced. This runs on every load but only ever writes once
+    per article -- after the first backfill, every article already has an
+    id and this becomes a no-op scan."""
+    articles = _load(ARTICLES_PATH, [])
+    changed = False
+    for a in articles:
+        if not a.get("id"):
+            a["id"] = uuid.uuid4().hex[:10]
+            changed = True
+    if changed:
+        _save(ARTICLES_PATH, articles)
+    return articles
 
 
 def save_articles(articles):
@@ -71,6 +92,21 @@ def save_site(site):
 def get_article(slug):
     for a in load_articles():
         if a["slug"] == slug:
+            return a
+    return None
+
+
+def get_article_by_id(article_id):
+    """Looks an article up by its stable `id` rather than its (mutable)
+    slug -- used by ad placements targeting a specific article, and by the
+    Placements admin UI to display which article a placement points at.
+    Deliberately ignores publish status: this is an internal lookup, never
+    a public one (ad placements are configured by master_admin regardless
+    of the target article's current status)."""
+    if not article_id:
+        return None
+    for a in load_articles():
+        if a.get("id") == article_id:
             return a
     return None
 
@@ -417,3 +453,57 @@ def recent_audit_log(limit=100):
 def _audit_timestamp():
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# -------------------------------------------------------------------- ads --
+# Advertisements and their placements are kept in two separate files, same
+# split as User/AuthorProfile: an Advertisement is "what to show" (creative,
+# sponsor, schedule); a Placement is "where to show it" (slot + scope). A
+# placement never embeds a copy of the ad -- it only references ad_id, so
+# editing an ad's creative once updates it everywhere it's placed.
+
+def load_ads():
+    return _load(ADS_PATH, [])
+
+
+def save_ads(ads):
+    _save(ADS_PATH, ads)
+
+
+def get_ad(ad_id):
+    return _by_id(load_ads(), ad_id)
+
+
+def load_placements():
+    return _load(AD_PLACEMENTS_PATH, [])
+
+
+def save_placements(placements):
+    _save(AD_PLACEMENTS_PATH, placements)
+
+
+def get_placement(placement_id):
+    return _by_id(load_placements(), placement_id)
+
+
+def placements_for_ad(ad_id):
+    """Every placement currently using this ad -- powers the admin "where is
+    this advertisement used" view."""
+    return [p for p in load_placements() if p["ad_id"] == ad_id]
+
+
+def find_placement(slot, scope, section=None, content_type=None, content_id=None):
+    """Looks up an existing placement occupying the same (slot, scope,
+    target) combination. Used to enforce "at most one placement per slot
+    per target" -- saving a new placement for an already-occupied
+    combination replaces it instead of creating a second, competing one."""
+    for p in load_placements():
+        if p["slot"] != slot or p["scope"] != scope:
+            continue
+        if scope == "section" and p.get("section") == section:
+            return p
+        if scope == "content" and p.get("content_type") == content_type and p.get("content_id") == content_id:
+            return p
+        if scope == "global":
+            return p
+    return None

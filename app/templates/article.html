@@ -35,10 +35,19 @@
   </div>
   {% endif %}
 
+  {% set is_magazin = article.section == 'magazin' %}
+  {% set ad_after_slot = 'magazine.article.after_paragraph_2' if is_magazin else 'article.after_paragraph_3' %}
+  {% set ad_after_n = 2 if is_magazin else 3 %}
+  {% set ad_bottom_slot = 'magazine.article.bottom' if is_magazin else 'article.bottom' %}
+  {% set ns = namespace(p_count=0) %}
   <div class="article-body">
     {% for block in article.body %}
       {% if block.type == 'p' %}
         <p>{{ block.text }}</p>
+        {% set ns.p_count = ns.p_count + 1 %}
+        {% if ns.p_count == ad_after_n %}
+        {{ ad_slot(ad_after_slot, section=article.section, content_id=article.id) }}
+        {% endif %}
       {% elif block.type == 'h3' %}
         <h3>{{ block.text }}</h3>
       {% elif block.type == 'pullquote' %}
@@ -76,6 +85,8 @@
     {% for t in article.tags %}<a href="{{ url_for('search', q=t) }}">#{{ t }}</a>{% endfor %}
   </div>
   {% endif %}
+
+  {{ ad_slot(ad_bottom_slot, section=article.section, content_id=article.id) }}
 </article>
 
 {% if related %}

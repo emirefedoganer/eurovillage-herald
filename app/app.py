@@ -10,6 +10,7 @@ from flask import Flask, Blueprint, render_template, request, redirect, url_for,
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash, generate_password_hash
 
+import ads
 import cf_access
 import store
 import games_engine as ge
@@ -19,12 +20,15 @@ import storage
 import turnstile
 import uploads
 from minecraft_service import MinecraftProfileService
-from sections import SECTIONS, SECTION_ORDER, section_label
+from sections import (
+    SECTIONS, SECTION_ORDER, section_label, MAIN_SECTIONS, SPECIAL_SECTION_ROUTES,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ARTICLE_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "articles")
 ISSUE_PDF_DIR = os.path.join(BASE_DIR, "static", "issues")
 AUTHOR_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "authors")
+AD_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "ads")
 SECRET_PATH = os.path.join(BASE_DIR, "data", ".secret_key")
 
 TWITTER_HANDLE_RE = re.compile(r"^[A-Za-z0-9_]{1,15}$")
@@ -143,6 +147,7 @@ if SERVER_NAME:
 os.makedirs(ARTICLE_IMG_DIR, exist_ok=True)
 os.makedirs(ISSUE_PDF_DIR, exist_ok=True)
 os.makedirs(AUTHOR_IMG_DIR, exist_ok=True)
+os.makedirs(AD_IMG_DIR, exist_ok=True)
 
 # Available to every template without each view having to pre-resolve authors
 # for every article it passes along (cards, river items, related lists...).
@@ -185,6 +190,7 @@ def media_url(value, legacy_subdir, external=False):
 
 app.jinja_env.globals["media_url"] = media_url
 app.jinja_env.globals["turnstile_site_key"] = turnstile.SITE_KEY if turnstile.ENABLED else None
+app.jinja_env.globals["ad_slot"] = ads.ad_slot
 
 KOSE_YAZISI_LABEL = "Köşe Yazısı"
 
@@ -389,7 +395,10 @@ def sudoku_public_payload(sd):
 
 @app.route("/")
 def home():
-    articles = store.all_articles_sorted()
+    # Only ordinary Herald news (MAIN_SECTIONS) is eligible for the main
+    # feed -- Arı Magazin and Oyun Köşesi articles have their own dedicated
+    # pages and must never surface here as if they were ordinary news.
+    articles = [a for a in store.all_articles_sorted() if a.get("section") in MAIN_SECTIONS]
     lead = next((a for a in articles if a.get("featured") == "lead"), articles[0] if articles else None)
     secondary = [a for a in articles if a is not lead and a.get("featured") == "secondary"][:6]
     rest = [a for a in articles if a is not lead and a not in secondary]
@@ -410,7 +419,13 @@ def home():
 
 @app.route("/bolum/<section>")
 def section_page(section):
-    if section not in SECTIONS:
+    # Magazin/Oyun have their own dedicated, differently-branded pages --
+    # redirect rather than also serving them through the generic section
+    # listing (which would show them with plain Herald branding and be a
+    # second, inconsistent URL for the same content).
+    if section in SPECIAL_SECTION_ROUTES:
+        return redirect(url_for(SPECIAL_SECTION_ROUTES[section]), code=301)
+    if section not in MAIN_SECTIONS:
         abort(404)
     articles = store.articles_by_section(section)
     return render_template("section.html", section=section, articles=articles)
@@ -621,7 +636,14 @@ def sudoku_hint(slug):
 @app.route("/magazin")
 def magazin():
     g.publication_context = "ari"
-    return render_template("magazin.html")
+    # This was the actual bug: the route never queried the store, so it
+    # always rendered a static "no content yet" placeholder regardless of
+    # how many articles had section="magazin" -- they were never broken,
+    # just never looked up here.
+    articles = store.articles_by_section("magazin")
+    lead = next((a for a in articles if a.get("featured") == "lead"), articles[0] if articles else None)
+    rest = [a for a in articles if a is not lead]
+    return render_template("magazin.html", lead=lead, rest=rest)
 
 
 @app.route("/hakkimizda")
@@ -1024,6 +1046,7 @@ def article_new():
             data["date"] = _date.today().isoformat()
         slug = store.unique_slug(data["title"] or "makale", existing_slugs)
         data["slug"] = slug
+        data["id"] = uuid.uuid4().hex[:10]
         data["image"] = None
 
         if is_master:
@@ -1073,6 +1096,7 @@ def article_edit(slug):
         new_title = data["title"] or article["title"]
         new_slug = store.unique_slug(new_title, existing_slugs, current_slug=slug)
         data["slug"] = new_slug
+        data["id"] = article.get("id") or uuid.uuid4().hex[:10]
         data["image"] = article.get("image")
         data["gallery"] = article.get("gallery")
 
@@ -2369,6 +2393,339 @@ def role_delete(rid):
     store.append_audit(actor["email"], "role_deleted", role["name"])
     flash("Rol silindi.", "success")
     return redirect(url_for("admin.roles_list"))
+
+
+# -------------------------------------------------------- admin: advertising --
+# Every route below is master_admin_required -- deliberately not a
+# permission_required() custom-role permission, for the same reason author
+# management is hardcoded to master_admin: this is a capability no role
+# should ever be able to grant itself or anyone else by editing role data.
+# Cloudflare Access (in front of admin.eurovillageherald.com) and Herald
+# login (login_required, folded into master_admin_required) both already
+# ran before this decorator even runs -- this is the third, final check in
+# that chain, and it's the one that actually decides authorization.
+
+def _ad_form_to_dict(form):
+    errors = []
+    internal_name = form.get("internal_name", "").strip()[:ads.MAX_LENGTHS["internal_name"]]
+    sponsor_name = form.get("sponsor_name", "").strip()[:ads.MAX_LENGTHS["sponsor_name"]]
+    headline = form.get("headline", "").strip()[:ads.MAX_LENGTHS["headline"]]
+    body = form.get("body", "").strip()[:ads.MAX_LENGTHS["body"]]
+    cta_text = form.get("cta_text", "").strip()[:ads.MAX_LENGTHS["cta_text"]]
+    destination_url = form.get("destination_url", "").strip()
+
+    if not internal_name:
+        errors.append("Dahili isim zorunludur.")
+    if not sponsor_name:
+        errors.append("Sponsor / reklam veren adı zorunludur.")
+    if not headline:
+        errors.append("Başlık zorunludur.")
+    url_error = ads.validate_destination_url(destination_url)
+    if url_error:
+        errors.append(url_error)
+
+    try:
+        priority = int(form.get("priority", "0") or "0")
+    except ValueError:
+        priority = 0
+
+    data = {
+        "internal_name": internal_name,
+        "sponsor_name": sponsor_name,
+        "headline": headline,
+        "body": body or None,
+        "cta_text": cta_text or None,
+        "destination_url": destination_url,
+        "priority": priority,
+        "status": "active" if form.get("status") == "active" else "inactive",
+        "start_at": _normalize_dt_input(form.get("start_at", "")),
+        "end_at": _normalize_dt_input(form.get("end_at", "")),
+    }
+    return data, errors
+
+
+def _normalize_dt_input(value):
+    """`<input type="datetime-local">` submits "YYYY-MM-DDTHH:MM" with no
+    timezone. This app has no per-admin timezone concept anywhere else
+    either, so -- consistent with that -- the value is stored treated as
+    UTC by simply appending a Z, rather than building out real timezone
+    handling for a single-admin-scale tool."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    if len(value) == 16:
+        value += ":00"
+    if not value.endswith("Z") and "+" not in value:
+        value += "Z"
+    return value
+
+
+@admin_bp.route("/reklam")
+@master_admin_required
+def ads_dashboard():
+    stats = ads.dashboard_stats()
+    return render_template("admin/ads_dashboard.html", stats=stats,
+                            status_labels=ads.STATUS_LABELS, active="ads")
+
+
+@admin_bp.route("/reklam/ilanlar")
+@master_admin_required
+def ads_list():
+    all_ads = sorted(store.load_ads(), key=lambda a: a.get("updated_at") or "", reverse=True)
+    placement_counts = {}
+    for p in store.load_placements():
+        placement_counts[p["ad_id"]] = placement_counts.get(p["ad_id"], 0) + 1
+    return render_template(
+        "admin/ads_list.html", ads_list=all_ads, placement_counts=placement_counts,
+        status_labels=ads.STATUS_LABELS, ad_status=ads.ad_effective_status, active="ads",
+    )
+
+
+@admin_bp.route("/reklam/ilanlar/yeni", methods=["GET", "POST"])
+@master_admin_required
+def ad_new():
+    actor = _resolve_logged_in_user()
+    if request.method == "POST":
+        data, errors = _ad_form_to_dict(request.form)
+        if errors:
+            for e in errors:
+                flash(e, "error")
+            return render_template("admin/ad_form.html", ad=None, form=request.form, active="ads")
+
+        now = _now_iso()
+        ad_id = ads.new_ad_id()
+        data.update({
+            "id": ad_id, "image": None,
+            "created_at": now, "updated_at": now,
+            "created_by": actor["email"], "updated_by": actor["email"],
+        })
+
+        file = request.files.get("image_file")
+        if file and file.filename:
+            image_value, upload_error = uploads.save_ad_image(file, ad_id, AD_IMG_DIR)
+            if upload_error:
+                flash(upload_error, "error")
+            else:
+                data["image"] = image_value
+
+        all_ads = store.load_ads()
+        all_ads.append(data)
+        store.save_ads(all_ads)
+        store.append_audit(actor["email"], "ad_created", data["internal_name"])
+        flash("Reklam oluşturuldu.", "success")
+        return redirect(url_for("admin.ads_list"))
+
+    return render_template("admin/ad_form.html", ad=None, form={}, active="ads")
+
+
+@admin_bp.route("/reklam/ilanlar/<aid>/duzenle", methods=["GET", "POST"])
+@master_admin_required
+def ad_edit(aid):
+    actor = _resolve_logged_in_user()
+    all_ads = store.load_ads()
+    idx = next((i for i, a in enumerate(all_ads) if a["id"] == aid), None)
+    if idx is None:
+        abort(404)
+    ad = all_ads[idx]
+
+    if request.method == "POST":
+        data, errors = _ad_form_to_dict(request.form)
+        if errors:
+            for e in errors:
+                flash(e, "error")
+            return render_template("admin/ad_form.html", ad=ad, form=request.form, active="ads")
+
+        data["id"] = aid
+        data["image"] = ad.get("image")
+        data["created_at"] = ad.get("created_at")
+        data["created_by"] = ad.get("created_by")
+        data["updated_at"] = _now_iso()
+        data["updated_by"] = actor["email"]
+
+        file = request.files.get("image_file")
+        if file and file.filename:
+            image_value, upload_error = uploads.save_ad_image(file, aid, AD_IMG_DIR)
+            if upload_error:
+                flash(upload_error, "error")
+            else:
+                uploads.delete_stored(ad.get("image"))
+                data["image"] = image_value
+        elif request.form.get("remove_image"):
+            uploads.delete_stored(ad.get("image"))
+            data["image"] = None
+
+        all_ads[idx] = data
+        store.save_ads(all_ads)
+        store.append_audit(actor["email"], "ad_updated", data["internal_name"])
+        flash("Reklam güncellendi.", "success")
+        return redirect(url_for("admin.ads_list"))
+
+    return render_template("admin/ad_form.html", ad=ad, form=ad, active="ads")
+
+
+@admin_bp.route("/reklam/ilanlar/<aid>/durum", methods=["POST"])
+@master_admin_required
+def ad_toggle_status(aid):
+    actor = _resolve_logged_in_user()
+    all_ads = store.load_ads()
+    idx = next((i for i, a in enumerate(all_ads) if a["id"] == aid), None)
+    if idx is None:
+        abort(404)
+    new_status = "active" if all_ads[idx].get("status") != "active" else "inactive"
+    all_ads[idx]["status"] = new_status
+    all_ads[idx]["updated_at"] = _now_iso()
+    all_ads[idx]["updated_by"] = actor["email"]
+    store.save_ads(all_ads)
+    store.append_audit(actor["email"], "ad_status_changed", all_ads[idx]["internal_name"], {"status": new_status})
+    flash("Reklam durumu güncellendi.", "success")
+    return redirect(url_for("admin.ads_list"))
+
+
+@admin_bp.route("/reklam/ilanlar/<aid>/sil", methods=["POST"])
+@master_admin_required
+def ad_delete(aid):
+    actor = _resolve_logged_in_user()
+    all_ads = store.load_ads()
+    ad = next((a for a in all_ads if a["id"] == aid), None)
+    if not ad:
+        abort(404)
+    uploads.delete_stored(ad.get("image"))
+    all_ads = [a for a in all_ads if a["id"] != aid]
+    store.save_ads(all_ads)
+    remaining_placements = [p for p in store.load_placements() if p["ad_id"] != aid]
+    store.save_placements(remaining_placements)
+    store.append_audit(actor["email"], "ad_deleted", ad["internal_name"])
+    flash("Reklam ve ona bağlı tüm yerleşimler silindi.", "success")
+    return redirect(url_for("admin.ads_list"))
+
+
+@admin_bp.route("/reklam/ilanlar/<aid>/onizle")
+@master_admin_required
+def ad_preview(aid):
+    ad = store.get_ad(aid)
+    if not ad:
+        abort(404)
+    return render_template("admin/ad_preview.html", ad=ad, ad_html=ads.render_ad_html(ad),
+                            status=ads.ad_effective_status(ad), status_labels=ads.STATUS_LABELS, active="ads")
+
+
+@admin_bp.route("/reklam/yerlesimler")
+@master_admin_required
+def placements_list():
+    ad_filter = request.args.get("ad_id") or None
+    placements = store.load_placements()
+    if ad_filter:
+        placements = [p for p in placements if p["ad_id"] == ad_filter]
+    placements.sort(key=lambda p: p.get("created_at") or "", reverse=True)
+
+    ads_by_id = {a["id"]: a for a in store.load_ads()}
+    rows = []
+    for p in placements:
+        ad = ads_by_id.get(p["ad_id"])
+        target_label = "Site geneli"
+        if p["scope"] == "section":
+            target_label = ads.CONTEXT_LABELS.get(p.get("section"), p.get("section"))
+        elif p["scope"] == "content":
+            article = store.get_article_by_id(p.get("content_id"))
+            target_label = article["title"] if article else "(silinmiş makale)"
+        rows.append({
+            "placement": p,
+            "ad": ad,
+            "slot_label": ads.SLOTS.get(p["slot"], {}).get("label", p["slot"]),
+            "scope_label": ads.SCOPE_LABELS.get(p["scope"], p["scope"]),
+            "target_label": target_label,
+        })
+
+    filtered_ad = ads_by_id.get(ad_filter) if ad_filter else None
+    return render_template("admin/placements_list.html", rows=rows, filtered_ad=filtered_ad, active="ads")
+
+
+@admin_bp.route("/reklam/yerlesimler/yeni", methods=["GET", "POST"])
+@master_admin_required
+def placement_new():
+    actor = _resolve_logged_in_user()
+    all_ads = sorted(store.load_ads(), key=lambda a: a["internal_name"].lower())
+    slot_choices = ads.slot_choices()
+    articles = store.all_articles_sorted()
+
+    if request.method == "POST":
+        ad_id = request.form.get("ad_id", "")
+        slot = request.form.get("slot", "")
+        scope = request.form.get("scope", "")
+        section = request.form.get("section") or None
+        content_id = request.form.get("content_id") or None
+
+        errors = []
+        if not store.get_ad(ad_id):
+            errors.append("Geçerli bir reklam seçin.")
+        if slot not in ads.SLOTS:
+            errors.append("Geçerli bir slot seçin.")
+        if scope not in ("global", "section", "content"):
+            errors.append("Geçerli bir kapsam seçin.")
+        elif scope == "section":
+            if section not in ads.valid_section_contexts_for_slot(slot):
+                errors.append("Seçilen bölüm bu slot için geçerli değil.")
+        elif scope == "content":
+            if not ads.slot_supports_content_scope(slot):
+                errors.append("Bu slot belirli bir sayfaya özel yerleşimi desteklemiyor.")
+            elif not store.get_article_by_id(content_id):
+                errors.append("Geçerli bir makale seçin.")
+
+        if errors:
+            for e in errors:
+                flash(e, "error")
+            return render_template("admin/placement_form.html", placement=None, form=request.form,
+                                    all_ads=all_ads, slot_choices=slot_choices, articles=articles,
+                                    surface_labels=ads.SURFACE_LABELS, context_labels=ads.CONTEXT_LABELS,
+                                    active="ads")
+
+        now = _now_iso()
+        existing = store.find_placement(
+            slot, scope, section=section, content_type="article" if scope == "content" else None,
+            content_id=content_id if scope == "content" else None,
+        )
+        placements = store.load_placements()
+        record = {
+            "id": existing["id"] if existing else ads.new_placement_id(),
+            "ad_id": ad_id,
+            "slot": slot,
+            "scope": scope,
+            "section": section if scope == "section" else None,
+            "content_type": "article" if scope == "content" else None,
+            "content_id": content_id if scope == "content" else None,
+            "created_at": existing["created_at"] if existing else now,
+            "updated_at": now,
+            "created_by": existing["created_by"] if existing else actor["email"],
+        }
+        if existing:
+            placements = [record if p["id"] == existing["id"] else p for p in placements]
+            store.append_audit(actor["email"], "ad_placement_replaced", store.get_ad(ad_id)["internal_name"])
+            flash("Bu konumda zaten bir reklam vardı — yeni reklamla değiştirildi.", "success")
+        else:
+            placements.append(record)
+            store.append_audit(actor["email"], "ad_placement_created", store.get_ad(ad_id)["internal_name"])
+            flash("Yerleşim oluşturuldu.", "success")
+        store.save_placements(placements)
+        return redirect(url_for("admin.placements_list"))
+
+    return render_template("admin/placement_form.html", placement=None, form={}, all_ads=all_ads,
+                            slot_choices=slot_choices, articles=articles,
+                            surface_labels=ads.SURFACE_LABELS, context_labels=ads.CONTEXT_LABELS, active="ads")
+
+
+@admin_bp.route("/reklam/yerlesimler/<pid>/sil", methods=["POST"])
+@master_admin_required
+def placement_delete(pid):
+    actor = _resolve_logged_in_user()
+    placement = store.get_placement(pid)
+    if not placement:
+        abort(404)
+    placements = [p for p in store.load_placements() if p["id"] != pid]
+    store.save_placements(placements)
+    ad = store.get_ad(placement["ad_id"])
+    store.append_audit(actor["email"], "ad_placement_deleted", ad["internal_name"] if ad else placement["ad_id"])
+    flash("Yerleşim kaldırıldı.", "success")
+    return redirect(url_for("admin.placements_list"))
 
 
 app.register_blueprint(admin_bp)

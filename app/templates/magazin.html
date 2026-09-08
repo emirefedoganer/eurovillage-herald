@@ -1,14 +1,54 @@
 {% extends "base.html" %}
-{% block title %}Magazin (ARI) — {{ site.name }}{% endblock %}
+{% from "_macros.html" import author_byline %}
+{% block title %}Arı Magazin — {{ site.name }}{% endblock %}
 {% block content %}
 
-<div class="section-header"><h1>Magazin — ARI Eki</h1></div>
+<div class="section-header"><h1>Arı Magazin</h1></div>
 
+{{ ad_slot('magazine.home.top', section='magazin') }}
+
+{% if lead or rest %}
+<div class="section-list">
+  <div>
+    {% if lead %}
+    <article class="story-card {{ '' if lead.image else 'story-card--noimg' }}" style="margin-bottom: 30px;">
+      <span class="kicker">{{ effective_kicker(lead) }}</span>
+      {% if lead.image %}
+      <a href="{{ url_for('article_page', slug=lead.slug) }}">
+        <img src="{{ media_url(lead.image, 'img/articles') }}" alt="{{ lead.title }}">
+      </a>
+      {% endif %}
+      <a href="{{ url_for('article_page', slug=lead.slug) }}"><h2>{{ lead.title }}</h2></a>
+      <p class="dek">{{ lead.dek }}</p>
+      <div class="byline">{{ author_byline(resolve_authors(lead)) }} · {{ lead.date }}</div>
+    </article>
+    {% endif %}
+
+    {% for a in rest %}
+    <article class="story-card {{ '' if a.image else 'story-card--noimg' }}" style="margin-bottom: 30px;">
+      <span class="kicker">{{ effective_kicker(a) }}</span>
+      {% if a.image %}
+      <a href="{{ url_for('article_page', slug=a.slug) }}">
+        <img src="{{ media_url(a.image, 'img/articles') }}" alt="{{ a.title }}">
+      </a>
+      {% endif %}
+      <a href="{{ url_for('article_page', slug=a.slug) }}"><h3>{{ a.title }}</h3></a>
+      <p class="dek">{{ a.dek }}</p>
+      <div class="byline">{{ author_byline(resolve_authors(a)) }} · {{ a.date }}</div>
+    </article>
+    {% if loop.index == 3 %}
+    {{ ad_slot('magazine.home.after_story_3', section='magazin') }}
+    {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% else %}
 <div class="magazin-empty">
   Kentimizde şu an için kayda değer bir magazin haberi bulunmamaktadır.<br>
   Olursa buraya gelecek.<br>
   Anlayışınız için teşekkürler.
   <div style="font-family: var(--font-mast); font-size: 30px; margin-top: 24px; font-style: normal;">ARI</div>
 </div>
+{% endif %}
 
 {% endblock %}

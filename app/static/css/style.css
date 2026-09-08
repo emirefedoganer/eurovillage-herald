@@ -227,6 +227,19 @@ body.drawer-open{ overflow: hidden; }
 .ad-box .ad-sub{ font-size: 12.5px; color: var(--gray-700); }
 .ad-box .ad-handle{ font-size: 11px; color: var(--gray-500); margin-top: 8px; }
 
+/* Dynamic ad slots (ads.py render_ad_html) reuse .ad-box above; these rules
+   only cover what a real ad adds on top -- a clickable image and a CTA
+   line. Fixed aspect-ratio + object-fit prevents layout shift and overflow
+   regardless of the source image's real dimensions. */
+.ad-slot-link{ display: block; color: inherit; text-decoration: none; }
+.ad-slot-link:hover .ad-title{ text-decoration: underline; }
+.ad-slot-media{ width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: var(--gray-100); }
+.ad-slot-media img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+.ad-box .ad-cta{
+  display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 700;
+  color: var(--red); text-transform: uppercase; letter-spacing: .03em;
+}
+
 .puzzle-teaser{ border: 1px solid var(--gray-300); padding: 16px; text-align: center; }
 .puzzle-teaser img{ margin: 0 auto 10px; max-height: 140px; width: auto; }
 .puzzle-teaser-list{ display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; text-align: left; }
@@ -241,6 +254,7 @@ body.drawer-open{ overflow: hidden; }
 .section-header{ border-bottom: 3px solid var(--black); margin-bottom: 24px; padding-bottom: 10px; }
 .section-header h1{ font-family: var(--font-headline); font-size: 36px; margin: 0; }
 .section-list{ display: grid; grid-template-columns: 2fr 1fr; gap: 30px 40px; }
+.section-list--full{ grid-template-columns: 1fr; } /* no sidebar ad assigned -- don't reserve empty space for it */
 .section-list .story-card h3{ font-size: 26px; }
 .section-empty{ font-family: var(--font-sans); color: var(--gray-500); padding: 40px 0; }
 

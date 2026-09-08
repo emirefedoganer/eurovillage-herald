@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Yeni Yerleşim — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Yeni Reklam Yerleşimi</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.placements_list') }}">← Listeye Dön</a>
+  </div>
+
+  <form class="admin-panel" method="post" id="placement-form">
+    <div class="form-row">
+      <label for="ad_id">Reklam</label>
+      <select id="ad_id" name="ad_id" required>
+        <option value="" disabled {{ '' if form and form.ad_id else 'selected' }}>Bir reklam seçin</option>
+        {% for ad in all_ads %}
+        <option value="{{ ad.id }}" {{ 'selected' if form and form.ad_id == ad.id else '' }}>{{ ad.internal_name }} ({{ ad.sponsor_name }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label for="slot">Slot (Konum)</label>
+      <select id="slot" name="slot" required>
+        <option value="" disabled {{ '' if form and form.slot else 'selected' }}>Bir slot seçin</option>
+        {% set ns = namespace(surface=None) %}
+        {% for key, meta in slot_choices %}
+          {% if meta.surface != ns.surface %}
+            {% if ns.surface is not none %}</optgroup>{% endif %}
+            <optgroup label="{{ surface_labels.get(meta.surface, meta.surface) }}">
+            {% set ns.surface = meta.surface %}
+          {% endif %}
+          <option value="{{ key }}"
+                  data-contexts="{{ meta.section_contexts|join(',') }}"
+                  data-supports-content="{{ 'true' if meta.supports_content_scope else 'false' }}"
+                  {{ 'selected' if form and form.slot == key else '' }}>{{ meta.label }}</option>
+        {% endfor %}
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label for="scope">Kapsam</label>
+      <select id="scope" name="scope" required>
+        <option value="global" {{ 'selected' if form and form.scope == 'global' else '' }}>Site geneli</option>
+        <option value="section" {{ 'selected' if form and form.scope == 'section' else '' }}>Bölüme özel</option>
+        <option value="content" {{ 'selected' if form and form.scope == 'content' else '' }}>Belirli bir makale</option>
+      </select>
+    </div>
+
+    <div class="form-row" id="section-row">
+      <label for="section">Bölüm</label>
+      <select id="section" name="section">
+        {% for key in context_labels %}
+        <option value="{{ key }}" {{ 'selected' if form and form.section == key else '' }}>{{ context_labels[key] }}</option>
+        {% endfor %}
+      </select>
+      <div class="hint">Yalnızca seçilen slot için geçerli olan bölümler kullanılabilir.</div>
+    </div>
+
+    <div class="form-row" id="content-row">
+      <label for="content_id">Makale</label>
+      <select id="content_id" name="content_id">
+        <option value="" disabled {{ '' if form and form.content_id else 'selected' }}>Bir makale seçin</option>
+        {% for a in articles %}
+        <option value="{{ a.id }}" {{ 'selected' if form and form.content_id == a.id else '' }}>{{ a.title }} ({{ a.slug }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-red" type="submit">Yerleşimi Kaydet</button>
+    </div>
+  </form>
+</div>
+
+<script src="{{ versioned_static('js/ad-placement-form.js') }}"></script>
+
+{% endblock %}
