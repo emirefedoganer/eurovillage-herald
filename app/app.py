@@ -26,6 +26,14 @@ from sections import (
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# These five are passed to uploads.py's save_*() functions purely as the
+# LOCAL-DEV FALLBACK write location (used only when storage.ENABLED is
+# False -- see uploads._store()/save_tip_image()). They are never read
+# from directly to render a page: every template resolves a stored
+# reference through the media_url() helper below, which returns a stored
+# R2 URL as-is and only falls back to one of these static/ paths for a
+# genuinely legacy (never-migrated) bare filename. In production, with R2
+# configured, these directories sit empty/unused.
 ARTICLE_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "articles")
 ISSUE_PDF_DIR = os.path.join(BASE_DIR, "static", "issues")
 AUTHOR_IMG_DIR = os.path.join(BASE_DIR, "static", "img", "authors")

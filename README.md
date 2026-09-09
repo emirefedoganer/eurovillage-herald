@@ -237,9 +237,15 @@ değiştirin.
 ## Notlar
 
 - Veri, veritabanı yerine JSON dosyalarında tutulur — küçük ölçekli, tek yönetici için
-  yeterlidir. Farklı bir sunucuya taşırken `app/data` ve `app/static/img/articles` ile
-  `app/static/issues` klasörlerini birlikte taşıyın.
-- Gazete PDF'leri tarayıcının yerleşik PDF görüntüleyicisiyle okunur (`<iframe>`).
+  yeterlidir. R2 yapılandırıldığında medya (görseller, gazete PDF'leri) tamamen R2'de
+  yaşar ve `app/data`'daki kayıtlar `matbaa.eurovillageherald.com` URL'leri tutar; farklı
+  bir sunucuya taşırken yalnızca `app/data`'yı taşımanız yeterlidir. R2 hiç
+  yapılandırılmamışsa (yerel geliştirme) medya `app/static/img/articles` ve
+  `app/static/issues` altında yaşamaya devam eder — bu durumda o klasörleri de taşıyın.
+- Gazete PDF'leri PDF.js ile (`app/templates/gazete_oku.html`, canvas tabanlı) okunur;
+  R2 yapılandırıldığında PDF doğrudan `matbaa.eurovillageherald.com`'dan JavaScript
+  üzerinden fetch edilir — bunun çalışması için R2 bucket'ında bir CORS politikası
+  gerekir (bkz. `CLOUDFLARE_SETUP.md` §2 adım 9).
 - `static/fonts/FrutigerLTStd-Bold.otf` lisanslı ticari bir fonttur (Frutiger LT Std, Monotype).
   Yalnızca sahip olunan bir lisansla kullanın; bu repoyu herkese açık paylaşırken bu dosyayı
   hariç tutmayı değerlendirin.

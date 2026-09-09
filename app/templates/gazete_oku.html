@@ -56,6 +56,32 @@ let zoomFactor = 1;
 let rendering = false;
 let pendingPage = null;
 
+function showPdfError(err) {
+  // The PDF itself is public and reachable directly (the "PDF'i indir" /
+  // "Yeni Sekmede Aç" links below always work) -- but PDF.js loads it via
+  // a cross-origin fetch() with Range requests, which the browser blocks
+  // unless the bucket's CORS policy allows this site's origin (see
+  // CLOUDFLARE_SETUP.md §2 step 9). A failure on a cross-origin URL is
+  // almost always that, not a broken/missing file, so log a pointer to it
+  // for whoever's debugging -- console only, the visitor-facing message
+  // stays simple and just offers the direct link either way.
+  try {
+    const isCrossOrigin = new URL(url, window.location.href).origin !== window.location.origin;
+    if (isCrossOrigin) {
+      console.error(
+        'PDF.js could not load ' + url + ' -- if this is a fetch/CORS failure (check the ' +
+        'Network tab), the R2 bucket needs a CORS policy allowing this origin (' +
+        window.location.origin + '). See CLOUDFLARE_SETUP.md §2 step 9.', err
+      );
+    } else {
+      console.error('PDF.js could not load ' + url, err);
+    }
+  } catch (_) {
+    console.error('PDF.js could not load ' + url, err);
+  }
+  viewport_el.innerHTML = '<div style="padding:40px; text-align:center; font-family: var(--font-sans);"><p>PDF yüklenemedi.</p><a class="btn btn-red" href="' + url + '">PDF\'i indir</a></div>';
+}
+
 function renderPage(num) {
   if (rendering) { pendingPage = num; return; }
   rendering = true;
@@ -76,7 +102,7 @@ function renderPage(num) {
     });
   }).catch(function (err) {
     rendering = false;
-    viewport_el.innerHTML = '<div style="padding:40px; text-align:center; font-family: var(--font-sans);"><p>PDF yüklenemedi.</p><a class="btn btn-red" href="' + url + '">PDF\'i indir</a></div>';
+    showPdfError(err);
   });
 }
 
@@ -90,7 +116,7 @@ pdfjsLib.getDocument({ url: url }).promise.then(function (doc) {
     renderPage(pageNum);
   });
 }).catch(function (err) {
-  viewport_el.innerHTML = '<div style="padding:40px; text-align:center; font-family: var(--font-sans);"><p>PDF yüklenemedi.</p><a class="btn btn-red" href="' + url + '">PDF\'i indir</a></div>';
+  showPdfError(err);
 });
 
 document.getElementById('pdfPrev').addEventListener('click', function () {

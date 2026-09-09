@@ -71,6 +71,39 @@ guarantee against ever silently falling back again.
    consider also setting `R2_REQUIRED=true` for a permanent guarantee that
    uploads never silently fall back to local disk again, even during a
    future R2 outage or an accidentally-unset variable.
+9. **CORS policy (required for the newspaper PDF reader):** the custom
+   domain in step 4 makes objects fetchable, but a plain `<img src>` or a
+   top-level link (like the reader page's "İndir" / "Yeni Sekmede Aç"
+   buttons) is not the same thing as a cross-origin `fetch()` — and
+   `/gazete/<issue>` reads its PDF with PDF.js, which fetches the file
+   (with HTTP Range requests, to render page 1 without downloading the
+   whole PDF first) via JavaScript from `eurovillageherald.com`, a
+   *different* origin than `matbaa.eurovillageherald.com`. Without a CORS
+   policy on the bucket, the browser blocks PDF.js from reading that
+   response and the reader shows "PDF yüklenemedi" even though the file
+   itself loads fine via a direct link. R2 does not add this by default —
+   it's a separate bucket setting from the custom domain: bucket →
+   **Settings** → **CORS Policy** → **Add CORS policy**:
+   ```json
+   [
+     {
+       "AllowedOrigins": [
+         "https://eurovillageherald.com",
+         "https://www.eurovillageherald.com"
+       ],
+       "AllowedMethods": ["GET", "HEAD"],
+       "AllowedHeaders": ["Range"],
+       "ExposeHeaders": ["Content-Range", "Content-Length", "Accept-Ranges"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+   Only `GET`/`HEAD` and only the public site's own origins — nothing here
+   grants write access or a third party's origin anything. This is a
+   bucket-level setting, so it applies to the whole `eurovillage-herald-media`
+   bucket (article/author/ad images load fine without it since those are
+   plain `<img src>` tags, never fetched via JS — this policy only matters
+   for PDF.js).
 
 ## 2b. A private bucket for reader-tip images (recommended)
 
