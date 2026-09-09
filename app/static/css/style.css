@@ -306,6 +306,30 @@ body.drawer-open{ overflow: hidden; }
   border-left: 3px solid var(--black); font-family: var(--font-sans); font-size: 13.5px; color: var(--gray-700);
 }
 
+/* ---------- "Bu Haber Gazetede" / "Bu Sayıdan" issue-article link ---------- */
+.issue-link-card{
+  max-width: 700px; margin: 26px auto 0; padding: 16px 20px; background: #fff;
+  border: 1px solid var(--gray-300); border-top: 3px solid var(--red);
+}
+.issue-link-kicker{
+  display: block; font-family: var(--font-sans); font-size: 11px; font-weight: 700;
+  letter-spacing: .08em; color: var(--red); margin-bottom: 8px;
+}
+.issue-link-body{
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.issue-link-body strong{ font-family: var(--font-headline); font-size: 17px; font-weight: 400; }
+.issue-articles-block{ margin-top: 40px; }
+.issue-articles-list{ display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; }
+.issue-article-card{ border: 1px solid var(--gray-300); padding: 14px 16px; }
+.issue-article-card .page-badge{
+  display: inline-block; font-family: var(--font-sans); font-size: 11px; color: var(--gray-500);
+  margin-bottom: 6px;
+}
+.issue-article-card h4{ font-family: var(--font-headline); font-weight: 400; margin: 0 0 6px; font-size: 16px; }
+.issue-article-card h4 a{ color: inherit; text-decoration: none; }
+.issue-article-card h4 a:hover{ text-decoration: underline; }
+
 /* ---------- oyun kosesi / puzzles ---------- */
 .puzzle-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
 .puzzle-card{ border: 1px solid var(--gray-300); padding: 20px; text-align: center; }
@@ -323,6 +347,25 @@ body.drawer-open{ overflow: hidden; }
 .issue-card-body{ padding: 14px; }
 .issue-card h3{ font-family: var(--font-headline); font-size: 20px; margin: 0 0 6px; }
 .issue-card p{ font-family: var(--font-sans); font-size: 13px; color: var(--gray-500); margin: 0 0 10px; }
+.issue-card-noimg{
+  width: 100%; aspect-ratio: 3/4; background: var(--gray-100); display: flex;
+  align-items: center; justify-content: center; font-family: var(--font-headline);
+  font-size: 22px; color: var(--gray-400); border-bottom: 1px solid var(--gray-300);
+}
+.issue-card-desc{ color: var(--gray-700) !important; font-size: 13.5px !important; line-height: 1.5; }
+
+/* ---------- newsletter subscribe widget ---------- */
+.subscribe-widget{
+  margin-top: 44px; padding: 24px 28px; background: var(--gray-100); border: 1px solid var(--gray-300);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 30px; flex-wrap: wrap;
+}
+.subscribe-widget-text strong{ font-family: var(--font-headline); font-size: 19px; font-weight: 400; }
+.subscribe-widget-text p{ font-family: var(--font-sans); font-size: 13.5px; color: var(--gray-500); margin: 6px 0 0; max-width: 380px; }
+.subscribe-widget-form{ flex: 0 0 auto; min-width: 260px; }
+.subscribe-widget-form input[type="email"]{
+  width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); font-family: var(--font-sans);
+  font-size: 14px; margin-bottom: 10px;
+}
 .btn{
   display: inline-block; font-family: var(--font-sans); font-weight: 700; font-size: 13px;
   background: var(--black); color: #fff; padding: 9px 16px; border-radius: 3px; border: none; cursor: pointer;
@@ -340,16 +383,34 @@ body.drawer-open{ overflow: hidden; }
 .reader-frame-wrap{ border: 1px solid var(--gray-300); background: var(--gray-100); height: 82vh; display: flex; flex-direction: column; min-width: 0; }
 .pdf-toolbar{
   flex-shrink: 0; display: flex; align-items: center; gap: 4px; padding: 8px 12px;
-  background: #fff; border-bottom: 1px solid var(--gray-300); font-family: var(--font-sans); min-width: 0; overflow: hidden;
+  background: #fff; border-bottom: 1px solid var(--gray-300); font-family: var(--font-sans); min-width: 0;
+  overflow-x: auto;
 }
 .pdf-btn{
   background: var(--gray-100); border: 1px solid var(--gray-300); border-radius: 3px; width: 30px; height: 30px;
   font-size: 16px; line-height: 1; cursor: pointer; color: var(--ink); flex-shrink: 0;
 }
 .pdf-btn:hover{ background: var(--gray-200); }
+.pdf-btn[aria-pressed="true"]{ background: var(--ink); color: #fff; border-color: var(--ink); }
 .pdf-page-info{ font-size: 12.5px; color: var(--gray-700); min-width: 44px; text-align: center; flex-shrink: 0; }
 .pdf-toolbar-spacer{ flex: 1; min-width: 4px; }
+.pdf-goto-form{ display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.pdf-goto-form input{
+  width: 46px; height: 30px; border: 1px solid var(--gray-300); border-radius: 3px; text-align: center; font-size: 13px;
+}
+.pdf-body{ flex: 1; display: flex; min-height: 0; min-width: 0; }
+.pdf-thumbs{
+  flex: 0 0 96px; overflow-y: auto; border-right: 1px solid var(--gray-300); background: #fff;
+  padding: 8px; display: flex; flex-direction: column; gap: 8px;
+}
+.pdf-thumb{
+  border: 2px solid transparent; background: none; padding: 0; cursor: pointer; position: relative;
+  font-family: var(--font-sans); font-size: 10px; color: var(--gray-500); text-align: center;
+}
+.pdf-thumb canvas{ display: block; width: 100%; border: 1px solid var(--gray-300); margin-bottom: 3px; }
+.pdf-thumb.active{ border-color: var(--red); }
 .pdf-viewport{ flex: 1; overflow: auto; display: flex; justify-content: center; padding: 16px; min-width: 0; min-height: 0; }
+.pdf-viewport:focus-visible{ outline: 2px solid var(--red); outline-offset: -2px; }
 .pdf-viewport canvas{ box-shadow: 0 2px 12px rgba(0,0,0,.18); background: #fff; height: fit-content; flex-shrink: 0; }
 .reader-side h1{ font-family: var(--font-headline); font-size: 26px; margin: 0 0 8px; }
 .reader-side .issue-date{ font-family: var(--font-sans); font-size: 13px; color: var(--gray-500); margin-bottom: 14px; }
@@ -475,6 +536,9 @@ body.drawer-open{ overflow: hidden; }
   .mobile-drawer:not([hidden]){ display: flex; }
   .front-grid, .section-list, .reader-layout{ grid-template-columns: minmax(0, 1fr); }
   .reader-frame-wrap{ height: 60vh; }
+  .pdf-thumbs{ flex-basis: 72px; }
+  .subscribe-widget{ flex-direction: column; }
+  .subscribe-widget-form{ width: 100%; min-width: 0; }
   .secondary-grid{ grid-template-columns: 1fr; }
   .river-list{ grid-template-columns: 1fr; }
   .lead-story h1{ font-size: 32px; }

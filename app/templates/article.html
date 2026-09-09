@@ -1,10 +1,18 @@
 {% extends "base.html" %}
 {% from "_macros.html" import author_byline, author_avatar %}
 {% block title %}{{ article.title }} — {{ site.name }}{% endblock %}
+{% block meta_description %}{{ article.dek or site.tagline }}{% endblock %}
+{% block og_title %}{{ article.title }}{% endblock %}
+{% block og_description %}{{ article.dek or site.tagline }}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_image %}
+{% if article.image %}<meta property="og:image" content="{{ media_url(article.image, 'img/articles', external=True) }}">
+<meta name="twitter:card" content="summary_large_image">{% endif %}
+{% endblock %}
 {% block extra_head %}
-<meta name="description" content="{{ article.dek }}">
 {% if is_preview %}<meta name="robots" content="noindex, nofollow">{% endif %}
 {% endblock %}
+{% block extra_scripts %}<script src="{{ versioned_static('js/newspaper-analytics.js') }}"></script>{% endblock %}
 {% block content %}
 
 {% if is_preview %}
@@ -96,6 +104,17 @@
   {% if article.tags %}
   <div class="article-tags">
     {% for t in article.tags %}<a href="{{ url_for('search', q=t) }}">#{{ t }}</a>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if linked_issue %}
+  <div class="issue-link-card">
+    <span class="issue-link-kicker">BU HABER GAZETEDE</span>
+    <div class="issue-link-body">
+      <strong>{{ site.name }} — Sayı {{ linked_issue.no }}{% if article.issue_page %}, s. {{ article.issue_page }}{% endif %}</strong>
+      <a class="btn btn-red" onclick="EHAnalytics && EHAnalytics.ctaClick('{{ linked_issue.id }}')"
+         href="{{ url_for('gazete_oku', issue_id=linked_issue.id) }}{% if article.issue_page %}#page={{ article.issue_page }}{% endif %}">Gazetede Oku</a>
+    </div>
   </div>
   {% endif %}
 

@@ -1,50 +1,167 @@
 {% extends "base.html" %}
-{% block title %}Yeni Sayı Yükle — {{ site.name }}{% endblock %}
+{% block title %}{{ 'Sayıyı Düzenle' if issue else 'Yeni Sayı Yükle' }} — {{ site.name }}{% endblock %}
 {% block content %}
 
 <div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
   <div class="admin-header">
-    <h1>Yeni Sayı Yükle</h1>
-    <a class="btn btn-outline" href="{{ url_for('admin.dashboard') }}">← Panele Dön</a>
+    <h1>{{ 'Sayıyı Düzenle' if issue else 'Yeni Sayı Yükle' }}</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.issues_list') }}">← Sayılara Dön</a>
   </div>
 
   <form class="admin-panel" method="post" enctype="multipart/form-data">
     <div class="form-grid-2">
       <div class="form-row">
         <label for="title">Sayı Başlığı</label>
-        <input type="text" id="title" name="title" required placeholder="ör. Ekim Sayısı">
+        <input type="text" id="title" name="title" required placeholder="ör. Ekim Sayısı"
+               value="{{ issue.title if issue else '' }}">
       </div>
       <div class="form-row">
         <label for="no">Sayı No</label>
-        <input type="number" id="no" name="no" min="1" required>
+        <input type="number" id="no" name="no" min="1" required value="{{ issue.no if issue else '' }}">
+      </div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="date">Yayın Tarihi</label>
+        <input type="date" id="date" name="date" required value="{{ issue.date if issue else '' }}">
+      </div>
+      <div class="form-row">
+        <label for="issue_type">Sayı Türü</label>
+        <select id="issue_type" name="issue_type">
+          {% for key, label in type_labels.items() %}
+          <option value="{{ key }}" {{ 'selected' if issue and issue.issue_type == key else '' }}>{{ label }}</option>
+          {% endfor %}
+        </select>
       </div>
     </div>
 
     <div class="form-row">
-      <label for="date">Yayın Tarihi</label>
-      <input type="date" id="date" name="date" required>
+      <label for="description">Açıklama (herkese açık)</label>
+      <textarea id="description" name="description" rows="3">{{ issue.description if issue else '' }}</textarea>
     </div>
 
     <div class="form-row">
-      <label for="description">Açıklama</label>
-      <textarea id="description" name="description" rows="3"></textarea>
+      <label for="editor_note">Editör Notu (yalnızca yönetim panelinde görünür)</label>
+      <textarea id="editor_note" name="editor_note" rows="2">{{ issue.editor_note if issue else '' }}</textarea>
+      <div class="hint">Ziyaretçilere hiçbir zaman gösterilmez — yalnızca bu sayı üzerinde çalışan editörler için.</div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="status">Yayın Durumu</label>
+        <select id="status" name="status">
+          {% for key, label in status_labels.items() %}
+          <option value="{{ key }}" {{ 'selected' if (issue and issue.status == key) or (not issue and key == 'published') else '' }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <div class="hint">Taslak/İncelemede/Hazır asla herkese açık olmaz. Zamanlanmış, seçilen saatte otomatik yayımlanır.</div>
+      </div>
+      <div class="form-row" id="publish_at-row">
+        <label for="publish_at">Yayın Tarihi/Saati ({{ editorial_timezone_name }})</label>
+        <input type="datetime-local" id="publish_at" name="publish_at"
+               value="{{ to_editorial_input(issue.publish_at) if issue else '' }}">
+      </div>
     </div>
 
     <div class="form-row">
-      <label for="pdf_file">PDF Dosyası</label>
-      <input type="file" id="pdf_file" name="pdf_file" accept="application/pdf" required>
+      <label for="page_count">Sayfa Sayısı (opsiyonel)</label>
+      <input type="number" id="page_count" name="page_count" min="1" value="{{ issue.pages if issue and issue.pages else '' }}">
+    </div>
+
+    <div class="form-row">
+      <label for="pdf_file">PDF Dosyası{% if not issue %} (zorunlu){% endif %}</label>
+      {% if issue and issue.pdf %}
+      <div class="hint" style="margin-bottom:6px;">Mevcut PDF yüklü. Yeni bir dosya seçerseniz onun yerini alır.</div>
+      {% endif %}
+      <input type="file" id="pdf_file" name="pdf_file" accept="application/pdf" {{ 'required' if not issue else '' }}>
     </div>
 
     <div class="form-row">
       <label for="cover_file">Kapak Görseli (opsiyonel)</label>
+      {% if issue and issue.cover_image %}
+      <div class="current-image">
+        <img src="{{ media_url(issue.cover_image, 'img/articles') }}" alt="">
+        <label style="font-weight:400;"><input type="checkbox" name="remove_cover" value="1" style="width:auto;"> Kapağı kaldır</label>
+      </div>
+      {% endif %}
       <input type="file" id="cover_file" name="cover_file" accept="image/*">
     </div>
 
     <div class="form-actions">
-      <button class="btn btn-red" type="submit">Sayıyı Yükle</button>
-      <a class="btn btn-outline" href="{{ url_for('admin.dashboard') }}">Vazgeç</a>
+      <button class="btn btn-red" type="submit">{{ 'Kaydet' if issue else 'Sayıyı Yükle' }}</button>
+      <a class="btn btn-outline" href="{{ url_for('admin.issues_list') }}">Vazgeç</a>
     </div>
   </form>
+
+  {% if issue and issue.status not in ('published', 'archived') %}
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); margin-top:0;">Önizleme Bağlantısı</h2>
+    <p class="hint" style="margin-top:0;">
+      Herald hesabı olmayan biriyle bu sayıyı paylaşmak için güvenli bir bağlantı oluşturun.
+      Sayı bu bağlantı üzerinden görüntülenebilir ama herkese açık kalmaz.
+    </p>
+    {% if issue.preview_token_hash %}
+    <p>
+      <strong>Aktif bir önizleme bağlantısı var</strong>
+      (oluşturuldu: {{ issue.preview_token_created_at[:16].replace('T',' ') if issue.preview_token_created_at else '' }},
+      {% if issue.preview_token_expires_at %}bitiş: {{ issue.preview_token_expires_at[:16].replace('T',' ') }} UTC{% else %}süresiz{% endif %}).
+      Bağlantının kendisi güvenlik nedeniyle yalnızca oluşturulduğu anda gösterilir — kaybettiyseniz yenisini oluşturun.
+    </p>
+    <form method="post" action="{{ url_for('admin.issue_preview_revoke', issue_id=issue.id) }}" style="display:inline;" onsubmit="return confirm('Bu önizleme bağlantısını iptal etmek istediğinize emin misiniz?');">
+      <button class="btn btn-danger" type="submit">Bağlantıyı İptal Et</button>
+    </form>
+    {% else %}
+    <p>Şu anda aktif bir önizleme bağlantısı yok.</p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('admin.issue_preview_generate', issue_id=issue.id) }}" style="margin-top:14px;">
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label for="expiry">Geçerlilik Süresi</label>
+          <select id="expiry" name="expiry">
+            <option value="24h">24 saat</option>
+            <option value="7d">7 gün</option>
+            <option value="custom">Özel</option>
+            <option value="none">Süresiz</option>
+          </select>
+        </div>
+        <div class="form-row" id="custom_expiry-row" hidden>
+          <label for="custom_expiry">Özel Bitiş Tarihi/Saati (UTC)</label>
+          <input type="datetime-local" id="custom_expiry" name="custom_expiry">
+        </div>
+      </div>
+      <button class="btn btn-outline" type="submit">{{ 'Yeni Bağlantı Oluştur' if issue.preview_token_hash else 'Önizleme Bağlantısı Oluştur' }}</button>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if issue %}
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); margin-top:0;">Analitik</h2>
+    <a class="btn btn-outline" href="{{ url_for('admin.issue_analytics_view', issue_id=issue.id) }}">Bu Sayının Analitiğini Gör</a>
+  </div>
+  {% endif %}
 </div>
+
+<script>
+(function () {
+  var statusSelect = document.getElementById("status");
+  var publishAtRow = document.getElementById("publish_at-row");
+  function syncPublishAt() {
+    if (statusSelect && publishAtRow) publishAtRow.hidden = statusSelect.value !== "scheduled";
+  }
+  if (statusSelect) { statusSelect.addEventListener("change", syncPublishAt); syncPublishAt(); }
+
+  var expiry = document.getElementById("expiry");
+  var customRow = document.getElementById("custom_expiry-row");
+  function syncExpiry() {
+    if (expiry && customRow) customRow.hidden = expiry.value !== "custom";
+  }
+  if (expiry) { expiry.addEventListener("change", syncExpiry); syncExpiry(); }
+})();
+</script>
 
 {% endblock %}

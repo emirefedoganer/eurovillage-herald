@@ -187,21 +187,30 @@ HTML/JSON içinde yer almaz; her kontrol isteği sunucuda doğrulanır.
 
 ```
 app/
-  app.py             Flask uygulaması ve tüm route'lar
-  store.py           JSON veri okuma/yazma yardımcıları
+  app.py             Flask uygulaması, versiyon sabiti (APP_VERSION) ve tüm route'lar
+  store.py           JSON veri okuma/yazma yardımcıları + tüm self-healing yükleyiciler
   sections.py        Bölüm (Politika, Şehir, Kültür...) tanımları
+  ads.py             Reklam/yerleşim mantığı (öncelik çözümleme, istatistikler)
+  analytics.py       Gazete sayısı analitiği (okuma oturumu/sayfa/indirme kaydı ve özetleri)
+  subscriptions.py   "Yeni sayı" abonelik sistemi (çifte onay, güvenli abonelikten çıkma token'ı)
+  mailer.py          E-posta gönderimi (SMTP_* yapılandırılmamışsa günlüğe yazar, göndermez)
+  drafts.py          Editöryal taslak üretimi (şablon tabanlı; hiçbir şeyi otomatik yayımlamaz)
+  editorial_tz.py    Zamanlanmış yayın için editoryal saat dilimi dönüşümü (stdlib zoneinfo)
   games_engine.py    Bulmaca numaralandırma/yerleştirme + sudoku çözücü/üretici (saf mantık)
   games_export.py    Bulmaca/sudoku için PNG dışa aktarma (Pillow)
   minecraft_service.py  Mojang/Crafatar/mc-heads.net üzerinden Minecraft profil çözümü (cache'li)
   runtime_env.py     Üretim/geliştirme tespiti (APP_ENV / SERVER_NAME) -- diğer modüllerin sıkılık kararları için
   turnstile.py       Cloudflare Turnstile sunucu tarafı doğrulama (Siteverify)
-  storage.py         Cloudflare R2 istemcisi (S3 uyumlu API, boto3)
+  storage.py         Cloudflare R2 istemcisi (S3 uyumlu API, boto3; EU jurisdiction endpoint)
   uploads.py         Yükleme doğrulama + R2/yerel disk yönlendirme (tüm admin yüklemeleri buradan geçer)
   cf_access.py       Cloudflare Access imzalı kimlik doğrulama (opsiyonel, savunma derinliği)
   ratelimit.py        Hassas uç noktalar için basit bellek-içi hız sınırlama
   data/
-    articles.json    Tüm makaleler (author_ids ile yazar profillerine bağlanır)
-    issues.json      PDF gazete sayıları
+    articles.json    Tüm makaleler (author_ids ile yazar profillerine, opsiyonel issue_id/issue_page ile bir gazete sayısına bağlanır)
+    issues.json      Gazete sayıları: yayın durumu/zamanlama/önizleme dahil yapılandırılmış kayıtlar
+    issue_subscriptions.json   Abonelikler (bkz. subscriptions.py)
+    issue_analytics.json       Sayı başına toplu analitik sayaçları (bkz. analytics.py)
+    editorial_drafts.json      Otomatik hazırlanan, insan onayı bekleyen editöryal taslaklar
     site.json        Site/masthead bilgileri
     users.json       Hesaplar: e-posta, şifre hash'i, hesap rolü (master_admin/author)
     authors.json     Yazar profilleri: biyografi, editoryal rol, Twitter/Minecraft, slug geçmişi
@@ -214,17 +223,33 @@ app/
     css/style.css
     js/               crossword-play.js, sudoku-play.js, crossword-builder.js,
                        sudoku-builder.js, game-storage.js (localStorage yardımcıları),
-                       author-card.js (paylaşılan yazar önizleme kartı)
+                       author-card.js (paylaşılan yazar önizleme kartı),
+                       newspaper-analytics.js (analitik beacon yardımcısı)
     img/articles/     Makale görselleri
     img/authors/      Yazar profil/kapak fotoğrafları
     img/ari-logo.svg  Arı dergisi resmi logosu (Arı bağlamındaki sayfalarda masthead'i değiştirir)
     fonts/            FrutigerLTStd-Bold.otf — yalnızca "Buraya Bakarlar" başlığı için (lisanslı font)
     issues/           Yüklenen PDF sayılar (yalnızca R2 yapılandırılmamışken kullanılır)
 scripts/
-  migrate_media_to_r2.py  Mevcut yerel medyayı R2'ye taşıyan tek seferlik betik
+  migrate_media_to_r2.py  Tamamlanmış tek seferlik R2 medya taşıma betiği (bkz. dosyanın kendi başlığı)
+tests/
+  test_v101.py       1.0.1 sürümünün testleri -- izole geçici veri dizini kullanır, gerçek app/data'ya asla dokunmaz
 .env.example          Tüm ortam değişkenlerinin listesi (yer tutucu değerlerle)
 CLOUDFLARE_SETUP.md    Cloudflare panelinde elle yapılması gereken adımların kontrol listesi
+CHANGELOG.md           Sürüm notları
 ```
+
+## Testler
+
+```bash
+cd app  # veya doğrudan repo kökünden: python3 -m unittest tests.test_v101 -v
+python3 -m unittest discover -s ../tests -t ..
+```
+
+Testler tamamen izole, geçici bir veri dizininde çalışır — gerçek `app/data/*.json`
+dosyalarını hiçbir zaman okumaz veya değiştirmez, bu yüzden gerçek (üretim şekilli)
+veri içeren bir kopyaya karşı bile güvenle tekrar tekrar çalıştırılabilir. Ekstra bir
+test bağımlılığı gerekmez (stdlib `unittest`).
 
 ## Güvenlik Notu
 

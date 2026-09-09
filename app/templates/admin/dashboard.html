@@ -63,27 +63,32 @@
 
   <div class="admin-panel">
     <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h2 style="font-family: var(--font-headline); margin:0;">Gazete Sayıları ({{ issues|length }})</h2>
-      <a class="btn btn-red" href="{{ url_for('admin.issue_new') }}">+ Yeni Sayı Yükle</a>
+      <h2 style="font-family: var(--font-headline); margin:0;">Son Gazete Sayıları</h2>
+      <div class="admin-actions">
+        <a class="btn btn-outline" href="{{ url_for('admin.issues_list') }}">Tümünü Yönet</a>
+        <a class="btn btn-red" href="{{ url_for('admin.issue_new') }}">+ Yeni Sayı Yükle</a>
+      </div>
     </div>
     <table class="admin-table" style="margin-top:16px;">
       <thead>
-        <tr><th>Başlık</th><th>No</th><th>Tarih</th><th></th></tr>
+        <tr><th>Başlık</th><th>No</th><th>Tarih</th><th>Durum</th><th></th></tr>
       </thead>
       <tbody>
         {% for i in issues %}
         <tr>
-          <td><a href="{{ url_for('gazete_oku', issue_id=i.id) }}" target="_blank">{{ i.title }}</a></td>
+          <td><a href="{{ url_for('admin.issue_edit', issue_id=i.id) }}">{{ i.title }}</a></td>
           <td>{{ i.no }}</td>
           <td>{{ i.date }}</td>
+          <td>
+            {% if i.status in ('published', 'archived') %}<span class="badge badge-lead">{{ status_labels.get(i.status, i.status) }}</span>
+            {% else %}<span class="badge badge-secondary">{{ status_labels.get(i.status, i.status) }}</span>{% endif %}
+          </td>
           <td class="admin-actions">
-            <form method="post" action="{{ url_for('admin.issue_delete', issue_id=i.id) }}" onsubmit="return confirm('Bu sayıyı silmek istediğinize emin misiniz?');">
-              <button class="btn btn-danger" type="submit">Sil</button>
-            </form>
+            <a class="btn btn-outline" href="{{ url_for('admin.issue_edit', issue_id=i.id) }}">Düzenle</a>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="4">Henüz sayı yok.</td></tr>
+        <tr><td colspan="5">Henüz sayı yok.</td></tr>
         {% endfor %}
       </tbody>
     </table>

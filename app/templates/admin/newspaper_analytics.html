@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Gazete Analitiği — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Gazete Analitiği — Genel Bakış</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.issues_list') }}">← Sayılara Dön</a>
+  </div>
+
+  <div class="admin-panel">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Sayı</th><th>Okuyucu</th><th>Oturum</th><th>Ort. Sayfa</th>
+          <th>Son Sayfaya Ulaşma</th><th>İndirme</th><th>Paylaşım</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for issue, summary in rows %}
+        <tr>
+          <td>Sayı {{ issue.no }} — {{ issue.title }}</td>
+          <td>{{ summary.opens }}</td>
+          <td>{{ summary.sessions }}</td>
+          <td>{{ summary.avg_pages_viewed }}</td>
+          <td>%{{ summary.completion_rate_pct }}</td>
+          <td>{{ summary.downloads }}</td>
+          <td>{{ summary.share_actions }}</td>
+          <td><a class="btn btn-outline" href="{{ url_for('admin.issue_analytics_view', issue_id=issue.id) }}">Detay</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8">Henüz analitik verisi yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="hint">
+    IP adresleri hiçbir zaman kaydedilmez. Okuyucular, hesaba veya kimliğe bağlı olmayan, rastgele
+    bir tarayıcı belirteci ile ayırt edilir — bkz. app/analytics.py.
+  </p>
+</div>
+
+{% endblock %}

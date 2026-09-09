@@ -57,6 +57,26 @@
       </div>
     </div>
 
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="issue_id">İlişkili Gazete Sayısı (opsiyonel)</label>
+        <select id="issue_id" name="issue_id">
+          <option value="">— Yok —</option>
+          {% for iss in issues %}
+          <option value="{{ iss.id }}" {{ 'selected' if article and article.issue_id == iss.id else '' }}>
+            Sayı {{ iss.no }} — {{ iss.title }}
+          </option>
+          {% endfor %}
+        </select>
+        <div class="hint">Seçilirse, makale sayfasında "Bu Haber Gazetede" kutusu ve gazete sayfasında "Bu Sayıdan" listesinde görünür.</div>
+      </div>
+      <div class="form-row">
+        <label for="issue_page">Gazete Sayfa No (opsiyonel)</label>
+        <input type="number" id="issue_page" name="issue_page" min="1"
+               value="{{ article.issue_page if article and article.issue_page else '' }}">
+      </div>
+    </div>
+
     <div class="form-row">
       <label>Yazar(lar)</label>
       {% if is_master %}

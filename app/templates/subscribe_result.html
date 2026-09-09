@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Abonelik — {{ site.name }}{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+
+<div class="section-header"><h1>Abonelik</h1></div>
+<p style="font-family: var(--font-sans); font-size: 15px; max-width: 560px;">
+  {{ message }}
+</p>
+<a class="btn btn-outline" href="{{ url_for('gazete') }}">Gazete Arşivine Dön</a>
+
+{% endblock %}

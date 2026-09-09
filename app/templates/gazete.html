@@ -1,5 +1,9 @@
 {% extends "base.html" %}
+{% from "_macros.html" import turnstile_widget %}
 {% block title %}Gazete Arşivi (PDF) — {{ site.name }}{% endblock %}
+{% block meta_description %}The Eurovillage Herald'ın tüm sayılarını PDF olarak okuyun.{% endblock %}
+{% block og_title %}Gazete Arşivi — {{ site.name }}{% endblock %}
+{% if issues %}{% block og_image %}<meta property="og:image" content="{{ media_url(issues[0].cover_image, 'img/articles', external=True) }}">{% endblock %}{% endif %}
 {% block content %}
 
 <div class="section-header"><h1>Gazete Arşivi</h1></div>
@@ -16,12 +20,16 @@
     {% if i.cover_image %}
       <img src="{{ media_url(i.cover_image, 'img/articles') }}" alt="{{ i.title }}">
     {% else %}
-      <img src="{{ url_for('static', filename='img/articles/obgis-baskan-konusma.jpg') }}" alt="{{ i.title }}">
+      <div class="issue-card-noimg">SAYI {{ i.no }}</div>
     {% endif %}
     <div class="issue-card-body">
-      <span class="kicker">SAYI {{ i.no }}</span>
+      <span class="kicker">
+        SAYI {{ i.no }}
+        {% if i.issue_type and i.issue_type != 'regular' %}· {{ type_labels.get(i.issue_type, i.issue_type) }}{% endif %}
+      </span>
       <h3>{{ i.title }}</h3>
       <p>{{ i.date }}{% if i.pages %} · {{ i.pages }} sayfa{% endif %}</p>
+      {% if i.description %}<p class="issue-card-desc">{{ i.description[:140] }}{% if i.description|length > 140 %}…{% endif %}</p>{% endif %}
       <a class="btn btn-red" href="{{ url_for('gazete_oku', issue_id=i.id) }}">PDF'i Oku</a>
     </div>
   </div>
@@ -30,5 +38,18 @@
 {% else %}
 <p class="section-empty">Henüz yüklenmiş bir sayı yok.</p>
 {% endif %}
+
+<div class="subscribe-widget">
+  <div class="subscribe-widget-text">
+    <strong>Yeni sayı yayımlandığında haberdar olun.</strong>
+    <p>E-posta adresinizi bırakın, yeni bir sayı çıktığında size haber verelim.</p>
+  </div>
+  <form method="post" action="{{ url_for('subscribe_submit') }}" class="subscribe-widget-form">
+    <input type="email" name="email" placeholder="e-posta adresiniz" required maxlength="200">
+    <input type="hidden" name="pref_new_issue" value="1">
+    <div style="margin: 10px 0;">{{ turnstile_widget() }}</div>
+    <button class="btn btn-red" type="submit">Abone Ol</button>
+  </form>
+</div>
 
 {% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Editöryal Taslaklar — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Editöryal Taslaklar ({{ drafts|length }})</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.issues_list') }}">← Sayılara Dön</a>
+  </div>
+
+  <p class="hint">
+    Bu taslaklar otomatik olarak hazırlanır (yeni sayı duyurusu, bülten girişi, sosyal medya metni vb.)
+    ama hiçbir zaman kendiliğinden yayımlanmaz veya gönderilmez — her biri elle incelenmeli ve
+    kullanılacaksa ilgili yerde (sosyal medya, bülten aracı vb.) elle kullanılmalıdır.
+  </p>
+
+  <div class="admin-panel">
+    <table class="admin-table">
+      <thead><tr><th>Başlık</th><th>Tür</th><th>Oluşturulma</th><th>Durum</th><th></th></tr></thead>
+      <tbody>
+        {% for d in drafts %}
+        <tr>
+          <td>{{ d.title }}</td>
+          <td>{{ d.kind }}</td>
+          <td>{{ d.created_at[:16].replace('T',' ') if d.created_at else '' }}</td>
+          <td>
+            {% if d.status == 'draft' %}<span class="badge badge-secondary">Taslak</span>
+            {% elif d.status == 'published' %}<span class="badge badge-lead">Kullanıldı</span>
+            {% else %}<span class="badge">Reddedildi</span>{% endif %}
+          </td>
+          <td class="admin-actions">
+            <a class="btn btn-outline" href="{{ url_for('admin.draft_view', draft_id=d.id) }}">Görüntüle</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">Henüz taslak yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

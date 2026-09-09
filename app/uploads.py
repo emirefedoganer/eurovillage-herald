@@ -60,6 +60,14 @@ def _file_size(file):
     return size
 
 
+def file_size(file):
+    """Public wrapper -- lets app.py record an issue PDF's byte size
+    (issue.file_size) without duplicating the seek/tell dance above."""
+    if not file or not file.filename:
+        return None
+    return _file_size(file)
+
+
 def validate_image(file):
     """Returns an error message (in Turkish, ready to flash) if `file` isn't
     an acceptable image upload, else None. Does not treat a missing file as

@@ -20,6 +20,9 @@ ROLES_PATH = os.path.join(DATA_DIR, "roles.json")
 ADS_PATH = os.path.join(DATA_DIR, "ads.json")
 AD_PLACEMENTS_PATH = os.path.join(DATA_DIR, "ad_placements.json")
 MANAGEMENT_PATH = os.path.join(DATA_DIR, "newspaper_management.json")
+ISSUE_SUBSCRIPTIONS_PATH = os.path.join(DATA_DIR, "issue_subscriptions.json")
+ISSUE_ANALYTICS_PATH = os.path.join(DATA_DIR, "issue_analytics.json")
+EDITORIAL_DRAFTS_PATH = os.path.join(DATA_DIR, "editorial_drafts.json")
 
 TR_MAP = str.maketrans({
     "ç": "c", "Ç": "c", "ğ": "g", "Ğ": "g", "ı": "i", "I": "i",
@@ -132,12 +135,156 @@ def save_articles(articles):
     _save(ARTICLES_PATH, articles)
 
 
+# --------------------------------------------------------------- issues --
+# Newspaper issues, extended from a bare PDF record into a structured
+# publishing entity -- same self-healing/restart-safe pattern already used
+# for articles (see load_articles() above): every existing field
+# (id/no/title/date/description/cover_image/pdf/pages) is left exactly as
+# it was, new fields are only ever ADDED with a safe default, and a
+# "scheduled" issue whose publish_at has passed flips to "published" on
+# every single read -- no timer, no background job, no in-process
+# scheduler that wouldn't survive a Railway restart.
+
+ISSUE_STATUSES = ["draft", "in_review", "ready", "scheduled", "published", "archived"]
+# "archived" is deliberately public, unlike games' "archived" (which hides
+# the item entirely): the newspaper archive page's whole purpose is being
+# a permanent public archive of past issues, so retiring an issue from
+# "current" doesn't mean hiding it -- there's no real-world newspaper
+# where last year's issue vanishes from the archive.
+ISSUE_PUBLIC_STATUSES = {"published", "archived"}
+ISSUE_TYPES = ["regular", "special", "election_special"]
+
+
+def _iso_from_date(date_str):
+    """Best-effort 'YYYY-MM-DD' -> a UTC-midnight ISO timestamp, used only
+    to backfill created_at/published_at for issues that predate those
+    fields (so they get a real, sortable timestamp instead of None)."""
+    if not date_str:
+        return None
+    from datetime import datetime, timezone
+    try:
+        dt = datetime.strptime(date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return None
+
+
 def load_issues():
-    return _load(ISSUES_PATH, [])
+    issues = _load(ISSUES_PATH, [])
+    changed = False
+    now = _utcnow()
+    for i in issues:
+        just_flipped = False
+        if not i.get("slug"):
+            # The existing `id` is already unique and URL-safe (e.g.
+            # "sayi-01-secim-ozel") -- reusing it as the slug means every
+            # existing /gazete/<id> link keeps working unchanged.
+            i["slug"] = i["id"]
+            changed = True
+        if not i.get("status"):
+            i["status"] = "published"  # every pre-existing issue was already public
+            changed = True
+        if not i.get("issue_type"):
+            i["issue_type"] = "regular"
+            changed = True
+        if "editor_note" not in i:
+            i["editor_note"] = ""  # internal-only, never rendered publicly
+            changed = True
+        if "publish_at" not in i:
+            i["publish_at"] = None
+            changed = True
+        if not i.get("created_at"):
+            i["created_at"] = _iso_from_date(i.get("date")) or _audit_timestamp()
+            changed = True
+        if not i.get("updated_at"):
+            i["updated_at"] = i["created_at"]
+            changed = True
+        if not i.get("published_at") and i.get("status") in ISSUE_PUBLIC_STATUSES:
+            i["published_at"] = _iso_from_date(i.get("date")) or i["created_at"]
+            changed = True
+        for key in ("preview_token_hash", "preview_token_expires_at", "preview_token_created_at"):
+            if key not in i:
+                i[key] = None
+                changed = True
+        if "file_size" not in i:
+            # Populated at upload time going forward (see uploads.py); not
+            # worth a live R2 HEAD request just to backfill this for
+            # pre-existing issues -- that would put network I/O in a read
+            # path that runs on every page load.
+            i["file_size"] = None
+            changed = True
+        if i.get("status") == "scheduled":
+            publish_at = _parse_iso(i.get("publish_at"))
+            if publish_at and publish_at <= now:
+                i["status"] = "published"
+                i["published_at"] = _audit_timestamp()
+                just_flipped = True
+                changed = True
+        if "announcement_sent_at" not in i:
+            # A pre-existing issue that was already published/archived
+            # before this field existed must NOT retroactively fire a
+            # "new issue" notification/draft the first time this code
+            # runs -- so it's immediately marked as already-handled. An
+            # issue that just auto-flipped from scheduled THIS pass is
+            # left None instead, so app.py's publish-hook (which treats
+            # "published with announcement_sent_at still None" as "fire
+            # the hook, then stamp this field") picks it up on the very
+            # next relevant request.
+            if i.get("status") in ISSUE_PUBLIC_STATUSES and not just_flipped:
+                i["announcement_sent_at"] = i.get("published_at") or i.get("created_at")
+            else:
+                i["announcement_sent_at"] = None
+            changed = True
+    if changed:
+        _save(ISSUES_PATH, issues)
+    return issues
 
 
 def save_issues(issues):
     _save(ISSUES_PATH, issues)
+
+
+def is_issue_public(issue, now=None):
+    """The single place that decides whether an issue is visible to an
+    ordinary visitor right now -- mirrors is_article_public()."""
+    status = issue.get("status", "published")
+    if status in ISSUE_PUBLIC_STATUSES:
+        return True
+    if status == "scheduled":
+        publish_at = _parse_iso(issue.get("publish_at"))
+        return bool(publish_at and publish_at <= (now or _utcnow()))
+    return False
+
+
+def public_issues(issues):
+    now = _utcnow()
+    return [i for i in issues if is_issue_public(i, now)]
+
+
+def all_issues_sorted(published_only=False):
+    items = load_issues()
+    if published_only:
+        items = public_issues(items)
+    items.sort(key=lambda i: i.get("date", ""), reverse=True)
+    return items
+
+
+def get_issue_by_preview_token(token):
+    """Mirrors get_article_by_preview_token() exactly -- same hash
+    function, same expiry semantics, same "missing/wrong/expired/revoked
+    are indistinguishable" behavior. Ignores publish status by design:
+    previewing a draft/scheduled issue by its token is the entire point."""
+    if not token:
+        return None
+    token_hash = hash_preview_token(token)
+    now = _utcnow()
+    for i in load_issues():
+        if i.get("preview_token_hash") == token_hash:
+            expires_at = _parse_iso(i.get("preview_token_expires_at"))
+            if expires_at and expires_at <= now:
+                return None
+            return i
+    return None
 
 
 def load_site():
@@ -247,9 +394,15 @@ def all_articles_sorted(published_only=False):
     return items
 
 
-def get_issue(issue_id):
+def get_issue(issue_id, published_only=False):
+    """Looks up by id OR slug -- in practice the same value for every
+    issue today (see load_issues()'s self-heal), kept as two checks so a
+    future issue with a slug that legitimately diverges from its id still
+    resolves via either one."""
     for i in load_issues():
-        if i["id"] == issue_id:
+        if i["id"] == issue_id or i.get("slug") == issue_id:
+            if published_only and not is_issue_public(i):
+                return None
             return i
     return None
 
@@ -544,6 +697,18 @@ def articles_by_author(author_id, exclude_slug=None, published_only=False):
     return items
 
 
+def articles_by_issue(issue_id, published_only=False):
+    """Powers 'Bu Sayıdan' on the issue reader page. Sorted by the
+    article's newspaper page number where set (articles without one --
+    the association is entirely optional -- sort after those that have
+    one, then fall back to date)."""
+    items = [a for a in load_articles() if a.get("issue_id") == issue_id]
+    if published_only:
+        items = public_articles(items)
+    items.sort(key=lambda a: (a.get("issue_page") is None, a.get("issue_page") or 0, a.get("date", "")))
+    return items
+
+
 # --------------------------------------------------------------- audit log --
 
 def load_audit_log():
@@ -689,3 +854,100 @@ def active_management_entries():
         [e for e in load_management() if e.get("active")],
         key=lambda e: e.get("display_order", 0),
     )
+
+
+# --------------------------------------------------------- issue subscriptions --
+# "Let me know when a new issue is published." Double opt-in: a new
+# signup is "pending" until the confirm link is clicked, and only
+# "confirmed" subscribers are ever notified. Two separate tokens per
+# record -- confirm (short-lived, single use) and unsubscribe (long-lived,
+# unrelated to whether the subscription is even confirmed yet) -- neither
+# is ever stored in plaintext, same hash-only pattern as article/issue
+# preview tokens (see hash_preview_token()).
+
+def load_subscriptions():
+    return _load(ISSUE_SUBSCRIPTIONS_PATH, [])
+
+
+def save_subscriptions(subs):
+    _save(ISSUE_SUBSCRIPTIONS_PATH, subs)
+
+
+def get_subscription_by_email(email):
+    if not email:
+        return None
+    email = email.strip().lower()
+    for s in load_subscriptions():
+        if s["email"].strip().lower() == email:
+            return s
+    return None
+
+
+def get_subscription_by_id(sub_id):
+    return _by_id(load_subscriptions(), sub_id)
+
+
+def get_subscription_by_confirm_token(token):
+    if not token:
+        return None
+    token_hash = hash_preview_token(token)
+    now = _utcnow()
+    for s in load_subscriptions():
+        if s.get("confirm_token_hash") == token_hash:
+            expires_at = _parse_iso(s.get("confirm_token_expires_at"))
+            if expires_at and expires_at <= now:
+                return None
+            return s
+    return None
+
+
+def confirmed_subscribers(preference_key):
+    """Confirmed, still-subscribed emails opted into `preference_key`
+    (e.g. 'new_issue'). Used by the publish-notification hook -- never
+    returns anything for a pending or unsubscribed record."""
+    return [
+        s for s in load_subscriptions()
+        if s.get("status") == "confirmed" and (s.get("preferences") or {}).get(preference_key)
+    ]
+
+
+# ------------------------------------------------------------ issue analytics --
+# Aggregate-only, privacy-conscious counters per issue -- see app/analytics.py
+# for the recording/derived-stats logic. Deliberately NOT a raw per-event
+# log (which would grow unbounded in a flat JSON file with no real
+# forensic value for a small newsroom); every event updates one compact
+# per-issue counter record instead.
+
+def load_issue_analytics():
+    return _load(ISSUE_ANALYTICS_PATH, {})
+
+
+def save_issue_analytics(data):
+    _save(ISSUE_ANALYTICS_PATH, data)
+
+
+# --------------------------------------------------------------- editorial drafts --
+# AI/automation-prepared drafts (issue announcements, newsletter intros,
+# social copy, ...). See app/drafts.py for generation. These are ALWAYS
+# created with status "draft" and require an explicit human "Yayımla"
+# action in the admin panel -- nothing in this module or drafts.py ever
+# flips a draft to "published" on its own.
+
+def load_drafts():
+    return _load(EDITORIAL_DRAFTS_PATH, [])
+
+
+def save_drafts(drafts):
+    _save(EDITORIAL_DRAFTS_PATH, drafts)
+
+
+def get_draft(draft_id):
+    return _by_id(load_drafts(), draft_id)
+
+
+def draft_exists(dedup_key):
+    """True if a draft with this dedup_key was already generated --
+    dedup_key is normally f'{kind}:{issue_id}', so re-running the
+    publish-hook logic (e.g. after a redeploy retries a half-finished
+    request) never creates a second copy of the same announcement draft."""
+    return any(d.get("dedup_key") == dedup_key for d in load_drafts())

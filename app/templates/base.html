@@ -5,7 +5,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}{{ site.name }}{% endblock %}</title>
-<meta name="description" content="{{ site.tagline }}">
+<meta name="description" content="{% block meta_description %}{{ site.tagline }}{% endblock %}">
+<link rel="canonical" href="{% block canonical_url %}{{ request.url }}{% endblock %}">
+<meta property="og:site_name" content="{{ site.name }}">
+<meta property="og:type" content="{% block og_type %}website{% endblock %}">
+<meta property="og:title" content="{% block og_title %}{{ site.name }}{% endblock %}">
+<meta property="og:description" content="{% block og_description %}{{ site.tagline }}{% endblock %}">
+<meta property="og:url" content="{% block og_url %}{{ request.url }}{% endblock %}">
+{% block og_image %}{% endblock %}
+<meta name="twitter:card" content="{% block twitter_card %}summary{% endblock %}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Noto+Serif:ital,wght@0,400;0,500;0,600;0,700;0,900;1,400;1,700&family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&family=Libre+Franklin:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
@@ -119,7 +127,7 @@
       <p>For further information about Eurovillage, please visit <a href="{{ site.eurovillage_site_url }}" target="_blank" rel="noopener">www.eurovillagebb.com</a>.</p>
     </div>
 
-    <div class="footer-credit">Website by <a href="{{ site.credit_url }}" target="_blank" rel="noopener">{{ site.credit_name }}</a></div>
+    <div class="footer-credit">Website by <a href="{{ site.credit_url }}" target="_blank" rel="noopener">{{ site.credit_name }}</a> · v{{ app_version }}</div>
   </div>
 </footer>
 

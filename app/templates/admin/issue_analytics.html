@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Analitik — {{ issue.title }} — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Sayı {{ issue.no }} — Analitik</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.issue_edit', issue_id=issue.id) }}">← Sayıya Dön</a>
+  </div>
+
+  <div class="admin-stat-grid">
+    <div class="admin-stat-card"><span class="n">{{ summary.opens }}</span><span class="l">Okuyucu</span></div>
+    <div class="admin-stat-card"><span class="n">{{ summary.sessions }}</span><span class="l">Okuma Oturumu</span></div>
+    <div class="admin-stat-card"><span class="n">{{ summary.avg_pages_viewed }}</span><span class="l">Ort. Görüntülenen Sayfa</span></div>
+    <div class="admin-stat-card"><span class="n">%{{ summary.completion_rate_pct }}</span><span class="l">Son Sayfaya Ulaşma</span></div>
+    <div class="admin-stat-card"><span class="n">{{ summary.downloads }}</span><span class="l">PDF İndirme</span></div>
+    <div class="admin-stat-card"><span class="n">{{ summary.share_actions }}</span><span class="l">Paylaşım</span></div>
+    <div class="admin-stat-card"><span class="n">{{ summary.cta_clicks }}</span><span class="l">"Gazetede Oku" Tıklaması</span></div>
+  </div>
+
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); margin-top:0;">Cihaz Dağılımı</h2>
+    <table class="admin-table">
+      <tbody>
+        {% for device, count in summary.devices.items() %}
+        <tr><td>{{ device }}</td><td>{{ count }}</td></tr>
+        {% else %}
+        <tr><td>Henüz veri yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); margin-top:0;">En Çok Gelinen Kaynaklar</h2>
+    <table class="admin-table">
+      <tbody>
+        {% for host, count in summary.top_referrers %}
+        <tr><td>{{ host }}</td><td>{{ count }}</td></tr>
+        {% else %}
+        <tr><td>Henüz veri yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="hint">
+    Bu istatistikler, kimliği tanımlanamayan, rastgele tarayıcı belirteçleri üzerinden toplanır —
+    IP adresi hiçbir zaman kaydedilmez ve hiçbir okuyucu kişisel olarak tanımlanamaz.
+  </p>
+</div>
+
+{% endblock %}

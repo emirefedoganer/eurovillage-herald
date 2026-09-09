@@ -1,28 +1,67 @@
 {% extends "base.html" %}
 {% block title %}{{ issue.title }} — {{ site.name }}{% endblock %}
+{% block meta_description %}{{ issue.description or (site.name ~ ' — Sayı ' ~ issue.no) }}{% endblock %}
+{% block og_title %}{{ issue.title }} — Sayı {{ issue.no }}{% endblock %}
+{% block og_description %}{{ issue.description or (site.name ~ ' gazete arşivi.') }}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_image %}
+{% if issue.cover_image %}<meta property="og:image" content="{{ media_url(issue.cover_image, 'img/articles', external=True) }}">
+<meta name="twitter:card" content="summary_large_image">{% endif %}
+{% endblock %}
+{% block extra_head %}
+{% if is_preview %}<meta name="robots" content="noindex, nofollow">{% endif %}
+{% endblock %}
 {% block content %}
+
+{% if is_preview %}
+<div class="preview-banner">
+  {% if issue.status == 'scheduled' %}
+  Bu bir ÖNİZLEMEdir — sayı {{ to_editorial_display(issue.publish_at) }} ({{ editorial_timezone_name }}) tarihinde otomatik yayımlanacak şekilde zamanlanmış. Henüz herkese açık değil.
+  {% else %}
+  Bu bir ÖNİZLEMEdir — sayı henüz "{{ status_labels.get(issue.status, issue.status) }}" durumunda ve herkese açık değil.
+  {% endif %}
+</div>
+{% endif %}
 
 <div class="reader-layout">
   <div class="reader-frame-wrap">
     <div class="pdf-toolbar">
+      <button type="button" id="pdfThumbsToggle" class="pdf-btn" aria-label="Sayfa küçük resimlerini göster/gizle" aria-pressed="false" title="Sayfalar">☰</button>
       <button type="button" id="pdfPrev" class="pdf-btn" aria-label="Önceki sayfa">‹</button>
-      <span id="pdfPageInfo" class="pdf-page-info">Yükleniyor…</span>
+      <span id="pdfPageInfo" class="pdf-page-info" aria-live="polite">Yükleniyor…</span>
       <button type="button" id="pdfNext" class="pdf-btn" aria-label="Sonraki sayfa">›</button>
+      <form id="pdfGotoForm" class="pdf-goto-form" aria-label="Sayfaya git">
+        <input type="number" id="pdfGotoInput" min="1" aria-label="Sayfa numarası" inputmode="numeric">
+        <button type="submit" class="pdf-btn" aria-label="Git">Git</button>
+      </form>
       <span class="pdf-toolbar-spacer"></span>
+      <button type="button" id="pdfFitWidth" class="pdf-btn" aria-label="Genişliğe sığdır" title="Genişliğe Sığdır">⬌</button>
+      <button type="button" id="pdfFitPage" class="pdf-btn" aria-label="Sayfaya sığdır" title="Sayfaya Sığdır">⬍</button>
       <button type="button" id="pdfZoomOut" class="pdf-btn" aria-label="Uzaklaştır">−</button>
       <span id="pdfZoomLevel" class="pdf-page-info">100%</span>
       <button type="button" id="pdfZoomIn" class="pdf-btn" aria-label="Yakınlaştır">+</button>
+      <button type="button" id="pdfFullscreen" class="pdf-btn" aria-label="Tam ekran" title="Tam Ekran">⛶</button>
+      <button type="button" id="pdfShare" class="pdf-btn" aria-label="Bu sayfayı paylaş" title="Paylaş">↗</button>
     </div>
-    <div class="pdf-viewport" id="pdfViewport">
-      <canvas id="pdfCanvas"></canvas>
+    <div class="pdf-body">
+      <div id="pdfThumbs" class="pdf-thumbs" hidden aria-label="Sayfa küçük resimleri"></div>
+      <div class="pdf-viewport" id="pdfViewport" tabindex="0" aria-label="PDF görüntüleyici, sol/sağ ok tuşlarıyla gezinebilirsiniz">
+        <canvas id="pdfCanvas"></canvas>
+      </div>
     </div>
   </div>
   <aside class="reader-side">
-    <span class="kicker">SAYI {{ issue.no }}</span>
+    <span class="kicker">
+      SAYI {{ issue.no }}
+      {% if issue.issue_type and issue.issue_type != 'regular' %}· {{ type_labels.get(issue.issue_type, issue.issue_type) }}{% endif %}
+    </span>
     <h1>{{ issue.title }}</h1>
-    <div class="issue-date">{{ issue.date }}{% if issue.pages %} · {{ issue.pages }} sayfa{% endif %}</div>
+    <div class="issue-date">
+      {{ issue.date }}{% if issue.pages %} · {{ issue.pages }} sayfa{% endif %}
+      {% if issue.file_size %} · {{ (issue.file_size / 1048576) | round(1) }} MB{% endif %}
+    </div>
     <p style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">{{ issue.description }}</p>
-    <a class="btn btn-outline" style="margin-top: 10px;" href="{{ media_url(issue.pdf, 'issues') }}" download>PDF'i İndir</a>
+    <a class="btn btn-outline" style="margin-top: 10px;" id="pdfDownloadLink" href="{{ media_url(issue.pdf, 'issues') }}" download>PDF'i İndir</a>
     <a class="btn btn-outline" style="margin-top: 10px;" href="{{ media_url(issue.pdf, 'issues') }}" target="_blank" rel="noopener">Yeni Sekmede Aç</a>
 
     {% if others %}
@@ -38,23 +77,50 @@
   </aside>
 </div>
 
+{% if related_articles %}
+<div class="issue-articles-block">
+  <h2 class="rail-title">Bu Sayıdan</h2>
+  <div class="issue-articles-list">
+    {% for a in related_articles %}
+    <div class="issue-article-card">
+      {% if a.issue_page %}<span class="page-badge">s. {{ a.issue_page }}</span>{% endif %}
+      <h4><a href="{{ url_for('article_page', slug=a.slug) }}">{{ a.title }}</a></h4>
+      {% if a.dek %}<p class="hint" style="margin:0;">{{ a.dek }}</p>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<script src="{{ versioned_static('js/newspaper-analytics.js') }}"></script>
 <script type="module">
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.2.108/pdf.worker.min.mjs";
 
+const ISSUE_ID = {{ issue.id|tojson }};
+const IS_PREVIEW = {{ 'true' if is_preview else 'false' }};
 const url = {{ media_url(issue.pdf, 'issues')|tojson }};
+const LAST_PAGE_KEY = "eh_reader_last_page:" + ISSUE_ID;
+
 const canvas = document.getElementById('pdfCanvas');
 const ctx = canvas.getContext('2d');
-const viewport_el = document.getElementById('pdfViewport');
+const viewportEl = document.getElementById('pdfViewport');
 const pageInfo = document.getElementById('pdfPageInfo');
 const zoomLevel = document.getElementById('pdfZoomLevel');
+const gotoForm = document.getElementById('pdfGotoForm');
+const gotoInput = document.getElementById('pdfGotoInput');
+const thumbsPanel = document.getElementById('pdfThumbs');
+const thumbsToggle = document.getElementById('pdfThumbsToggle');
 
 let pdfDoc = null;
 let pageNum = 1;
 let baseScale = 1;
 let zoomFactor = 1;
+let fitMode = 'width'; // 'width' | 'page'
 let rendering = false;
 let pendingPage = null;
+let maxPageReached = 1;
+let thumbsRendered = false;
 
 function showPdfError(err) {
   // The PDF itself is public and reachable directly (the "PDF'i indir" /
@@ -62,9 +128,7 @@ function showPdfError(err) {
   // a cross-origin fetch() with Range requests, which the browser blocks
   // unless the bucket's CORS policy allows this site's origin (see
   // CLOUDFLARE_SETUP.md §2 step 9). A failure on a cross-origin URL is
-  // almost always that, not a broken/missing file, so log a pointer to it
-  // for whoever's debugging -- console only, the visitor-facing message
-  // stays simple and just offers the direct link either way.
+  // almost always that, not a broken/missing file.
   try {
     const isCrossOrigin = new URL(url, window.location.href).origin !== window.location.origin;
     if (isCrossOrigin) {
@@ -79,21 +143,50 @@ function showPdfError(err) {
   } catch (_) {
     console.error('PDF.js could not load ' + url, err);
   }
-  viewport_el.innerHTML = '<div style="padding:40px; text-align:center; font-family: var(--font-sans);"><p>PDF yüklenemedi.</p><a class="btn btn-red" href="' + url + '">PDF\'i indir</a></div>';
+  viewportEl.innerHTML = '<div style="padding:40px; text-align:center; font-family: var(--font-sans);"><p>PDF yüklenemedi.</p><a class="btn btn-red" href="' + url + '">PDF\'i indir</a></div>';
 }
 
-function renderPage(num) {
+function computeBaseScale(page) {
+  const unscaled = page.getViewport({ scale: 1 });
+  const containerWidth = viewportEl.clientWidth - 32;
+  const containerHeight = viewportEl.clientHeight - 32;
+  const widthScale = Math.max(0.2, containerWidth / unscaled.width);
+  if (fitMode === 'page') {
+    const heightScale = Math.max(0.2, containerHeight / unscaled.height);
+    return Math.min(widthScale, heightScale);
+  }
+  return widthScale;
+}
+
+function updateHashForPage(num) {
+  const newHash = '#page=' + num;
+  if (window.location.hash !== newHash) {
+    history.replaceState(null, '', newHash);
+  }
+}
+
+function renderPage(num, opts) {
+  opts = opts || {};
   if (rendering) { pendingPage = num; return; }
   rendering = true;
   pdfDoc.getPage(num).then(function (page) {
+    if (opts.recomputeScale) {
+      baseScale = computeBaseScale(page);
+    }
     const viewport = page.getViewport({ scale: baseScale * zoomFactor });
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     const renderTask = page.render({ canvasContext: ctx, viewport: viewport });
     return renderTask.promise.then(function () {
       rendering = false;
+      pageNum = num;
+      maxPageReached = Math.max(maxPageReached, num);
       pageInfo.textContent = num + ' / ' + pdfDoc.numPages;
+      gotoInput.value = num;
       zoomLevel.textContent = Math.round(zoomFactor * 100) + '%';
+      updateHashForPage(num);
+      try { localStorage.setItem(LAST_PAGE_KEY, String(num)); } catch (e) {}
+      setActiveThumb(num);
       if (pendingPage !== null) {
         const next = pendingPage;
         pendingPage = null;
@@ -106,38 +199,190 @@ function renderPage(num) {
   });
 }
 
-pdfjsLib.getDocument({ url: url }).promise.then(function (doc) {
-  pdfDoc = doc;
-  return doc.getPage(1).then(function (page) {
-    const unscaled = page.getViewport({ scale: 1 });
-    const containerWidth = viewport_el.clientWidth - 32;
-    baseScale = Math.max(0.2, containerWidth / unscaled.width);
-    pageNum = 1;
-    renderPage(pageNum);
+function goToPage(num) {
+  if (!pdfDoc) return;
+  num = Math.max(1, Math.min(pdfDoc.numPages, Math.round(num) || 1));
+  if (num === pageNum) return;
+  renderPage(num);
+}
+
+// ---- thumbnails (rendered lazily, once, the first time the panel opens --
+// keeps the reader light for anyone who never opens it) ----
+function renderThumbnails() {
+  if (thumbsRendered || !pdfDoc) return;
+  thumbsRendered = true;
+  for (let n = 1; n <= pdfDoc.numPages; n++) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pdf-thumb';
+    btn.setAttribute('data-page', n);
+    btn.setAttribute('aria-label', 'Sayfa ' + n + "'e git");
+    btn.textContent = n;
+    btn.addEventListener('click', function () { goToPage(n); });
+    thumbsPanel.appendChild(btn);
+    pdfDoc.getPage(n).then(function (page) {
+      const vp = page.getViewport({ scale: 1 });
+      const scale = 110 / vp.width;
+      const thumbViewport = page.getViewport({ scale: scale });
+      const c = document.createElement('canvas');
+      c.width = thumbViewport.width;
+      c.height = thumbViewport.height;
+      page.render({ canvasContext: c.getContext('2d'), viewport: thumbViewport }).promise.then(function () {
+        btn.insertBefore(c, btn.firstChild);
+      });
+    });
+  }
+}
+
+function setActiveThumb(num) {
+  if (!thumbsRendered) return;
+  thumbsPanel.querySelectorAll('.pdf-thumb').forEach(function (el) {
+    el.classList.toggle('active', Number(el.getAttribute('data-page')) === num);
   });
-}).catch(function (err) {
-  showPdfError(err);
+}
+
+thumbsToggle.addEventListener('click', function () {
+  const willShow = thumbsPanel.hidden;
+  thumbsPanel.hidden = !willShow;
+  thumbsToggle.setAttribute('aria-pressed', String(willShow));
+  if (willShow) { renderThumbnails(); setActiveThumb(pageNum); }
 });
 
-document.getElementById('pdfPrev').addEventListener('click', function () {
-  if (!pdfDoc || pageNum <= 1) return;
-  pageNum -= 1;
-  renderPage(pageNum);
+// ---- navigation controls ----
+document.getElementById('pdfPrev').addEventListener('click', function () { goToPage(pageNum - 1); });
+document.getElementById('pdfNext').addEventListener('click', function () { goToPage(pageNum + 1); });
+gotoForm.addEventListener('submit', function (e) {
+  e.preventDefault();
+  goToPage(parseInt(gotoInput.value, 10));
 });
-document.getElementById('pdfNext').addEventListener('click', function () {
-  if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
-  pageNum += 1;
-  renderPage(pageNum);
-});
+
 document.getElementById('pdfZoomIn').addEventListener('click', function () {
   if (!pdfDoc) return;
-  zoomFactor = Math.min(zoomFactor + 0.2, 2.5);
+  zoomFactor = Math.min(zoomFactor + 0.2, 3);
   renderPage(pageNum);
 });
 document.getElementById('pdfZoomOut').addEventListener('click', function () {
   if (!pdfDoc) return;
-  zoomFactor = Math.max(zoomFactor - 0.2, 0.4);
+  zoomFactor = Math.max(zoomFactor - 0.2, 0.3);
   renderPage(pageNum);
+});
+document.getElementById('pdfFitWidth').addEventListener('click', function () {
+  fitMode = 'width'; zoomFactor = 1;
+  renderPage(pageNum, { recomputeScale: true });
+});
+document.getElementById('pdfFitPage').addEventListener('click', function () {
+  fitMode = 'page'; zoomFactor = 1;
+  renderPage(pageNum, { recomputeScale: true });
+});
+
+document.getElementById('pdfFullscreen').addEventListener('click', function () {
+  const wrap = document.querySelector('.reader-frame-wrap');
+  if (!document.fullscreenElement) {
+    (wrap.requestFullscreen || wrap.webkitRequestFullscreen || function () {}).call(wrap);
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document);
+  }
+});
+document.addEventListener('fullscreenchange', function () {
+  if (document.fullscreenElement) { renderPage(pageNum, { recomputeScale: true }); }
+});
+
+// ---- keyboard navigation (left/right arrows) -- skipped while the user
+// is typing in a form field so it doesn't fight with e.g. the "go to
+// page" input or the site search box ----
+document.addEventListener('keydown', function (e) {
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.key === 'ArrowRight') goToPage(pageNum + 1);
+  else if (e.key === 'ArrowLeft') goToPage(pageNum - 1);
+});
+
+// ---- mobile swipe navigation ----
+let touchStartX = null;
+viewportEl.addEventListener('touchstart', function (e) {
+  touchStartX = e.changedTouches[0].clientX;
+}, { passive: true });
+viewportEl.addEventListener('touchend', function (e) {
+  if (touchStartX === null) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(dx) > 50) { dx < 0 ? goToPage(pageNum + 1) : goToPage(pageNum - 1); }
+  touchStartX = null;
+}, { passive: true });
+
+// ---- share current page ----
+function currentShareUrl() {
+  return window.location.origin + window.location.pathname + '#page=' + pageNum;
+}
+document.getElementById('pdfShare').addEventListener('click', function () {
+  const shareUrl = currentShareUrl();
+  EHAnalytics && EHAnalytics.send(ISSUE_ID, 'share', { page: pageNum });
+  if (navigator.share) {
+    navigator.share({ title: document.title, url: shareUrl }).catch(function () {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(shareUrl).then(function () {
+      const btn = document.getElementById('pdfShare');
+      const original = btn.textContent;
+      btn.textContent = '✓';
+      setTimeout(function () { btn.textContent = original; }, 1500);
+    });
+  }
+});
+
+document.getElementById('pdfDownloadLink').addEventListener('click', function () {
+  EHAnalytics && EHAnalytics.send(ISSUE_ID, 'download');
+});
+
+// ---- analytics: one "open" beacon on load, one session-summary beacon
+// on page close (never per-page-turn) -- see app/analytics.py ----
+if (!IS_PREVIEW && window.EHAnalytics) {
+  EHAnalytics.send(ISSUE_ID, 'acilis', {
+    reader_id: EHAnalytics.getReaderId(),
+    device: EHAnalytics.deviceCategory(),
+    referrer: document.referrer || '',
+  });
+  const sendSummary = function () {
+    EHAnalytics.send(ISSUE_ID, 'session_summary', {
+      max_page: maxPageReached,
+      total_pages: (pdfDoc && pdfDoc.numPages) || 0,
+    });
+  };
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') sendSummary();
+  });
+  window.addEventListener('pagehide', sendSummary);
+}
+
+// ---- initial page: URL fragment (#page=N) wins, then a remembered last
+// page for this issue (localStorage), else page 1 ----
+function initialPage(totalPages) {
+  const match = window.location.hash.match(/page=(\d+)/);
+  if (match) {
+    const n = parseInt(match[1], 10);
+    if (n >= 1 && n <= totalPages) return n;
+  }
+  try {
+    const remembered = parseInt(localStorage.getItem(LAST_PAGE_KEY), 10);
+    if (remembered >= 1 && remembered <= totalPages) return remembered;
+  } catch (e) {}
+  return 1;
+}
+
+window.addEventListener('hashchange', function () {
+  const match = window.location.hash.match(/page=(\d+)/);
+  if (match) goToPage(parseInt(match[1], 10));
+});
+
+pdfjsLib.getDocument({ url: url }).promise.then(function (doc) {
+  pdfDoc = doc;
+  gotoInput.max = doc.numPages;
+  return doc.getPage(1).then(function (page) {
+    baseScale = computeBaseScale(page);
+    const start = initialPage(doc.numPages);
+    maxPageReached = start;
+    renderPage(start);
+  });
+}).catch(function (err) {
+  showPdfError(err);
 });
 </script>
 

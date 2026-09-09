@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ draft.title }} — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>{{ draft.title }}</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.drafts_list') }}">← Taslaklara Dön</a>
+  </div>
+
+  <div class="admin-panel">
+    <p class="hint" style="margin-top:0;">
+      Bu metin {{ 'bir yapay zeka sağlayıcısı tarafından' if draft.generated_by == 'ai' else 'şablon tabanlı olarak otomatik' }}
+      hazırlandı{% if issue %}, Sayı {{ issue.no }} ({{ issue.title }}) için{% endif %}.
+      Hiçbir şey otomatik olarak yayımlanmadı veya gönderilmedi — aşağıdaki metni kopyalayıp
+      ilgili yerde (sosyal medya, bülten aracı, makale editörü vb.) elle kullanmanız gerekir.
+    </p>
+    <textarea readonly rows="20" style="width:100%; font-family: var(--font-sans); font-size:13.5px; padding:12px;">{{ draft.body }}</textarea>
+
+    <div class="form-actions" style="margin-top:16px;">
+      {% if draft.status == 'draft' %}
+      <form method="post" action="{{ url_for('admin.draft_mark_used', draft_id=draft.id) }}" style="display:inline;">
+        <button class="btn btn-red" type="submit">Kullanıldı Olarak İşaretle</button>
+      </form>
+      <form method="post" action="{{ url_for('admin.draft_discard', draft_id=draft.id) }}" style="display:inline;">
+        <button class="btn btn-outline" type="submit">Reddet</button>
+      </form>
+      {% else %}
+      <p class="hint">
+        {% if draft.status == 'published' %}Bu taslak {{ draft.reviewed_by }} tarafından kullanıldı olarak işaretlendi ({{ draft.reviewed_at[:16].replace('T',' ') if draft.reviewed_at else '' }}).
+        {% else %}Bu taslak reddedildi.{% endif %}
+      </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}

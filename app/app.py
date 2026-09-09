@@ -7,23 +7,33 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, abort, flash, jsonify, send_file, Response, g
-from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from itsdangerous import URLSafeTimedSerializer, URLSafeSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import ads
+import analytics
 import cf_access
+import drafts
 import editorial_tz
+import mailer
 import store
 import games_engine as ge
 import games_export
 import ratelimit
 import storage
+import subscriptions
 import turnstile
 import uploads
 from minecraft_service import MinecraftProfileService
 from sections import (
     SECTIONS, SECTION_ORDER, section_label, MAIN_SECTIONS, SPECIAL_SECTION_ROUTES,
 )
+
+# The single source of truth for the site's software version -- shown in
+# the admin footer and available to any template as `app_version`. Not to
+# be confused with site.json's `issue_no`/`issue_label`, which describe
+# the current PRINTED newspaper issue, a completely different concept.
+APP_VERSION = "1.0.1"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # These five are passed to uploads.py's save_*() functions purely as the
@@ -268,6 +278,7 @@ def inject_globals():
         "current_author": author,
         "author_preview_json": author_preview_json(),
         "publication_context": getattr(g, "publication_context", "main"),
+        "app_version": APP_VERSION,
     }
 
 
@@ -282,7 +293,7 @@ def author_preview_json():
     for a in store.active_authors():
         p = store.author_preview(a)
         if p["profile_image"]:
-            p["profile_image"] = url_for("static", filename="img/authors/" + p["profile_image"])
+            p["profile_image"] = media_url(p["profile_image"], "img/authors", external=False)
         previews.append(p)
     return _json.dumps(previews, ensure_ascii=False)
 
@@ -325,6 +336,7 @@ PERMISSION_CHOICES = [
     ("messages", "İletişim Mesajları"),
     ("site_settings", "Site Ayarları"),
     ("audit_log", "Denetim Kaydı"),
+    ("newspaper", "Gazete Sayıları (Yükleme, Yayın, Zamanlama)"),
 ]
 
 
@@ -470,8 +482,17 @@ def _render_article(article, is_preview=False):
     ) else None
     if article["section"] == "magazin":
         g.publication_context = "ari"
+    # "Bu Haber Gazetede" -- only ever shown for a PUBLIC issue, even if
+    # the article itself points at one that's since been unpublished/
+    # archived-away or was never finished; is_issue_public() is the same
+    # check the reader page itself uses.
+    linked_issue = None
+    if article.get("issue_id"):
+        candidate = store.get_issue(article["issue_id"])
+        if candidate and store.is_issue_public(candidate):
+            linked_issue = candidate
     return render_template("article.html", article=article, related=related, article_authors=article_authors,
-                            columnist=columnist, is_preview=is_preview)
+                            columnist=columnist, is_preview=is_preview, linked_issue=linked_issue)
 
 
 @app.route("/makale/<slug>")
@@ -718,19 +739,158 @@ def kurumsal():
     return render_template("kurumsal.html", entries=entries, authors_by_id=authors_by_id)
 
 
+def _render_issue_reader(issue, is_preview=False):
+    """Shared by the real reader page and the token-based preview route --
+    mirrors _render_article(). Both "others" (sidebar) and "Bu Sayıdan"
+    always go through published-only filtering regardless of which
+    caller this is, so a preview of a draft/scheduled issue never leaks
+    OTHER unpublished issues or draft articles."""
+    others = [i for i in store.load_issues() if i["id"] != issue["id"] and store.is_issue_public(i)]
+    related_articles = store.articles_by_issue(issue["id"], published_only=True)
+    return render_template(
+        "gazete_oku.html", issue=issue, others=others, related_articles=related_articles,
+        is_preview=is_preview, status_labels=ISSUE_STATUS_LABELS, type_labels=ISSUE_TYPE_LABELS,
+    )
+
+
 @app.route("/gazete")
 def gazete():
-    issues = sorted(store.load_issues(), key=lambda i: i["date"], reverse=True)
-    return render_template("gazete.html", issues=issues)
+    _process_due_issues()
+    issues = store.all_issues_sorted(published_only=True)
+    return render_template("gazete.html", issues=issues, type_labels=ISSUE_TYPE_LABELS)
 
 
 @app.route("/gazete/<issue_id>")
 def gazete_oku(issue_id):
-    issue = store.get_issue(issue_id)
+    _process_due_issues()
+    issue = store.get_issue(issue_id, published_only=True)
     if not issue:
         abort(404)
-    others = [i for i in store.load_issues() if i["id"] != issue_id]
-    return render_template("gazete_oku.html", issue=issue, others=others)
+    return _render_issue_reader(issue)
+
+
+@app.route("/gazete/onizleme/<token>")
+def gazete_preview(token):
+    """Mirrors /preview/<token> for articles exactly: a high-entropy,
+    never-guessable token (never a stored plaintext -- see
+    store.hash_preview_token()) that lets someone without a Herald
+    account view one specific unpublished issue and grants no admin
+    capability whatsoever."""
+    issue = store.get_issue_by_preview_token(token)
+    if not issue:
+        abort(404)
+    return _render_issue_reader(issue, is_preview=True)
+
+
+# ------------------------------------------------------- newspaper analytics --
+# See app/analytics.py's module docstring for exactly what is and isn't
+# collected. Every endpoint here: (1) rate-limits by remote address (the
+# address itself is never stored -- see ratelimit.py), (2) only records
+# against an issue that actually exists AND is currently public, so
+# these endpoints can never be used to probe for the existence of a
+# draft/scheduled issue by id.
+
+def _analytics_rate_limited():
+    return not ratelimit.allow(f"analytics:{request.remote_addr}", max_hits=60, window_seconds=60)
+
+
+@app.route("/api/gazete/<issue_id>/analitik/acilis", methods=["POST"])
+def api_issue_analytics_open(issue_id):
+    if _analytics_rate_limited():
+        return jsonify(ok=False), 429
+    issue = store.get_issue(issue_id, published_only=True)
+    if not issue:
+        return jsonify(ok=False), 404
+    payload = request.get_json(silent=True) or {}
+    reader_id = str(payload.get("reader_id") or "")[:64] or None
+    device = str(payload.get("device") or "")[:20]
+    referrer = str(payload.get("referrer") or "")[:300]
+    analytics.record_open(issue["id"], reader_id, device=device, referrer=referrer)
+    return jsonify(ok=True)
+
+
+@app.route("/api/gazete/<issue_id>/analitik/<event_type>", methods=["POST"])
+def api_issue_analytics_event(issue_id, event_type):
+    if event_type not in ("session_summary", "download", "share", "cta_click"):
+        abort(404)
+    if _analytics_rate_limited():
+        return jsonify(ok=False), 429
+    issue = store.get_issue(issue_id, published_only=True)
+    if not issue:
+        return jsonify(ok=False), 404
+    if event_type == "session_summary":
+        payload = request.get_json(silent=True) or {}
+        try:
+            max_page = int(payload.get("max_page", 0))
+            total_pages = int(payload.get("total_pages", 0))
+        except (TypeError, ValueError):
+            return jsonify(ok=False), 400
+        analytics.record_session_summary(issue["id"], max_page, total_pages)
+    else:
+        analytics.record_event(issue["id"], event_type)
+    return jsonify(ok=True)
+
+
+# ------------------------------------------------------------ subscriptions --
+# "Let me know when a new issue is published." See app/subscriptions.py's
+# module docstring for the double opt-in / unsubscribe-token design.
+
+@app.route("/abone-ol", methods=["POST"])
+def subscribe_submit():
+    redirect_to = request.referrer or url_for("gazete")
+    if not ratelimit.allow(f"subscribe:{request.remote_addr}", max_hits=5, window_seconds=600):
+        flash("Çok fazla deneme yapıldı. Lütfen bir süre sonra tekrar deneyin.", "error")
+        return redirect(redirect_to)
+
+    email = request.form.get("email", "")
+    errors = []
+    if not subscriptions.validate_email(email):
+        errors.append("Geçerli bir e-posta adresi girin.")
+    turnstile.check(errors, request.form, remote_ip=request.remote_addr)
+    if errors:
+        for e in errors:
+            flash(e, "error")
+        return redirect(redirect_to)
+
+    preferences = {key: bool(request.form.get(f"pref_{key}")) for key, _ in subscriptions.PREFERENCE_CHOICES}
+    sub, token = subscriptions.subscribe(email, preferences)
+    if sub and token:
+        confirm_url = url_for("subscribe_confirm", token=token, _external=True)
+        mailer.send(
+            sub["email"], "Abonelik Onayı — The Eurovillage Herald",
+            f"The Eurovillage Herald aboneliğinizi onaylamak için aşağıdaki bağlantıya tıklayın:\n\n{confirm_url}\n\n"
+            "Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz -- başka bir işlem gerekmez.",
+        )
+    # Same message whether the address was new, already pending, or
+    # already confirmed -- this form must never be usable to test which
+    # addresses are already subscribed.
+    flash("Abonelik isteğiniz alındı. E-postanıza gönderilen onay bağlantısına tıklayarak tamamlayın.", "success")
+    return redirect(redirect_to)
+
+
+@app.route("/abone-ol/onayla/<token>")
+def subscribe_confirm(token):
+    sub = subscriptions.confirm(token)
+    if not sub:
+        return render_template("subscribe_result.html", ok=False,
+                                message="Bu onay bağlantısı geçersiz veya süresi dolmuş.")
+    return render_template("subscribe_result.html", ok=True, message="Aboneliğiniz onaylandı. Teşekkürler!")
+
+
+@app.route("/abone-ol/cik/<token>", methods=["GET", "POST"])
+def unsubscribe_page(token):
+    """GET shows a confirmation page rather than acting immediately --
+    a bare state-changing GET behind an emailed link is exactly the kind
+    of request an email client's link-prefetcher or a security scanner
+    can trigger without the recipient ever clicking anything."""
+    sub_id = subscriptions.subscription_id_from_unsubscribe_token(app.secret_key, token)
+    if not sub_id:
+        abort(404)
+    if request.method == "POST":
+        subscriptions.unsubscribe(sub_id)
+        return render_template("subscribe_result.html", ok=True, message="Abonelikten çıkışınız tamamlandı.")
+    sub = store.get_subscription_by_id(sub_id)
+    return render_template("unsubscribe_confirm.html", email=sub["email"] if sub else None)
 
 
 @app.route("/ara")
@@ -1011,11 +1171,12 @@ def dashboard():
         my_articles = store.articles_by_author(author["id"]) if author else []
         return render_template("admin/author_dashboard.html", author=author, articles=my_articles, active="dashboard")
 
+    _process_due_issues()
     articles = store.all_articles_sorted()
-    issues = sorted(store.load_issues(), key=lambda i: i["date"], reverse=True)
+    issues = sorted(store.load_issues(), key=lambda i: i.get("date", ""), reverse=True)[:5]
     message_count = len(store.load_messages())
     return render_template("admin/dashboard.html", articles=articles, issues=issues,
-                            message_count=message_count, active="dashboard")
+                            message_count=message_count, status_labels=ISSUE_STATUS_LABELS, active="dashboard")
 
 
 MESSAGES_PER_PAGE = 10
@@ -1145,6 +1306,12 @@ def _article_form_to_dict(form, existing=None):
     body = text_to_body(form.get("body", ""))
     tags = [t.strip() for t in form.get("tags", "").split(",") if t.strip()]
 
+    issue_id = form.get("issue_id", "").strip() or None
+    if issue_id and not store.get_issue(issue_id):
+        issue_id = None  # a spoofed/stale id from the form is silently dropped, never trusted as-is
+    issue_page = form.get("issue_page", "").strip()
+    issue_page = int(issue_page) if issue_page.isdigit() and issue_id else None
+
     data = {
         "section": form.get("section"),
         "kicker": form.get("kicker", "").strip(),
@@ -1157,6 +1324,8 @@ def _article_form_to_dict(form, existing=None):
         "image_caption": form.get("image_caption", "").strip() or None,
         "tags": tags,
         "body": body,
+        "issue_id": issue_id,
+        "issue_page": issue_page,
     }
     _apply_publish_state(data, form, existing)
     return data
@@ -1257,7 +1426,8 @@ def article_new():
 
     authors = store.active_authors() if is_master else ([current_author] if current_author else [])
     return render_template("admin/edit_article.html", article=None, sections=SECTIONS, body_text="",
-                            authors=authors, is_master=is_master, publish_state_labels=PUBLISH_STATE_LABELS)
+                            authors=authors, is_master=is_master, publish_state_labels=PUBLISH_STATE_LABELS,
+                            issues=store.all_issues_sorted())
 
 
 @admin_bp.route("/makale/<slug>/duzenle", methods=["GET", "POST"])
@@ -1314,7 +1484,7 @@ def article_edit(slug):
     authors = store.active_authors() if is_master else store.resolve_article_authors(article)
     return render_template("admin/edit_article.html", article=article, sections=SECTIONS,
                             body_text=body_to_text(article.get("body")), authors=authors, is_master=is_master,
-                            publish_state_labels=PUBLISH_STATE_LABELS)
+                            publish_state_labels=PUBLISH_STATE_LABELS, issues=store.all_issues_sorted())
 
 
 def _publish_flash_message(data, updated=False):
@@ -1428,21 +1598,172 @@ def article_preview_revoke(slug):
     return redirect(url_for("admin.article_edit", slug=slug))
 
 
+ISSUE_STATUS_LABELS = {
+    "draft": "Taslak", "in_review": "İncelemede", "ready": "Hazır",
+    "scheduled": "Zamanlanmış", "published": "Yayında", "archived": "Arşivlendi",
+}
+ISSUE_TYPE_LABELS = {
+    "regular": "Normal Sayı", "special": "Özel Sayı", "election_special": "Seçim Özel Sayısı",
+}
+
+
+def _apply_issue_publish_state(data, form, existing=None):
+    """Same fallback philosophy as _apply_publish_state() for articles:
+    choosing "Zamanlanmış" (scheduled) with no usable date/time falls
+    back to Taslak (draft) rather than silently going live immediately.
+    An issue picked up mid-workflow (draft/in_review/ready) never leaks
+    publicly -- see store.is_issue_public()."""
+    choice = form.get("status", "published")
+    if choice not in store.ISSUE_STATUSES:
+        choice = "published"
+    if choice == "scheduled":
+        publish_at = editorial_tz.local_input_to_utc_iso(form.get("publish_at", ""))
+        if publish_at:
+            data["status"] = "scheduled"
+            data["publish_at"] = publish_at
+        else:
+            data["status"] = "draft"
+            data["publish_at"] = None
+    else:
+        data["status"] = choice
+        data["publish_at"] = None
+
+    if existing:
+        data["published_at"] = existing.get("published_at")
+        data["announcement_sent_at"] = existing.get("announcement_sent_at")
+        data["preview_token_hash"] = existing.get("preview_token_hash")
+        data["preview_token_expires_at"] = existing.get("preview_token_expires_at")
+        data["preview_token_created_at"] = existing.get("preview_token_created_at")
+    else:
+        data["published_at"] = None
+        data["announcement_sent_at"] = None
+        data["preview_token_hash"] = None
+        data["preview_token_expires_at"] = None
+        data["preview_token_created_at"] = None
+
+    # A manually-chosen "Published"/"Archived" (as opposed to arriving via
+    # the scheduled auto-flip in store.load_issues()) stamps published_at
+    # immediately if it isn't already set, so "when did this first go
+    # public" is always known regardless of which path got it there.
+    if data["status"] in store.ISSUE_PUBLIC_STATUSES and not data.get("published_at"):
+        data["published_at"] = _now_iso()
+    return data
+
+
+def _issue_publish_flash_message(data, updated=False):
+    verb = "güncellendi" if updated else "kaydedildi"
+    if data["status"] == "scheduled":
+        when = editorial_tz.utc_iso_to_local_display(data.get("publish_at"))
+        return f"Sayı {when} ({editorial_tz.EDITORIAL_TIMEZONE_NAME}) tarihinde otomatik yayımlanacak şekilde zamanlandı."
+    if data["status"] in store.ISSUE_PUBLIC_STATUSES:
+        return "Sayı yayımlandı." if not updated else "Sayı güncellendi ve yayında."
+    return f"Sayı {ISSUE_STATUS_LABELS.get(data['status'], data['status'])} olarak {verb}."
+
+
+def _audit_issue_schedule_change(actor_email, before, after):
+    was_scheduled = before.get("status") == "scheduled"
+    now_scheduled = after.get("status") == "scheduled"
+    if not was_scheduled and now_scheduled:
+        store.append_audit(actor_email, "issue_scheduled", after["title"], {"publish_at": after.get("publish_at")})
+    elif was_scheduled and now_scheduled and before.get("publish_at") != after.get("publish_at"):
+        store.append_audit(actor_email, "issue_schedule_modified", after["title"],
+                            {"from": before.get("publish_at"), "to": after.get("publish_at")})
+    elif was_scheduled and not now_scheduled:
+        store.append_audit(actor_email, "issue_schedule_cancelled", after["title"], {"new_status": after["status"]})
+
+
+def _on_issue_published(issue):
+    """Fires exactly once per issue -- see store.load_issues()'s
+    announcement_sent_at self-heal and _process_due_issues() below for
+    how "exactly once, restart-safe" is guaranteed. Sends the "new issue"
+    email to every confirmed new_issue subscriber and generates the
+    announcement draft bundle for editorial review. Never publishes or
+    sends anything beyond the transactional notification itself -- the
+    draft this creates always has status="draft"."""
+    issue_url = url_for("gazete_oku", issue_id=issue["id"], _external=True)
+    title = issue.get("title") or f"Sayı {issue.get('no')}"
+    subject = f"Yeni Sayı: {title} — The Eurovillage Herald"
+    for sub in store.confirmed_subscribers("new_issue"):
+        unsub_url = url_for(
+            "unsubscribe_page",
+            token=subscriptions.unsubscribe_token(app.secret_key, sub["id"]),
+            _external=True,
+        )
+        text_body = (
+            f"The Eurovillage Herald'ın yeni sayısı yayında: {title}\n\n"
+            f"Okumak için: {issue_url}\n\n"
+            "Bu e-postayı, yeni sayı bildirimleri için abone olduğunuz için alıyorsunuz.\n"
+            f"Abonelikten çıkmak için: {unsub_url}"
+        )
+        mailer.send(sub["email"], subject, text_body)
+    drafts.generate_issue_announcement_if_needed(issue)
+
+
+def _process_due_issues():
+    """Timestamp-driven, restart-safe -- no background scheduler.
+    store.load_issues() already flips a scheduled issue to "published" the
+    moment its publish_at has passed, on every read; this additionally
+    fires the one-time "announce it" side effects (email + draft) for any
+    issue that is published/archived but hasn't been announced yet, then
+    stamps announcement_sent_at so a later call -- even after a full
+    redeploy mid-flight -- is a no-op for that issue. Called from the
+    routes that actually touch issues (public archive/reader, admin
+    dashboard/issue list), not on every request site-wide."""
+    issues = store.load_issues()
+    changed = False
+    for i in issues:
+        if i.get("status") in store.ISSUE_PUBLIC_STATUSES and not i.get("announcement_sent_at"):
+            _on_issue_published(i)
+            i["announcement_sent_at"] = _now_iso()
+            changed = True
+    if changed:
+        store.save_issues(issues)
+
+
+def _issue_form_common_fields(form, existing=None):
+    title = form.get("title", "").strip()
+    no = form.get("no", "").strip()
+    issue_type = form.get("issue_type", "regular")
+    if issue_type not in store.ISSUE_TYPES:
+        issue_type = "regular"
+    data = {
+        "title": title,
+        "no": int(no) if no.isdigit() else (existing["no"] if existing else 1),
+        "date": form.get("date", "").strip() or (existing["date"] if existing else ""),
+        "description": form.get("description", "").strip(),
+        "editor_note": form.get("editor_note", "").strip(),
+        "issue_type": issue_type,
+        "updated_at": _now_iso(),
+    }
+    _apply_issue_publish_state(data, form, existing)
+    return data
+
+
+@admin_bp.route("/sayilar")
+@permission_required("newspaper")
+def issues_list():
+    _process_due_issues()
+    issues = sorted(store.load_issues(), key=lambda i: i.get("date", ""), reverse=True)
+    return render_template("admin/issues_list.html", issues=issues,
+                            status_labels=ISSUE_STATUS_LABELS, type_labels=ISSUE_TYPE_LABELS, active="newspaper")
+
+
 @admin_bp.route("/sayi/yeni", methods=["GET", "POST"])
-@master_admin_required
+@permission_required("newspaper")
 def issue_new():
     if request.method == "POST":
+        actor = _resolve_logged_in_user()
         issues = store.load_issues()
         title = request.form.get("title", "").strip()
         no = request.form.get("no", "").strip()
         date = request.form.get("date", "").strip()
-        description = request.form.get("description", "").strip()
 
         pdf_file = request.files.get("pdf_file")
         pdf_error = uploads.validate_pdf(pdf_file)
         if pdf_error:
             flash(pdf_error, "error")
-            return render_template("admin/edit_issue.html", issue=None)
+            return render_template("admin/edit_issue.html", issue=None, status_labels=ISSUE_STATUS_LABELS,
+                                    type_labels=ISSUE_TYPE_LABELS)
 
         issue_id = store.slugify(title or f"sayi-{no}")
         existing_ids = {i["id"] for i in issues}
@@ -1452,10 +1773,12 @@ def issue_new():
             issue_id = f"{base_id}-{n}"
             n += 1
 
+        file_size = uploads.file_size(pdf_file)
         pdf_value, pdf_error = uploads.save_issue_pdf(pdf_file, issue_id, date, ISSUE_PDF_DIR)
         if pdf_error:
             flash(pdf_error, "error")
-            return render_template("admin/edit_issue.html", issue=None)
+            return render_template("admin/edit_issue.html", issue=None, status_labels=ISSUE_STATUS_LABELS,
+                                    type_labels=ISSUE_TYPE_LABELS)
 
         cover_image = None
         cover_file = request.files.get("cover_file")
@@ -1464,25 +1787,94 @@ def issue_new():
             if cover_error:
                 flash(cover_error, "error")
 
-        issues.append({
-            "id": issue_id,
-            "no": int(no) if no.isdigit() else len(issues) + 1,
-            "title": title,
-            "date": date,
-            "description": description,
-            "cover_image": cover_image,
-            "pdf": pdf_value,
-            "pages": None,
+        data = _issue_form_common_fields(request.form)
+        data.update({
+            "id": issue_id, "slug": issue_id, "cover_image": cover_image, "pdf": pdf_value,
+            "pages": int(request.form["page_count"]) if request.form.get("page_count", "").isdigit() else None,
+            "file_size": file_size, "created_at": _now_iso(),
         })
+        issues.append(data)
         store.save_issues(issues)
-        flash("Yeni sayı yüklendi.", "success")
-        return redirect(url_for("admin.dashboard"))
+        if data["status"] == "scheduled":
+            store.append_audit(actor["email"], "issue_scheduled", data["title"], {"publish_at": data["publish_at"]})
+        elif data["status"] in store.ISSUE_PUBLIC_STATUSES:
+            _on_issue_published(data)
+            data["announcement_sent_at"] = _now_iso()
+            store.save_issues(issues)
+        flash(_issue_publish_flash_message(data), "success")
+        return redirect(url_for("admin.issues_list"))
 
-    return render_template("admin/edit_issue.html", issue=None)
+    return render_template("admin/edit_issue.html", issue=None, status_labels=ISSUE_STATUS_LABELS,
+                            type_labels=ISSUE_TYPE_LABELS)
+
+
+@admin_bp.route("/sayi/<issue_id>/duzenle", methods=["GET", "POST"])
+@permission_required("newspaper")
+def issue_edit(issue_id):
+    actor = _resolve_logged_in_user()
+    issues = store.load_issues()
+    idx = next((i for i, iss in enumerate(issues) if iss["id"] == issue_id), None)
+    if idx is None:
+        abort(404)
+    issue = issues[idx]
+
+    if request.method == "POST":
+        data = _issue_form_common_fields(request.form, existing=issue)
+        data["id"] = issue["id"]
+        data["slug"] = issue.get("slug") or issue["id"]
+        data["cover_image"] = issue.get("cover_image")
+        data["pdf"] = issue.get("pdf")
+        data["file_size"] = issue.get("file_size")
+        data["created_at"] = issue.get("created_at")
+
+        page_count = request.form.get("page_count", "").strip()
+        data["pages"] = int(page_count) if page_count.isdigit() else issue.get("pages")
+
+        pdf_file = request.files.get("pdf_file")
+        if pdf_file and pdf_file.filename:
+            pdf_error = uploads.validate_pdf(pdf_file)
+            if pdf_error:
+                flash(pdf_error, "error")
+                return render_template("admin/edit_issue.html", issue=issue, status_labels=ISSUE_STATUS_LABELS,
+                                        type_labels=ISSUE_TYPE_LABELS)
+            file_size = uploads.file_size(pdf_file)
+            pdf_value, pdf_error = uploads.save_issue_pdf(pdf_file, issue["id"], data["date"], ISSUE_PDF_DIR)
+            if pdf_error:
+                flash(pdf_error, "error")
+            else:
+                uploads.delete_stored(issue.get("pdf"))
+                data["pdf"] = pdf_value
+                data["file_size"] = file_size
+
+        cover_file = request.files.get("cover_file")
+        if cover_file and cover_file.filename:
+            cover_image, cover_error = uploads.save_issue_cover(cover_file, issue["id"], data["date"], ARTICLE_IMG_DIR)
+            if cover_error:
+                flash(cover_error, "error")
+            else:
+                uploads.delete_stored(issue.get("cover_image"))
+                data["cover_image"] = cover_image
+        elif request.form.get("remove_cover"):
+            uploads.delete_stored(issue.get("cover_image"))
+            data["cover_image"] = None
+
+        issues[idx] = data
+        store.save_issues(issues)
+        _audit_issue_schedule_change(actor["email"], issue, data)
+        if issue.get("status") not in store.ISSUE_PUBLIC_STATUSES and data["status"] in store.ISSUE_PUBLIC_STATUSES \
+                and not data.get("announcement_sent_at"):
+            _on_issue_published(data)
+            issues[idx]["announcement_sent_at"] = _now_iso()
+            store.save_issues(issues)
+        flash(_issue_publish_flash_message(data, updated=True), "success")
+        return redirect(url_for("admin.issues_list"))
+
+    return render_template("admin/edit_issue.html", issue=issue, status_labels=ISSUE_STATUS_LABELS,
+                            type_labels=ISSUE_TYPE_LABELS)
 
 
 @admin_bp.route("/sayi/<issue_id>/sil", methods=["POST"])
-@master_admin_required
+@permission_required("newspaper")
 def issue_delete(issue_id):
     issues = store.load_issues()
     issue = next((i for i in issues if i["id"] == issue_id), None)
@@ -1492,7 +1884,49 @@ def issue_delete(issue_id):
     issues = [i for i in issues if i["id"] != issue_id]
     store.save_issues(issues)
     flash("Sayı silindi.", "success")
-    return redirect(url_for("admin.dashboard"))
+    return redirect(url_for("admin.issues_list"))
+
+
+@admin_bp.route("/sayi/<issue_id>/onizleme/olustur", methods=["POST"])
+@permission_required("newspaper")
+def issue_preview_generate(issue_id):
+    actor = _resolve_logged_in_user()
+    issues = store.load_issues()
+    idx = next((i for i, iss in enumerate(issues) if iss["id"] == issue_id), None)
+    if idx is None:
+        abort(404)
+
+    token = secrets.token_urlsafe(32)
+    expires_at = _preview_expires_at(request.form.get("expiry", "24h"), request.form.get("custom_expiry", ""))
+
+    issues[idx]["preview_token_hash"] = store.hash_preview_token(token)
+    issues[idx]["preview_token_expires_at"] = expires_at
+    issues[idx]["preview_token_created_at"] = _now_iso()
+    store.save_issues(issues)
+    store.append_audit(actor["email"], "issue_preview_link_generated", issues[idx]["title"], {"expires_at": expires_at})
+
+    preview_url = url_for("gazete_preview", token=token, _external=True)
+    flash(
+        "Önizleme bağlantısı oluşturuldu — bu bağlantı yalnızca şimdi gösterilir, "
+        f"kaydedin: {preview_url}",
+        "success",
+    )
+    return redirect(url_for("admin.issue_edit", issue_id=issue_id))
+
+
+@admin_bp.route("/sayi/<issue_id>/onizleme/iptal", methods=["POST"])
+@permission_required("newspaper")
+def issue_preview_revoke(issue_id):
+    issues = store.load_issues()
+    idx = next((i for i, iss in enumerate(issues) if iss["id"] == issue_id), None)
+    if idx is None:
+        abort(404)
+    issues[idx]["preview_token_hash"] = None
+    issues[idx]["preview_token_expires_at"] = None
+    issues[idx]["preview_token_created_at"] = None
+    store.save_issues(issues)
+    flash("Önizleme bağlantısı iptal edildi.", "success")
+    return redirect(url_for("admin.issue_edit", issue_id=issue_id))
 
 
 def _set_user_password(user_id, new_password, must_change=False):
@@ -2755,6 +3189,98 @@ def site_settings_contact():
     store.append_audit(actor["email"], "site_settings_updated", "İletişim Bilgileri")
     flash("İletişim bilgileri güncellendi.", "success")
     return redirect(url_for("admin.site_settings"))
+
+
+# ------------------------------------------------------ admin: newspaper analytics --
+
+@admin_bp.route("/gazete-analitik")
+@permission_required("newspaper")
+def newspaper_analytics_overview():
+    summaries = analytics.all_issue_summaries()
+    issues_by_id = {i["id"]: i for i in store.load_issues()}
+    rows = [(issues_by_id[iid], summary) for iid, summary in summaries.items() if iid in issues_by_id]
+    rows.sort(key=lambda r: r[0].get("date", ""), reverse=True)
+    return render_template("admin/newspaper_analytics.html", rows=rows, active="newspaper")
+
+
+@admin_bp.route("/sayi/<issue_id>/analitik")
+@permission_required("newspaper")
+def issue_analytics_view(issue_id):
+    issue = store.get_issue(issue_id)
+    if not issue:
+        abort(404)
+    summary = analytics.issue_summary(issue_id)
+    return render_template("admin/issue_analytics.html", issue=issue, summary=summary, active="newspaper")
+
+
+# ------------------------------------------------------ admin: editorial drafts --
+# IMPORTANT: nothing here ever publishes anything. "Mark as used" below
+# only updates the DRAFT record's own bookkeeping status (so the newsroom
+# can see what's already been acted on) -- it does not create, modify,
+# or publish any article, email, or social post. See app/drafts.py.
+
+@admin_bp.route("/taslaklar")
+@permission_required("newspaper")
+def drafts_list():
+    all_drafts = sorted(store.load_drafts(), key=lambda d: d.get("created_at", ""), reverse=True)
+    return render_template("admin/drafts_list.html", drafts=all_drafts, active="newspaper")
+
+
+@admin_bp.route("/taslaklar/<draft_id>")
+@permission_required("newspaper")
+def draft_view(draft_id):
+    draft = store.get_draft(draft_id)
+    if not draft:
+        abort(404)
+    issue = store.get_issue(draft.get("issue_id")) if draft.get("issue_id") else None
+    return render_template("admin/draft_view.html", draft=draft, issue=issue, active="newspaper")
+
+
+@admin_bp.route("/taslaklar/<draft_id>/kullanildi", methods=["POST"])
+@permission_required("newspaper")
+def draft_mark_used(draft_id):
+    actor = _resolve_logged_in_user()
+    all_drafts = store.load_drafts()
+    idx = next((i for i, d in enumerate(all_drafts) if d["id"] == draft_id), None)
+    if idx is None:
+        abort(404)
+    all_drafts[idx]["status"] = "published"
+    all_drafts[idx]["reviewed_by"] = actor["email"]
+    all_drafts[idx]["reviewed_at"] = _now_iso()
+    all_drafts[idx]["published_at"] = _now_iso()
+    store.save_drafts(all_drafts)
+    store.append_audit(actor["email"], "editorial_draft_marked_used", all_drafts[idx]["title"])
+    flash("Taslak kullanıldı olarak işaretlendi. Bu, herhangi bir içeriği otomatik olarak yayımlamaz.", "success")
+    return redirect(url_for("admin.drafts_list"))
+
+
+@admin_bp.route("/taslaklar/<draft_id>/reddet", methods=["POST"])
+@permission_required("newspaper")
+def draft_discard(draft_id):
+    all_drafts = store.load_drafts()
+    idx = next((i for i, d in enumerate(all_drafts) if d["id"] == draft_id), None)
+    if idx is None:
+        abort(404)
+    all_drafts[idx]["status"] = "discarded"
+    store.save_drafts(all_drafts)
+    flash("Taslak reddedildi.", "success")
+    return redirect(url_for("admin.drafts_list"))
+
+
+# ------------------------------------------------------ admin: subscribers --
+# Deliberately master_admin_required (not delegable via the "newspaper"
+# permission like the rest of this section) -- subscriber email addresses
+# are the one dataset in this whole feature set that must never be
+# visible to a broader set of accounts than strictly necessary.
+
+@admin_bp.route("/aboneler")
+@master_admin_required
+def subscribers_list():
+    subs = sorted(store.load_subscriptions(), key=lambda s: s.get("created_at", ""), reverse=True)
+    counts = {"pending": 0, "confirmed": 0, "unsubscribed": 0}
+    for s in subs:
+        counts[s.get("status", "pending")] = counts.get(s.get("status", "pending"), 0) + 1
+    return render_template("admin/subscribers_list.html", subs=subs, counts=counts, active="subscribers")
 
 
 # ----------------------------------------------------------- admin: roles --
