@@ -129,7 +129,29 @@ def _get_client():
             endpoint_url=R2_ENDPOINT_URL,
             aws_access_key_id=R2_ACCESS_KEY_ID,
             aws_secret_access_key=R2_SECRET_ACCESS_KEY,
-            config=Config(signature_version="s3v4"),
+            config=Config(
+                signature_version="s3v4",
+                # R2 is not AWS S3: it does not implement the newer flexible-
+                # checksum handshake (an automatic CRC32 header/trailer on
+                # every PutObject) that recent botocore versions attach by
+                # default ("when_supported" -- see PutObject's httpChecksum
+                # trait: it always models a requestAlgorithmMember, so
+                # "when_supported" fires on literally every upload, public
+                # and private alike). R2 mishandling that extra checksum
+                # data is what actually produced the AccessDenied /
+                # SignatureDoesNotMatch errors from both buckets -- not a
+                # credentials or permissions problem. "when_required" is the
+                # pre-2025 boto3 behavior: only send/validate a checksum
+                # when the operation actually demands one, which PutObject
+                # does not. addressing_style="path" is Cloudflare's own
+                # documented recommendation for R2 + boto3, avoiding any
+                # ambiguity from virtual-hosted-style bucket-in-hostname
+                # addressing that R2's edge may not resolve/sign identically
+                # to AWS.
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
+                s3={"addressing_style": "path"},
+            ),
             region_name="auto",
         )
     return _client
