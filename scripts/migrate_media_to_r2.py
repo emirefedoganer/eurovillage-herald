@@ -1,5 +1,26 @@
 #!/usr/bin/env python3
-"""Migrates ALL legacy PUBLIC Herald media to the public Cloudflare R2
+"""
+==============================================================================
+STATUS: ONE-OFF MIGRATION COMPLETED (2026-09-09) -- DO NOT RE-RUN --EXECUTE
+==============================================================================
+The production migration this script exists for has already been run and
+manually verified: 47 records/fields scanned, 27 uploaded, 27 references
+updated, 0 missing, 0 failures, 0 unresolved, 1 already-migrated skipped.
+Every migrated file has been confirmed loading from
+https://matbaa.eurovillageherald.com on the live site.
+
+There is no known remaining legacy public media to migrate. Do not run
+--execute against production again. This file is kept (not deleted) for
+two reasons: it's the historical record of exactly how the migration was
+performed, and its --verify mode remains genuinely useful as an ongoing,
+read-only health check (confirms every migrated reference still resolves
+in R2 and the full newspaper archive is intact) -- safe to run any time,
+makes no changes. If a genuinely new batch of legacy media ever needs
+migrating, review this script fresh against the current codebase before
+trusting it blindly -- app.py/store.py's data model may have moved on.
+==============================================================================
+
+Migrates ALL legacy PUBLIC Herald media to the public Cloudflare R2
 bucket (R2_BUCKET_NAME, served from R2_PUBLIC_BASE_URL -- normally
 https://matbaa.eurovillageherald.com), and rewrites the JSON records that
 reference it. Covers every public media type the application has:
