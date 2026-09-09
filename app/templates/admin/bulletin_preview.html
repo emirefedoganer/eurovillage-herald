@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Bülten Önizleme — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Önizleme — {{ bulletin.internal_title }}</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.bulletins_list') }}">← Listeye Dön</a>
+  </div>
+
+  <div class="admin-panel">
+    <table class="admin-table" style="margin-bottom:0;">
+      <tbody>
+        <tr><td style="width:160px;"><strong>Gönderen</strong></td><td>{{ sender }}</td></tr>
+        <tr><td><strong>Konu</strong></td><td>{{ subject }}</td></tr>
+        <tr><td><strong>Hedef Kitle</strong></td><td>{{ bulletin.target_preference }}</td></tr>
+        <tr><td><strong>Uygun Alıcı Sayısı</strong></td><td>{{ audience.eligible }}</td></tr>
+        <tr><td><strong>Durum</strong></td><td>{{ bulletin.status }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="admin-panel" style="display:flex; flex-wrap:wrap; gap:24px; align-items:flex-start;">
+    <div style="flex:1; min-width:280px;">
+      <h3 style="font-family:var(--font-sans); font-size:14px; margin:0 0 10px;">Test Gönderimi</h3>
+      <form method="post" action="{{ url_for('admin.bulletin_send_test', bulletin_id=bulletin.id) }}">
+        <div class="form-row">
+          <label for="test_addresses">Test E-posta Adresleri (virgülle ayırın)</label>
+          <input type="text" id="test_addresses" name="test_addresses" placeholder="ornek@eurovillageherald.com, digeri@eurovillageherald.com">
+        </div>
+        <button class="btn btn-outline" type="submit">Test Gönder</button>
+        <div class="hint">Yalnızca girilen adreslere gider — gerçek abonelere gönderilmez, konu satırı [TEST] ile işaretlenir.</div>
+      </form>
+    </div>
+    {% if bulletin.status in ('draft', 'scheduled') %}
+    <div style="flex:1; min-width:280px;">
+      <h3 style="font-family:var(--font-sans); font-size:14px; margin:0 0 10px;">Gerçek Gönderim</h3>
+      <a class="btn btn-red" href="{{ url_for('admin.bulletin_send_confirm', bulletin_id=bulletin.id) }}">Gönderime Hazırla</a>
+      <div class="hint">Alıcı listesini ve son onayı gösteren bir ekrana yönlendirilirsiniz.</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="admin-panel">
+    <h3 style="font-family:var(--font-sans); font-size:14px; margin:0 0 12px;">E-posta Önizlemesi</h3>
+    <div style="border:1px solid var(--gray-200); border-radius:6px; overflow:hidden;">
+      <iframe srcdoc="{{ html_body | e }}" style="width:100%; height:640px; border:0; background:#fff;"></iframe>
+    </div>
+  </div>
+
+  <div class="admin-panel">
+    <h3 style="font-family:var(--font-sans); font-size:14px; margin:0 0 12px;">Düz Metin Sürümü</h3>
+    <pre style="white-space:pre-wrap; font-family:var(--font-sans); font-size:13px; color:var(--gray-700);">{{ text_body }}</pre>
+  </div>
+</div>
+
+{% endblock %}

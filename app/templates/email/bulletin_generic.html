@@ -1,0 +1,13 @@
+{% extends "email/_layout.html" %}
+{% from "email/_macros.html" import article_card %}
+{% block content %}
+<div style="text-align:center; margin:0 0 22px;">
+  <span style="display:block; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; letter-spacing:0.08em; color:#c8102e; text-transform:uppercase; margin-bottom:8px;">{{ kind_label }}</span>
+  <span style="display:block; font-family:Georgia,'Times New Roman',serif; font-size:22px; font-weight:bold;">{{ bulletin.internal_title }}</span>
+</div>
+{% if bulletin.intro_text %}
+<p style="margin:0 0 24px;">{{ bulletin.intro_text }}</p>
+{% endif %}
+{% if lead_article %}{{ article_card(lead_article, is_lead=True) }}{% endif %}
+{% for a in other_articles %}{{ article_card(a) }}{% endfor %}
+{% endblock %}

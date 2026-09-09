@@ -22,21 +22,29 @@
 
   <div class="admin-panel">
     <table class="admin-table">
-      <thead><tr><th>E-posta</th><th>Tercihler</th><th>Durum</th><th>Kayıt</th></tr></thead>
+      <thead><tr><th>E-posta</th><th>Tercihler</th><th>Durum</th><th>Kayıt</th><th>Onay</th><th>Gizlilik Metni / Yöntem</th></tr></thead>
       <tbody>
         {% for s in subs %}
         <tr>
           <td>{{ s.email }}</td>
-          <td>{{ (s.preferences or {}).items() | selectattr('1') | map(attribute='0') | join(', ') }}</td>
+          <td>
+            {% for key, on in (s.preferences or {}).items() %}
+              {% if on %}{{ preference_labels.get(key, key) }}{{ ', ' if not loop.last else '' }}{% endif %}
+            {% endfor %}
+          </td>
           <td>
             {% if s.status == 'confirmed' %}<span class="badge badge-lead">Onaylı</span>
             {% elif s.status == 'pending' %}<span class="badge badge-secondary">Onay Bekliyor</span>
             {% else %}<span class="badge">Ayrılmış</span>{% endif %}
           </td>
           <td>{{ s.created_at[:10] if s.created_at else '' }}</td>
+          <td>{{ s.confirmed_at[:10] if s.confirmed_at else '—' }}</td>
+          <td>
+            <span class="hint">{{ s.privacy_notice_version or '—' }} / {{ s.consent_method or '—' }}</span>
+          </td>
         </tr>
         {% else %}
-        <tr><td colspan="4">Henüz abone yok.</td></tr>
+        <tr><td colspan="6">Henüz abone yok.</td></tr>
         {% endfor %}
       </tbody>
     </table>

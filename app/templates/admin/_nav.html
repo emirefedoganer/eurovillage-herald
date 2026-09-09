@@ -7,7 +7,11 @@
   <a href="{{ url_for('admin.issues_list') }}" class="{{ 'active' if active == 'newspaper' else '' }}">Gazete Sayıları</a>
   {% endif %}
   {% if 'messages' in perms %}
-  <a href="{{ url_for('admin.messages_list') }}" class="{{ 'active' if active == 'messages' else '' }}">İletişim Mesajları</a>
+  <a href="{{ url_for('admin.messages_list') }}" class="{{ 'active' if active == 'messages' else '' }}">İletişim / Talepler</a>
+  {% endif %}
+  {% if 'bulletins' in perms %}
+  <a href="{{ url_for('admin.bulletins_list') }}" class="{{ 'active' if active == 'bulletins' else '' }}">Bültenler</a>
+  <a href="{{ url_for('admin.email_system_health') }}" class="{{ 'active' if active == 'email_system' else '' }}">E-posta Sistemi</a>
   {% endif %}
   {% if 'site_settings' in perms %}
   <a href="{{ url_for('admin.site_settings') }}" class="{{ 'active' if active == 'site_settings' else '' }}">Site Ayarları</a>

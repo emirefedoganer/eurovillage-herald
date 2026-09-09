@@ -1,23 +1,30 @@
 {% extends "base.html" %}
-{% block title %}İletişim Mesajları — {{ site.name }}{% endblock %}
+{% block title %}İletişim / Talepler — {{ site.name }}{% endblock %}
 {% block content %}
 
 <div class="admin-wrap">
   {% include "admin/_nav.html" with context %}
 
   <div class="admin-header">
-    <h1>İletişim Mesajları ({{ total }})</h1>
+    <h1>İletişim / Talepler ({{ total }})</h1>
   </div>
+
+  <nav class="admin-subnav" style="margin-bottom:16px;">
+    <a href="{{ url_for('admin.messages_list', view='open') }}" class="{{ 'active' if view == 'open' else '' }}">Açık Talepler</a>
+    <a href="{{ url_for('admin.messages_list', view='resolved') }}" class="{{ 'active' if view == 'resolved' else '' }}">Çözülenler</a>
+    <a href="{{ url_for('admin.messages_list', view='all') }}" class="{{ 'active' if view == 'all' else '' }}">Tümü</a>
+  </nav>
 
   <div class="admin-panel">
     {% if messages %}
     <table class="admin-table">
       <thead>
-        <tr><th>Tarih</th><th>Kategori</th><th>Gönderen</th><th>Mesaj</th><th>Görseller</th><th>Durum</th><th></th></tr>
+        <tr><th>Ref</th><th>Tarih</th><th>Kategori</th><th>Gönderen</th><th>Mesaj</th><th>Görseller</th><th>Durum</th><th>E-posta</th><th></th></tr>
       </thead>
       <tbody>
         {% for m in messages %}
         <tr>
+          <td style="white-space:nowrap; font-family:var(--font-mono, monospace); font-size:12px;">{{ m.ref or m.id }}</td>
           <td style="white-space:nowrap;">{{ m.date }}</td>
           <td>{{ m.category or m.subject }}</td>
           <td>
@@ -29,7 +36,14 @@
               <span class="hint">Anonim gönderim</span>
             {% endif %}
           </td>
-          <td style="max-width:280px; white-space:pre-wrap;">{{ m.message }}</td>
+          <td style="max-width:260px; white-space:pre-wrap;">
+            {{ m.message }}
+            {% if m.resolution %}
+            <div class="hint" style="margin-top:6px; border-top:1px dashed var(--gray-200); padding-top:6px;">
+              <strong>Çözüm:</strong> {{ m.resolution }}
+            </div>
+            {% endif %}
+          </td>
           <td>
             {% if m.images %}
             <div style="display:flex; flex-wrap:wrap; gap:6px;">
@@ -45,15 +59,36 @@
           <td>
             <form method="post" action="{{ url_for('admin.message_set_status', mid=m.id) }}">
               <input type="hidden" name="sayfa" value="{{ page }}">
-              <select name="status" onchange="this.form.submit()">
+              <input type="hidden" name="view" value="{{ view }}">
+              <select name="status" style="margin-bottom:4px;">
                 {% for key, label in status_labels.items() %}
                 <option value="{{ key }}" {{ 'selected' if m.status == key else '' }}>{{ label }}</option>
                 {% endfor %}
               </select>
+              {% if m.email %}
+              <label style="font-weight:400; font-size:12px; display:block; margin-bottom:4px;">
+                <input type="checkbox" name="notify" value="1" style="width:auto;"> Bilgilendirme e-postası gönder
+              </label>
+              {% endif %}
+              <button class="btn btn-outline" type="submit" style="font-size:12px; padding:4px 10px;">Güncelle</button>
             </form>
           </td>
+          <td>
+            {% if m.acknowledgement_sent_at %}<div class="hint">✓ Alındı bildirimi gönderildi</div>{% endif %}
+            {% if m.resolution_sent_at %}<div class="hint">✓ Çözüm e-postası gönderildi</div>{% endif %}
+          </td>
           <td class="admin-actions">
-            <form method="post" action="{{ url_for('admin.message_delete', mid=m.id) }}" onsubmit="return confirm('Bu mesajı silmek istediğinize emin misiniz?');">
+            {% if m.email and m.status != 'resolved' %}
+            <details>
+              <summary class="btn btn-outline" style="cursor:pointer; display:inline-block;">Çözüm Yaz</summary>
+              <form method="post" action="{{ url_for('admin.message_send_resolution', mid=m.id) }}" style="margin-top:8px; min-width:260px;">
+                <input type="hidden" name="sayfa" value="{{ page }}">
+                <textarea name="resolution" rows="3" placeholder="Okura gönderilecek çözüm metni..." required></textarea>
+                <button class="btn btn-red" type="submit" style="margin-top:6px;">Çözüm Mesajı Gönder</button>
+              </form>
+            </details>
+            {% endif %}
+            <form method="post" action="{{ url_for('admin.message_delete', mid=m.id) }}" onsubmit="return confirm('Bu talebi silmek istediğinize emin misiniz?');">
               <input type="hidden" name="sayfa" value="{{ page }}">
               <button class="btn btn-danger" type="submit">Sil</button>
             </form>
@@ -66,14 +101,14 @@
     {% if page_count > 1 %}
     <div class="admin-pagination">
       <a class="btn btn-outline {{ 'is-disabled' if page <= 1 else '' }}"
-         href="{{ url_for('admin.messages_list', sayfa=page - 1) if page > 1 else '#' }}">← Önceki</a>
+         href="{{ url_for('admin.messages_list', sayfa=page - 1, view=view) if page > 1 else '#' }}">← Önceki</a>
       <span class="admin-pagination-status">Sayfa {{ page }} / {{ page_count }}</span>
       <a class="btn btn-outline {{ 'is-disabled' if page >= page_count else '' }}"
-         href="{{ url_for('admin.messages_list', sayfa=page + 1) if page < page_count else '#' }}">Sonraki →</a>
+         href="{{ url_for('admin.messages_list', sayfa=page + 1, view=view) if page < page_count else '#' }}">Sonraki →</a>
     </div>
     {% endif %}
     {% else %}
-    <p style="font-family: var(--font-sans); color: var(--gray-500); margin:0;">Henüz mesaj gelmedi.</p>
+    <p style="font-family: var(--font-sans); color: var(--gray-500); margin:0;">Bu görünümde talep yok.</p>
     {% endif %}
   </div>
 </div>

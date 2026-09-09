@@ -1,0 +1,30 @@
+{% extends "email/_layout.html" %}
+{% from "email/_macros.html" import article_card %}
+{% block content %}
+<div style="text-align:center; margin:0 0 22px;">
+  <span style="display:block; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; letter-spacing:0.08em; color:#c8102e; text-transform:uppercase; margin-bottom:8px;">SAYI {{ issue.no }} YAYINDA</span>
+  <span style="display:block; font-family:Georgia,'Times New Roman',serif; font-size:24px; font-weight:bold;">{{ issue.title }}</span>
+</div>
+{% if issue.cover_image %}
+<a href="{{ issue_url }}">
+  <img src="{{ media_url(issue.cover_image, 'img/articles', external=True) }}" width="260" alt="{{ issue.title }}" style="display:block; margin:0 auto 22px; width:260px; max-width:70%; height:auto; border:1px solid #e2e2e2;">
+</a>
+{% endif %}
+{% if bulletin.intro_text %}
+<p style="margin:0 0 22px;">{{ bulletin.intro_text }}</p>
+{% endif %}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 28px;">
+  <tr>
+    <td style="background-color:#c8102e; border-radius:2px;">
+      <a href="{{ issue_url }}" style="display:inline-block; padding:14px 30px; font-family:Arial,Helvetica,sans-serif; font-size:15px; font-weight:bold; color:#ffffff; text-decoration:none;">
+        GAZETEYİ OKU
+      </a>
+    </td>
+  </tr>
+</table>
+{% if lead_article or other_articles %}
+<h2 style="font-family:Georgia,'Times New Roman',serif; font-size:17px; font-weight:bold; border-top:2px solid #131313; padding-top:14px; margin:0 0 16px;">BU SAYIDAN</h2>
+{% if lead_article %}{{ article_card(lead_article, is_lead=True) }}{% endif %}
+{% for a in other_articles %}{{ article_card(a) }}{% endfor %}
+{% endif %}
+{% endblock %}

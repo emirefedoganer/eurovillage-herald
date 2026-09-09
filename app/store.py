@@ -23,6 +23,9 @@ MANAGEMENT_PATH = os.path.join(DATA_DIR, "newspaper_management.json")
 ISSUE_SUBSCRIPTIONS_PATH = os.path.join(DATA_DIR, "issue_subscriptions.json")
 ISSUE_ANALYTICS_PATH = os.path.join(DATA_DIR, "issue_analytics.json")
 EDITORIAL_DRAFTS_PATH = os.path.join(DATA_DIR, "editorial_drafts.json")
+EMAIL_OUTBOX_PATH = os.path.join(DATA_DIR, "email_outbox.json")
+BULLETINS_PATH = os.path.join(DATA_DIR, "bulletins.json")
+ARTICLE_VIEWS_PATH = os.path.join(DATA_DIR, "article_views.json")
 
 TR_MAP = str.maketrans({
     "ç": "c", "Ç": "c", "ğ": "g", "Ğ": "g", "ı": "i", "I": "i",
@@ -407,17 +410,33 @@ def get_issue(issue_id, published_only=False):
     return None
 
 
+# Ticket status: the vocabulary was upgraded from a flat
+# new/reviewing/replied/archived set to a slightly richer
+# new/in_review/waiting/resolved/closed one. A pre-existing message's
+# status is MIGRATED (not left on two parallel vocabularies) using the
+# closest semantic equivalent -- the underlying ticket content is
+# untouched either way. See MESSAGE_STATUS_MIGRATION below.
+MESSAGE_STATUS_MIGRATION = {
+    "new": "new", "reviewing": "in_review", "replied": "resolved", "archived": "closed",
+}
+
+
 def load_messages():
-    """Self-heals messages written before the tip/category/status extension
-    -- gives every record a category, status, images list, and follow-up
-    flag if it doesn't already have one, so an old plain contact message
-    (or one already sitting in production before this deploy) still
-    displays and behaves correctly rather than raising on a missing key."""
+    """Self-heals messages written before the ticket-system extension --
+    gives every record a category, status (migrated to the current
+    vocabulary -- see MESSAGE_STATUS_MIGRATION), a public ticket
+    reference, and the resolution/acknowledgement bookkeeping fields, if
+    it doesn't already have one, so an old plain contact message (or one
+    already sitting in production before this deploy) still displays and
+    behaves correctly rather than raising on a missing key. A message's
+    id/name/email/category/message/images/date -- its actual content --
+    is never altered here."""
     messages = _load(MESSAGES_PATH, [])
     changed = False
+    ref_seq_by_year = {}
     for m in messages:
-        if "status" not in m:
-            m["status"] = "new"
+        if "id" not in m:
+            m["id"] = uuid.uuid4().hex[:10]
             changed = True
         if "category" not in m:
             m["category"] = m.get("subject", "Diğer")
@@ -428,9 +447,21 @@ def load_messages():
         if "follow_up_consent" not in m:
             m["follow_up_consent"] = False
             changed = True
-        if "id" not in m:
-            m["id"] = uuid.uuid4().hex[:10]
+        if "status" not in m:
+            m["status"] = "new"
             changed = True
+        elif m["status"] in ("reviewing", "replied", "archived"):
+            m["status"] = MESSAGE_STATUS_MIGRATION[m["status"]]
+            changed = True
+        if "ref" not in m:
+            year = (m.get("date") or "")[:4] or "0000"
+            ref_seq_by_year[year] = ref_seq_by_year.get(year, 0) + 1
+            m["ref"] = f"TEH-{year}-{ref_seq_by_year[year]:04d}"
+            changed = True
+        for key in ("resolution", "resolved_at", "resolved_by", "acknowledgement_sent_at", "resolution_sent_at"):
+            if key not in m:
+                m[key] = None
+                changed = True
     if changed:
         _save(MESSAGES_PATH, messages)
     return messages
@@ -438,6 +469,19 @@ def load_messages():
 
 def save_messages(messages):
     _save(MESSAGES_PATH, messages)
+
+
+def get_message_by_ref(ref):
+    return next((m for m in load_messages() if m.get("ref") == ref), None)
+
+
+def next_ticket_ref(messages, year):
+    """The next TEH-<year>-NNNN reference, computed from how many tickets
+    already exist for that year -- no separate counter file to keep in
+    sync, and stable as long as tickets are never deleted out of order
+    (a deleted ticket's reference is simply retired, never reused)."""
+    existing = sum(1 for m in messages if (m.get("ref") or "").startswith(f"TEH-{year}-"))
+    return f"TEH-{year}-{existing + 1:04d}"
 
 
 def get_message(mid):
@@ -951,3 +995,44 @@ def draft_exists(dedup_key):
     publish-hook logic (e.g. after a redeploy retries a half-finished
     request) never creates a second copy of the same announcement draft."""
     return any(d.get("dedup_key") == dedup_key for d in load_drafts())
+
+
+# --------------------------------------------------------------- email outbox --
+# Raw persistence only -- see app/outbox.py for enqueue/process/retry logic.
+
+def load_email_outbox():
+    return _load(EMAIL_OUTBOX_PATH, [])
+
+
+def save_email_outbox(jobs):
+    _save(EMAIL_OUTBOX_PATH, jobs)
+
+
+# ----------------------------------------------------------------- bulletins --
+# Raw persistence only -- see app/bulletins.py for the CMS logic (audience
+# resolution, article selection, sending via the outbox).
+
+def load_bulletins():
+    return _load(BULLETINS_PATH, [])
+
+
+def save_bulletins(bulletins):
+    _save(BULLETINS_PATH, bulletins)
+
+
+def get_bulletin(bulletin_id):
+    return _by_id(load_bulletins(), bulletin_id)
+
+
+# ------------------------------------------------------------- article views --
+# Minimal, privacy-conscious view counting to power "most read" bulletin
+# suggestions (see app/analytics.py:top_articles) -- deliberately just a
+# per-slug, per-day counter, nothing per-visitor: this is popularity
+# ranking, not analytics about any individual reader.
+
+def load_article_views():
+    return _load(ARTICLE_VIEWS_PATH, {})
+
+
+def save_article_views(data):
+    _save(ARTICLE_VIEWS_PATH, data)

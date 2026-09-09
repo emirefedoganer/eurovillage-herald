@@ -1,5 +1,71 @@
 # Changelog
 
+## The Eurovillage Herald 1.1.0
+
+The production communication system: a provider-agnostic email layer, a
+durable outbox, editorial bulletins, and a contact-form-to-ticket
+workflow, all controllable from TEH Admin rather than an external
+provider dashboard. Every existing subscription/analytics/contact/issue
+behavior from 1.0.1 is preserved and extended, not replaced.
+
+**Email provider abstraction (`mailer.py`).** `EMAIL_PROVIDER` selects a
+backend (`fake` by default -- logs only, sends nothing; `smtp`; `resend`),
+behind exactly two entry points: `send_transactional_email()` (from
+`noreply@eurovillageherald.com`) and `send_bulletin_email()` (from
+`bulletin@news.eurovillageherald.com`). Neither address is ever a
+monitored inbox. Contact-flavored transactional mail carries
+`Reply-To: iletisim@eurovillageherald.com` -- the existing, real
+Zoho-hosted mailbox, which this release never creates, modifies, or
+synchronizes with in any way.
+
+**Durable email outbox (`outbox.py`).** Every outgoing email is queued
+(QUEUED/PROCESSING/SENT/FAILED) before it is ever sent, drained
+opportunistically on ordinary page loads (the same pattern already used
+for scheduled issue publishing) plus a manual admin action and an
+optional bearer-token Railway Cron endpoint. Idempotency keys prevent
+duplicate confirmation/acknowledgement/campaign emails across retries or
+redeploys; a job stuck mid-send after a crash is recovered automatically.
+
+**Multi-category bulletin subscriptions.** The "yeni sayı" subscription
+system now supports five independent preference categories (new issue,
+weekly digest, popular stories, breaking news, Arı Magazin), a no-login
+preference-management page, per-category unsubscribe links, and KVKK
+privacy-notice-version/consent tracking recorded on every signup and
+preference change.
+
+**Editorial bulletin CMS (`bulletins.py`, TEH Admin → Bültenler).**
+Draft-first campaigns (draft → scheduled → sent/cancelled) with manual
+article selection, ordering, and lead-story control; "most read" analytics
+are surfaced as suggestions only and never auto-selected. Test sends reach
+only explicitly entered addresses and are clearly marked, never touching
+the real subscriber list. A real send requires an explicit audience-safety
+confirmation screen before anything is queued. Publishing a newspaper
+issue automatically creates and sends its NEW_ISSUE bulletin exactly once,
+defaulting to every article linked to that issue; issue publication itself
+never fails due to an email-provider outage.
+
+**Contact form → ticket workflow.** Every contact submission now gets a
+human-readable reference (`TEH-2026-0042`) and a status lifecycle
+(Yeni → İnceleniyor → Ek Bilgi Bekleniyor → Çözüldü → Kapatıldı), visible
+in TEH Admin's İletişim/Talepler view with open/resolved/all filtering. An
+automatic acknowledgement email is queued when an address is given;
+resolving a ticket requires an explicit "Çözüm mesajı gönder" action and
+is never implied by an internal status change. A submission is never lost
+to an email-provider outage -- the ticket persists regardless.
+
+**Email System Health (TEH Admin → E-posta Sistemi).** Non-secret
+visibility into the active backend, configured sender identities, and
+outbox queue/failure counts, with safe per-job retry -- never a
+"resend everything" control, and API keys/SMTP passwords are never
+displayed here or anywhere else in the admin panel.
+
+**KVKK/privacy notice (`/gizlilik`).** A site-styled privacy notice
+covering what is collected and why, clearly marked with placeholders
+where a legal/compliance decision (data controller identity, retention
+periods, legal basis, provider/international-transfer disclosures) is
+still required -- this release implements the technical framework only
+and does not constitute legal compliance by itself.
+
 ## The Eurovillage Herald 1.0.1
 
 A newspaper-platform release: The Eurovillage Herald's PDF newspaper issues

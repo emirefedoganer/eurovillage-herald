@@ -1,0 +1,25 @@
+{% extends "email/_layout.html" %}
+{% block content %}
+<h1 style="font-size:22px; margin:0 0 16px; font-weight:normal;">Mesajınızı Aldık</h1>
+<p style="margin:0 0 16px;">{% if name %}Merhaba {{ name }},{% else %}Merhaba,{% endif %}</p>
+<p style="margin:0 0 20px;">
+  The Eurovillage Herald'a gönderdiğiniz mesaj için teşekkür ederiz. Okur İlişkileri ekibimiz
+  mesajınızı inceleyecek ve gerekirse sizinle iletişime geçecektir.
+</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f3f0; margin:0 0 20px;">
+  <tr>
+    <td style="padding:16px 20px; font-family:Arial,Helvetica,sans-serif; font-size:13px; color:#444444;">
+      <strong>Referans No:</strong> {{ ref }}<br>
+      <strong>Kategori:</strong> {{ category }}<br>
+      <strong>Tarih:</strong> {{ date }}
+    </td>
+  </tr>
+</table>
+<p style="margin:0; font-family:Arial,Helvetica,sans-serif; font-size:13px; color:#6b6b6b;">
+  Bu e-postaya doğrudan yanıt verirseniz mesajınız Okur İlişkileri ekibimize (iletisim@eurovillageherald.com) ulaşır.
+</p>
+{% endblock %}
+{% block footer %}
+<p style="margin:0 0 8px;">The Eurovillage Herald — Okur İlişkileri</p>
+<p style="margin:0;"><a href="{{ privacy_url }}" style="color:#6b6b6b;">Gizlilik / KVKK</a></p>
+{% endblock %}

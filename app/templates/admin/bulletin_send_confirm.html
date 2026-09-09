@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Gönderimi Onayla — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Gönderimi Onayla</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.bulletin_preview', bulletin_id=bulletin.id) }}">← Önizlemeye Dön</a>
+  </div>
+
+  <div class="admin-panel" style="border:2px solid var(--red); background:#fff8f8;">
+    <p style="font-weight:600; margin-top:0;">
+      Bu işlem, aşağıda listelenen tüm uygun abonelere GERÇEK bir e-posta kampanyası kuyruğa alacaktır.
+      Bu işlem geri alınamaz.
+    </p>
+    <table class="admin-table" style="margin-bottom:0;">
+      <tbody>
+        <tr><td style="width:200px;"><strong>Bülten</strong></td><td>{{ bulletin.internal_title }}</td></tr>
+        <tr><td><strong>Gönderen</strong></td><td>{{ sender }}</td></tr>
+        <tr><td><strong>Konu</strong></td><td>{{ bulletin.subject }}</td></tr>
+        <tr><td><strong>Hedef Tercih</strong></td><td>{{ preference_label }}</td></tr>
+        <tr><td><strong>Gönderilecek (ONAYLI + tercih açık)</strong></td>
+            <td><span class="badge badge-lead">{{ audience.eligible }} abone</span></td></tr>
+        <tr><td><strong>Hariç — Onay Bekliyor</strong></td><td>{{ audience.pending_excluded }} abone</td></tr>
+        <tr><td><strong>Hariç — Abonelikten Ayrılmış</strong></td><td>{{ audience.unsubscribed_excluded }} abone</td></tr>
+        {% if bulletin.scheduled_at %}
+        <tr><td><strong>Zamanlanan Gönderim</strong></td><td>{{ to_editorial_input(bulletin.scheduled_at) | replace('T', ' ') }} ({{ editorial_timezone_name }})</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <form method="post" action="{{ url_for('admin.bulletin_send', bulletin_id=bulletin.id) }}"
+        onsubmit="return confirm('{{ audience.eligible }} aboneye e-posta gönderilecek. Bu işlem geri alınamaz. Onaylıyor musunuz?');">
+    <div class="form-actions">
+      <button class="btn btn-red" type="submit">Evet, {{ audience.eligible }} Aboneye Gönder</button>
+      <a class="btn btn-outline" href="{{ url_for('admin.bulletin_preview', bulletin_id=bulletin.id) }}">Vazgeç</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Gizlilik Bildirimi (KVKK) — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="static-page">
+  <span class="kicker">{{ site.issue_label }}</span>
+  <h1>Gizlilik Bildirimi</h1>
+  <p style="font-family: var(--font-sans); font-size: 13px; color: var(--gray-500);">
+    Sürüm: {{ notice_version }}
+  </p>
+
+  <div style="border:2px solid var(--red); background:#fff8f8; padding:14px 18px; margin:18px 0; font-family:var(--font-sans); font-size:13px; color:#7a1220;">
+    <strong>Not (yalnızca geliştirme amaçlı):</strong> Bu sayfadaki metin teknik altyapıyı yansıtır ve
+    aşağıda <strong>[YASAL İNCELEME GEREKLİ]</strong> olarak işaretlenmiş yer tutucular içerir. Bu
+    yer tutucular, gerçek şirket/veri sorumlusu bilgileri, saklama süreleri, hukuki dayanaklar ve
+    olası yurt dışı aktarım beyanları netleşene kadar bir avukat/KVKK danışmanı tarafından
+    incelenip nihai hale getirilmelidir. Kod bu metni oluşturmuş olması, yasal uyumluluğun
+    sağlandığı anlamına gelmez.
+  </div>
+
+  <p style="font-family: var(--font-body); font-size: 16px; color: var(--gray-700);">
+    {{ site.name }} olarak, sitemizi ziyaret eden okuyucularımızın, haber bültenimize abone
+    olanların ve bize iletişim formu üzerinden ulaşanların kişisel verilerinin gizliliğine önem
+    veriyoruz. Bu bildirim, hangi verileri hangi amaçla işlediğimizi, ne kadar süreyle
+    sakladığımızı ve haklarınızı nasıl kullanabileceğinizi açıklar.
+  </p>
+
+  <h2>Veri Sorumlusu</h2>
+  <p style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">
+    [YASAL İNCELEME GEREKLİ: Veri sorumlusunun tam unvanı, adresi ve varsa KEP/iletişim
+    bilgileri buraya eklenecektir.]
+  </p>
+
+  <h2>Topladığımız Kişisel Veriler</h2>
+  <ul style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">
+    <li>İletişim formu: ad (opsiyonel), e-posta adresi (opsiyonel), mesaj kategorisi, mesaj içeriği, varsa eklenen görseller.</li>
+    <li>Bülten aboneliği: e-posta adresi, seçilen bildirim tercihleri, onay/kayıt/ayrılma tarihleri, kayıt sırasında sunulan gizlilik bildirimi sürümü.</li>
+    <li>Analitik: kimliksiz, tarayıcıda yerel olarak üretilen sıfırlanabilir bir okuyucu tanımlayıcısı; IP adresi hiçbir şekilde saklanmaz.</li>
+  </ul>
+
+  <h2>İşleme Amaçları</h2>
+  <div style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">
+    <p><strong>İletişim formu:</strong> Gönderdiğiniz talebi değerlendirmek, size bir referans
+    numarasıyla dönüş yapmak ve talebinizi sonuçlandırmak için kullanılır. İletişim formunu
+    kullanmanız sizi otomatik olarak bülten listesine eklemez.</p>
+    <p><strong>Bülten aboneliği:</strong> Yalnızca açıkça seçtiğiniz kategorilerde (ör. yeni sayı
+    duyuruları, haftalık özet) size editoryal e-posta göndermek için kullanılır. İstediğiniz zaman
+    tek bir kategoriyi kapatabilir veya tüm aboneliğinizi sonlandırabilirsiniz.</p>
+    <p><strong>Analitik:</strong> Hangi haberlerin daha çok okunduğunu anlamak için toplanır;
+    editoryal kararlar (örneğin bültene hangi haberlerin dahil edileceği) her zaman bir editör
+    tarafından verilir, analitik yalnızca öneri niteliğindedir.</p>
+  </div>
+
+  <h2>Hukuki Dayanak</h2>
+  <p style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">
+    [YASAL İNCELEME GEREKLİ: KVKK madde 5 kapsamında hangi hukuki sebebe (açık rıza, meşru
+    menfaat vb.) dayanıldığı, işleme türüne göre (iletişim formu / bülten / analitik) ayrı ayrı
+    belirtilecektir.]
+  </p>
+
+  <h2>Saklama Süresi</h2>
+  <p style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">
+    [YASAL İNCELEME GEREKLİ: Her veri kategorisi için somut saklama süresi ve imha yöntemi
+    burada belirtilecektir.]
+  </p>
+
+  <h2>Üçüncü Taraf Sağlayıcılar</h2>
+  <p style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">
+    E-postalarımızın iletilmesi için bir e-posta gönderim sağlayıcısı kullanıyoruz. Bu sağlayıcı
+    yalnızca gönderdiğimiz e-postayı iletmek amacıyla e-posta adresinize ve mesaj içeriğine erişir.
+    [YASAL İNCELEME GEREKLİ: Kullanılan sağlayıcının adı, sunucu konumu ve varsa yurt dışına veri
+    aktarımına ilişkin beyan buraya eklenecektir.]
+  </p>
+
+  <h2>Haklarınız</h2>
+  <p style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">
+    KVKK'nın 11. maddesi kapsamındaki haklarınızı (verilerinize erişme, düzeltilmesini veya
+    silinmesini talep etme dahil) kullanmak için
+    <a href="{{ url_for('iletisim') }}" style="text-decoration: underline; color: var(--red);">iletişim formumuz</a>
+    üzerinden bize ulaşabilirsiniz. Bülten e-postalarındaki bağlantılarla, hesap oluşturmadan
+    doğrudan tercihlerinizi değiştirebilir veya abonelikten çıkabilirsiniz.
+  </p>
+
+  <p style="font-family: var(--font-sans); font-size: 13px; color: var(--gray-500); line-height: 1.6;">{{ site.legal }}</p>
+</div>
+
+{% endblock %}

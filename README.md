@@ -192,8 +192,10 @@ app/
   sections.py        Bölüm (Politika, Şehir, Kültür...) tanımları
   ads.py             Reklam/yerleşim mantığı (öncelik çözümleme, istatistikler)
   analytics.py       Gazete sayısı analitiği (okuma oturumu/sayfa/indirme kaydı ve özetleri)
-  subscriptions.py   "Yeni sayı" abonelik sistemi (çifte onay, güvenli abonelikten çıkma token'ı)
-  mailer.py          E-posta gönderimi (SMTP_* yapılandırılmamışsa günlüğe yazar, göndermez)
+  subscriptions.py   Bülten abonelik sistemi (çoklu tercih kategorisi, çifte onay, tercih yönetimi/abonelikten çıkma token'ları, KVKK onay sürümü)
+  bulletins.py       Editöryal bülten/newsletter CMS (taslak->zamanlanmış->gönderildi/iptal, manuel haber seçimi, test gönderimi, yeni-sayı bülteni otomasyonu)
+  outbox.py          Kalıcı (JSON dosya tabanlı) e-posta kuyruğu -- QUEUED/PROCESSING/SENT/FAILED, idempotency_key ile tekrar gönderim koruması, yeniden başlatmaya dayanıklı
+  mailer.py          E-posta sağlayıcı soyutlaması (EMAIL_PROVIDER=fake/smtp/resend); işlemsel (noreply@) ve bülten (bulletin@news.) gönderim kimliklerini ayrı tutar
   drafts.py          Editöryal taslak üretimi (şablon tabanlı; hiçbir şeyi otomatik yayımlamaz)
   editorial_tz.py    Zamanlanmış yayın için editoryal saat dilimi dönüşümü (stdlib zoneinfo)
   games_engine.py    Bulmaca numaralandırma/yerleştirme + sudoku çözücü/üretici (saf mantık)
@@ -208,17 +210,21 @@ app/
   data/
     articles.json    Tüm makaleler (author_ids ile yazar profillerine, opsiyonel issue_id/issue_page ile bir gazete sayısına bağlanır)
     issues.json      Gazete sayıları: yayın durumu/zamanlama/önizleme dahil yapılandırılmış kayıtlar
-    issue_subscriptions.json   Abonelikler (bkz. subscriptions.py)
+    issue_subscriptions.json   Bülten abonelikleri (bkz. subscriptions.py) -- dosya adı tarihseldir, artık tüm bülten kategorilerini kapsar
     issue_analytics.json       Sayı başına toplu analitik sayaçları (bkz. analytics.py)
+    article_views.json        Haber başına/gün başına görüntülenme sayaçları -- yalnızca "çok okunanlar" bülten ÖNERİSİ için (bkz. analytics.top_article_slugs)
+    bulletins.json             Editöryal bülten kayıtları (bkz. bulletins.py)
+    email_outbox.json          Kalıcı e-posta gönderim kuyruğu (bkz. outbox.py)
     editorial_drafts.json      Otomatik hazırlanan, insan onayı bekleyen editöryal taslaklar
     site.json        Site/masthead bilgileri
     users.json       Hesaplar: e-posta, şifre hash'i, hesap rolü (master_admin/author)
     authors.json     Yazar profilleri: biyografi, editoryal rol, Twitter/Minecraft, slug geçmişi
     audit_log.json   Hassas admin işlemlerinin kaydı
-    messages.json    İletişim formu mesajları
+    messages.json    İletişim formu / okur talepleri (referans numarası, durum iş akışı, çözüm metni -- bkz. app.py'nin İletişim/Talepler bölümü)
     crosswords.json  Çapraz bulmacalar (ızgara + çözüm + ipuçları)
     sudokus.json     Sudokular (başlangıç ızgarası + çözüm, ayrı tutulur)
-  templates/          Jinja2 şablonları (templates/games/ ve templates/admin/ dahil)
+  templates/          Jinja2 şablonları (templates/games/, templates/admin/ ve templates/email/ dahil)
+  templates/email/    Giden e-postaların HTML/tablo tabanlı şablonları (base.html'i miras ALMAZ -- e-posta istemcisi uyumluluğu için bağımsız, satır içi stilli)
   static/
     css/style.css
     js/               crossword-play.js, sudoku-play.js, crossword-builder.js,

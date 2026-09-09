@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}E-posta Sistemi — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>E-posta Sistemi</h1>
+  </div>
+
+  <div class="admin-panel">
+    <h3 style="font-family:var(--font-sans); font-size:14px; margin:0 0 12px;">Sağlayıcı Durumu</h3>
+    <table class="admin-table" style="margin-bottom:0;">
+      <tbody>
+        <tr><td style="width:260px;"><strong>Aktif Arka Uç</strong></td>
+            <td>
+              {% if identities.backend == 'fake' %}<span class="badge badge-secondary">Test/Log Modu (gerçek e-posta gönderilmiyor)</span>
+              {% else %}<span class="badge badge-lead">{{ identities.backend | upper }}</span>{% endif %}
+            </td></tr>
+        <tr><td><strong>Sağlayıcı Yapılandırıldı mı?</strong></td>
+            <td>{{ 'Evet' if identities.provider_configured else 'Hayır — üretim e-postası göndermek için EMAIL_API_KEY/SMTP ayarları gerekli' }}</td></tr>
+        <tr><td><strong>İşlemsel Gönderen (noreply)</strong></td><td>{{ identities.transactional_from }}</td></tr>
+        <tr><td><strong>Bülten Gönderen</strong></td><td>{{ identities.bulletin_from }}</td></tr>
+        <tr><td><strong>Yanıt Adresi (Reply-To)</strong></td><td>{{ identities.contact_reply_to }}</td></tr>
+      </tbody>
+    </table>
+    <p class="hint" style="margin-top:10px;">
+      Bu sayfa yalnızca yapılandırma özetini gösterir. API anahtarları, SMTP şifresi ve diğer gizli
+      kimlik bilgileri hiçbir zaman burada veya başka bir yönetim panelinde görüntülenmez.
+    </p>
+  </div>
+
+  <div class="admin-stat-grid">
+    <div class="admin-stat-card"><span class="n">{{ outbox_stats.counts.queued }}</span><span class="l">Kuyrukta</span></div>
+    <div class="admin-stat-card"><span class="n">{{ outbox_stats.counts.processing }}</span><span class="l">İşleniyor</span></div>
+    <div class="admin-stat-card"><span class="n">{{ outbox_stats.counts.sent }}</span><span class="l">Gönderildi</span></div>
+    <div class="admin-stat-card"><span class="n">{{ outbox_stats.counts.failed }}</span><span class="l">Başarısız</span></div>
+  </div>
+
+  <div class="admin-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h3 style="font-family:var(--font-sans); font-size:14px; margin:0;">Son Durum</h3>
+      <form method="post" action="{{ url_for('admin.email_process_now') }}">
+        <button class="btn btn-outline" type="submit">Kuyruğu Şimdi İşle</button>
+      </form>
+    </div>
+    <table class="admin-table" style="margin-bottom:0;">
+      <tbody>
+        <tr><td style="width:260px;"><strong>Son Başarılı Gönderim</strong></td>
+            <td>{{ outbox_stats.last_sent.sent_at if outbox_stats.last_sent else '—' }}</td></tr>
+        <tr><td><strong>Son Başarısız Deneme</strong></td>
+            <td>{{ outbox_stats.last_failed.created_at if outbox_stats.last_failed else '—' }}
+                {% if outbox_stats.last_failed %} — {{ outbox_stats.last_failed.last_error }}{% endif %}</td></tr>
+        <tr><td><strong>Toplam İş Kaydı</strong></td><td>{{ outbox_stats.total }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="admin-panel">
+    <h3 style="font-family:var(--font-sans); font-size:14px; margin:0 0 12px;">Başarısız Gönderimler ({{ failed|length }})</h3>
+    {% if failed %}
+    <table class="admin-table">
+      <thead><tr><th>Alıcı</th><th>Konu</th><th>Tür</th><th>Deneme</th><th>Son Hata</th><th></th></tr></thead>
+      <tbody>
+        {% for job in failed %}
+        <tr>
+          <td>{{ job.to }}</td>
+          <td>{{ job.subject }}</td>
+          <td>{{ job.kind }}</td>
+          <td>{{ job.retry_count }}</td>
+          <td style="max-width:260px; white-space:pre-wrap;">{{ job.last_error }}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin.email_job_retry', job_id=job.id) }}">
+              <button class="btn btn-outline" type="submit">Yeniden Dene</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="hint" style="margin:0;">Başarısız gönderim yok.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

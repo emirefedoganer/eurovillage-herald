@@ -87,6 +87,9 @@ def _seed_minimal_data(data_dir):
     write("issue_subscriptions.json", [])
     write("issue_analytics.json", {})
     write("editorial_drafts.json", [])
+    write("email_outbox.json", [])
+    write("bulletins.json", [])
+    write("article_views.json", {})
 
 
 class V101TestCase(unittest.TestCase):
@@ -103,7 +106,8 @@ class V101TestCase(unittest.TestCase):
             "ARTICLES_PATH", "ISSUES_PATH", "SITE_PATH", "MESSAGES_PATH", "CROSSWORDS_PATH",
             "SUDOKUS_PATH", "USERS_PATH", "AUTHORS_PATH", "AUDIT_LOG_PATH", "ROLES_PATH",
             "ADS_PATH", "AD_PLACEMENTS_PATH", "MANAGEMENT_PATH", "ISSUE_SUBSCRIPTIONS_PATH",
-            "ISSUE_ANALYTICS_PATH", "EDITORIAL_DRAFTS_PATH",
+            "ISSUE_ANALYTICS_PATH", "EDITORIAL_DRAFTS_PATH", "EMAIL_OUTBOX_PATH",
+            "BULLETINS_PATH", "ARTICLE_VIEWS_PATH",
         ):
             filename = name.replace("_PATH", "").lower()
             filename = {
@@ -370,7 +374,8 @@ class AnalyticsTests(V101TestCase):
 
 class SubscriptionTests(V101TestCase):
     def test_subscribe_creates_pending_record(self):
-        r = self.client.post("/abone-ol", data={"email": "reader@example.com", "pref_new_issue": "1"},
+        r = self.client.post("/abone-ol", data={"email": "reader@example.com", "pref_new_issue": "1",
+                                                 "privacy_ack": "1"},
                               follow_redirects=True)
         self.assertEqual(r.status_code, 200)
         subs = self.load("issue_subscriptions.json")
@@ -379,7 +384,18 @@ class SubscriptionTests(V101TestCase):
         self.assertIsNotNone(subs[0]["confirm_token_hash"])
 
     def test_invalid_email_rejected(self):
-        self.client.post("/abone-ol", data={"email": "not-an-email", "pref_new_issue": "1"},
+        self.client.post("/abone-ol", data={"email": "not-an-email", "pref_new_issue": "1",
+                                             "privacy_ack": "1"},
+                          follow_redirects=True)
+        subs = self.load("issue_subscriptions.json")
+        self.assertEqual(len(subs), 0)
+
+    def test_missing_privacy_consent_is_rejected(self):
+        """A KVKK-consent checkbox was added on top of v1.0.1's original
+        subscribe form -- see app/subscriptions.py's CURRENT_PRIVACY_NOTICE_VERSION
+        and app.py's subscribe_submit(). Submitting without it must not
+        create a subscription."""
+        self.client.post("/abone-ol", data={"email": "noconsent@example.com", "pref_new_issue": "1"},
                           follow_redirects=True)
         subs = self.load("issue_subscriptions.json")
         self.assertEqual(len(subs), 0)

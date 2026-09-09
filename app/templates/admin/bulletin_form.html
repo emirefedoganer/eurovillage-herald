@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Bülteni Düzenle' if bulletin else 'Yeni Bülten' }} — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>{{ 'Bülteni Düzenle' if bulletin else 'Yeni Bülten' }}</h1>
+    <a class="btn btn-outline" href="{{ url_for('admin.bulletins_list') }}">← Listeye Dön</a>
+  </div>
+
+  {% if not bulletin %}
+  <div class="admin-panel" style="margin-bottom:16px;">
+    <div class="form-row">
+      <label for="kind_picker">Bülten Türü</label>
+      <select id="kind_picker" onchange="window.location = '{{ url_for('admin.bulletin_new') }}?kind=' + this.value;">
+        {% for key, label in kind_labels.items() %}
+        <option value="{{ key }}" {{ 'selected' if key == kind else '' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <div class="hint">Tür seçimi, önerilen içerik ve varsayılan hedef kitleyi belirler; aşağıda değiştirilebilir.</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <form class="admin-panel" method="post">
+    {% if not bulletin %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="internal_title">Dahili Başlık</label>
+        <input type="text" id="internal_title" name="internal_title" required maxlength="160"
+               value="{{ bulletin.internal_title if bulletin else '' }}" placeholder="Yalnızca yönetim panelinde görünür">
+      </div>
+      <div class="form-row">
+        <label for="target_preference">Hedef Kitle</label>
+        <select id="target_preference" name="target_preference">
+          {% for key, label in preference_choices %}
+          <option value="{{ key }}" {{ 'selected' if (bulletin.target_preference if bulletin else 'new_issue') == key else '' }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <div class="hint">Yalnızca bu tercihi açık ve ONAYLI aboneler alır.</div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="subject">E-posta Konusu</label>
+      <input type="text" id="subject" name="subject" required maxlength="160"
+             value="{{ bulletin.subject if bulletin else '' }}">
+    </div>
+
+    <div class="form-row">
+      <label for="preheader">Ön Başlık (preheader — gelen kutusunda konunun yanında görünür)</label>
+      <input type="text" id="preheader" name="preheader" maxlength="160"
+             value="{{ bulletin.preheader if bulletin else '' }}">
+    </div>
+
+    {% if kind == 'new_issue' %}
+    <div class="form-row">
+      <label for="issue_id">İlgili Sayı</label>
+      <select id="issue_id" name="issue_id">
+        <option value="">— Seçilmedi —</option>
+        {% for issue in issues %}
+        <option value="{{ issue.id }}" {{ 'selected' if (bulletin.issue_id if bulletin else '') == issue.id else '' }}>
+          Sayı {{ issue.no }} — {{ issue.title }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <div class="form-row">
+      <label for="intro_text">Giriş Metni (opsiyonel)</label>
+      <textarea id="intro_text" name="intro_text" rows="3" maxlength="600">{{ bulletin.intro_text if bulletin else '' }}</textarea>
+    </div>
+
+    <div class="form-row">
+      <label>Haberler</label>
+      <div class="hint" style="margin-bottom:8px;">
+        {% if suggested_slugs %}
+        Analitik en çok okunanları ÖNERİR — hangi haberlerin dahil edileceğine, sıralamaya ve öne çıkana
+        her zaman siz karar verirsiniz. Önerilenler <strong>★</strong> ile işaretlendi.
+        {% else %}
+        Dahil edilecek haberleri işaretleyin, birini "Öne Çıkan" olarak seçin.
+        {% endif %}
+      </div>
+      <div style="max-height:360px; overflow-y:auto; border:1px solid var(--gray-200); border-radius:6px; padding:10px;">
+        {% set selected_slugs = (bulletin.article_slugs if bulletin else []) %}
+        {% set lead_slug = (bulletin.lead_article_slug if bulletin else '') %}
+        {% for a in articles %}
+        <div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--gray-100);">
+          <input type="checkbox" name="article_slugs" value="{{ a.slug }}" id="art-{{ a.slug }}"
+                 style="width:auto;" {{ 'checked' if a.slug in selected_slugs else '' }}>
+          <input type="radio" name="lead_article_slug" value="{{ a.slug }}" title="Öne çıkan olarak seç"
+                 style="width:auto;" {{ 'checked' if a.slug == lead_slug else '' }}>
+          <label for="art-{{ a.slug }}" style="font-weight:400; margin:0; flex:1; cursor:pointer;">
+            {{ '★ ' if a.slug in suggested_slugs else '' }}{{ a.title }}
+            <span class="hint">— {{ a.section }}</span>
+          </label>
+        </div>
+        {% else %}
+        <p class="hint">Yayımlanmış haber bulunamadı.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if bulletin %}
+    <div class="form-row">
+      <label>
+        <input type="radio" name="schedule_choice" value="draft" style="width:auto;"
+               {{ 'checked' if not bulletin.scheduled_at else '' }}> Taslak olarak sakla (zamanlanmamış)
+      </label>
+      <label style="margin-top:6px;">
+        <input type="radio" name="schedule_choice" value="scheduled" style="width:auto;"
+               {{ 'checked' if bulletin.scheduled_at else '' }}> Belirli bir zamanda gönder
+      </label>
+      <input type="datetime-local" name="scheduled_at" style="margin-top:8px;"
+             value="{{ to_editorial_input(bulletin.scheduled_at) if bulletin.scheduled_at else '' }}">
+      <div class="hint">Zaman dilimi: {{ editorial_timezone_name }}. Zamanlanan bültenler, sitede herhangi bir sayfa yüklendiğinde otomatik olarak kontrol edilip gönderilir.</div>
+    </div>
+    {% endif %}
+
+    <div class="form-actions">
+      <button class="btn btn-red" type="submit">{{ 'Kaydet' if bulletin else 'Taslağı Oluştur' }}</button>
+      {% if bulletin %}
+      <a class="btn btn-outline" href="{{ url_for('admin.bulletin_preview', bulletin_id=bulletin.id) }}">Önizlemeye Git</a>
+      {% endif %}
+    </div>
+    <div class="hint">Kaydetmek asla e-posta göndermez.</div>
+  </form>
+</div>
+
+{% endblock %}

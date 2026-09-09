@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Bültenler — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Bültenler ({{ bulletins|length }})</h1>
+    <a class="btn btn-red" href="{{ url_for('admin.bulletin_new') }}">+ Yeni Bülten</a>
+  </div>
+
+  <p class="hint">
+    Taslak kaydetmek asla e-posta göndermez. Gerçek bir kampanya yalnızca açık onay ekranından
+    sonra, editörün açık "Gönder" işlemiyle kuyruğa alınır.
+  </p>
+
+  <div class="admin-panel">
+    {% if bulletins %}
+    <table class="admin-table">
+      <thead>
+        <tr><th>Başlık</th><th>Tür</th><th>Hedef Kitle</th><th>Durum</th><th>Alıcı</th><th>Tarih</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for b in bulletins %}
+        <tr>
+          <td>{{ b.internal_title }}</td>
+          <td>{{ kind_labels.get(b.kind, b.kind) }}</td>
+          <td>{{ preference_labels.get(b.target_preference, b.target_preference) }}</td>
+          <td>
+            {% if b.status == 'draft' %}<span class="badge badge-secondary">Taslak</span>
+            {% elif b.status == 'scheduled' %}<span class="badge">Zamanlandı</span>
+            {% elif b.status == 'sent' %}<span class="badge badge-lead">Gönderildi</span>
+            {% else %}<span class="badge">İptal Edildi</span>{% endif %}
+          </td>
+          <td>{{ b.recipients_total or '—' }}</td>
+          <td style="white-space:nowrap;">
+            {% if b.status == 'sent' %}{{ b.sent_at[:10] if b.sent_at else '' }}
+            {% elif b.status == 'scheduled' %}{{ to_editorial_input(b.scheduled_at) | replace('T', ' ') }}
+            {% else %}{{ b.created_at[:10] if b.created_at else '' }}{% endif %}
+          </td>
+          <td class="admin-actions">
+            {% if b.status in ('draft', 'scheduled') %}
+            <a class="btn btn-outline" href="{{ url_for('admin.bulletin_edit', bulletin_id=b.id) }}">Düzenle</a>
+            <a class="btn btn-outline" href="{{ url_for('admin.bulletin_preview', bulletin_id=b.id) }}">Önizle</a>
+            {% if b.status == 'scheduled' %}
+            <form method="post" action="{{ url_for('admin.bulletin_cancel', bulletin_id=b.id) }}" onsubmit="return confirm('Bu zamanlanmış bülteni iptal etmek istediğinize emin misiniz?');" style="display:inline;">
+              <button class="btn btn-danger" type="submit">İptal Et</button>
+            </form>
+            {% endif %}
+            {% else %}
+            <a class="btn btn-outline" href="{{ url_for('admin.bulletin_preview', bulletin_id=b.id) }}">Görüntüle</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="font-family: var(--font-sans); color: var(--gray-500); margin:0;">Henüz bülten oluşturulmadı.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

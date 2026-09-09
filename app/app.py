@@ -12,10 +12,12 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 import ads
 import analytics
+import bulletins
 import cf_access
 import drafts
 import editorial_tz
 import mailer
+import outbox
 import store
 import games_engine as ge
 import games_export
@@ -33,7 +35,7 @@ from sections import (
 # the admin footer and available to any template as `app_version`. Not to
 # be confused with site.json's `issue_no`/`issue_label`, which describe
 # the current PRINTED newspaper issue, a completely different concept.
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.1.0"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # These five are passed to uploads.py's save_*() functions purely as the
@@ -111,9 +113,20 @@ CONTACT_SUBJECTS = [
 ]
 
 MESSAGE_STATUS_LABELS = {
-    "new": "Yeni", "reviewing": "İnceleniyor", "replied": "Yanıtlandı", "archived": "Arşivlendi",
+    "new": "Yeni", "in_review": "İnceleniyor", "waiting": "Ek Bilgi Bekleniyor",
+    "resolved": "Çözüldü", "closed": "Kapatıldı",
 }
-MESSAGE_STATUS_ORDER = ["new", "reviewing", "replied", "archived"]
+MESSAGE_STATUS_ORDER = ["new", "in_review", "waiting", "resolved", "closed"]
+# Statuses that count as "open" for the admin Talepler / Açık Talepler tab
+# split. Also the requirement 29 boundary: only these two status changes
+# get an automatic (still explicit, editor-triggered -- see
+# message_send_status_update()) status email; every other transition is
+# silent bookkeeping, to avoid mail noise.
+OPEN_TICKET_STATUSES = {"new", "in_review", "waiting"}
+STATUS_EMAIL_COPY = {
+    "in_review": ("Talebiniz İnceleniyor", "Talebiniz [{ref}] şu anda ekibimiz tarafından inceleniyor."),
+    "waiting": ("Ek Bilgi Bekleniyor", "Talebiniz [{ref}] için ek bilgiye ihtiyacımız var. Bu e-postaya yanıt vererek bize ulaşabilirsiniz."),
+}
 
 # In production, set SERVER_NAME (e.g. "eurovillageherald.com") as an environment
 # variable. When set, the admin panel is served ONLY from admin.<SERVER_NAME> and is
@@ -333,10 +346,11 @@ def master_admin_required(view):
 # it's later edited) can ever grant itself or anyone else that power.
 PERMISSION_CHOICES = [
     ("games", "Oyunlar"),
-    ("messages", "İletişim Mesajları"),
+    ("messages", "İletişim Mesajları / Talepler"),
     ("site_settings", "Site Ayarları"),
     ("audit_log", "Denetim Kaydı"),
     ("newspaper", "Gazete Sayıları (Yükleme, Yayın, Zamanlama)"),
+    ("bulletins", "Bültenler / E-posta Sistemi"),
 ]
 
 
@@ -500,6 +514,7 @@ def article_page(slug):
     article = store.get_article(slug, published_only=True)
     if not article:
         abort(404)
+    analytics.record_article_view(slug)  # popularity-only counter; see analytics.py -- no reader_id involved
     return _render_article(article)
 
 
@@ -757,7 +772,8 @@ def _render_issue_reader(issue, is_preview=False):
 def gazete():
     _process_due_issues()
     issues = store.all_issues_sorted(published_only=True)
-    return render_template("gazete.html", issues=issues, type_labels=ISSUE_TYPE_LABELS)
+    return render_template("gazete.html", issues=issues, type_labels=ISSUE_TYPE_LABELS,
+                            preference_choices=subscriptions.PREFERENCE_CHOICES)
 
 
 @app.route("/gazete/<issue_id>")
@@ -831,6 +847,33 @@ def api_issue_analytics_event(issue_id, event_type):
     return jsonify(ok=True)
 
 
+# ------------------------------------------------------------ email rendering --
+# Shared by subscriptions, contact/ticket mail, and bulletins -- every
+# email's HTML comes from app/templates/email/*.html (never the site's
+# own web templates), and every one gets the same footer links.
+
+PRIVACY_NOTICE_VERSION = subscriptions.CURRENT_PRIVACY_NOTICE_VERSION
+
+
+def _privacy_url():
+    return url_for("privacy_notice", _external=True)
+
+
+def _manage_url(sub_id):
+    return url_for("subscription_manage", token=subscriptions.manage_token(app.secret_key, sub_id), _external=True)
+
+
+def _unsubscribe_url(sub_id):
+    return url_for("unsubscribe_page", token=subscriptions.unsubscribe_token(app.secret_key, sub_id), _external=True)
+
+
+def _render_email_html(template_name, **ctx):
+    ctx.setdefault("privacy_url", _privacy_url())
+    ctx.setdefault("manage_url", None)
+    ctx.setdefault("unsubscribe_url", None)
+    return render_template(f"email/{template_name}", **ctx)
+
+
 # ------------------------------------------------------------ subscriptions --
 # "Let me know when a new issue is published." See app/subscriptions.py's
 # module docstring for the double opt-in / unsubscribe-token design.
@@ -846,6 +889,8 @@ def subscribe_submit():
     errors = []
     if not subscriptions.validate_email(email):
         errors.append("Geçerli bir e-posta adresi girin.")
+    if not request.form.get("privacy_ack"):
+        errors.append("Devam etmek için gizlilik bilgilendirmesini onaylamanız gerekir.")
     turnstile.check(errors, request.form, remote_ip=request.remote_addr)
     if errors:
         for e in errors:
@@ -856,10 +901,16 @@ def subscribe_submit():
     sub, token = subscriptions.subscribe(email, preferences)
     if sub and token:
         confirm_url = url_for("subscribe_confirm", token=token, _external=True)
-        mailer.send(
-            sub["email"], "Abonelik Onayı — The Eurovillage Herald",
+        html = _render_email_html("subscribe_confirm.html", subject="The Eurovillage Herald aboneliğinizi doğrulayın",
+                                   confirm_url=confirm_url, expiry_hours=subscriptions.CONFIRM_TOKEN_TTL_HOURS)
+        text = (
             f"The Eurovillage Herald aboneliğinizi onaylamak için aşağıdaki bağlantıya tıklayın:\n\n{confirm_url}\n\n"
-            "Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz -- başka bir işlem gerekmez.",
+            f"Bu bağlantı {subscriptions.CONFIRM_TOKEN_TTL_HOURS} saat sonra geçerliliğini yitirir. "
+            "Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz -- başka bir işlem gerekmez."
+        )
+        outbox.enqueue(
+            "transactional", sub["email"], "The Eurovillage Herald aboneliğinizi doğrulayın", text, html_body=html,
+            idempotency_key=f"subscribe_confirm:{sub['id']}:{sub['confirm_token_hash']}",
         )
     # Same message whether the address was new, already pending, or
     # already confirmed -- this form must never be usable to test which
@@ -874,23 +925,63 @@ def subscribe_confirm(token):
     if not sub:
         return render_template("subscribe_result.html", ok=False,
                                 message="Bu onay bağlantısı geçersiz veya süresi dolmuş.")
+    enabled_labels = [label for key, label in subscriptions.PREFERENCE_CHOICES if sub["preferences"].get(key)]
+    html = _render_email_html(
+        "subscribe_confirmed.html", subject="Aboneliğiniz onaylandı", enabled_labels=enabled_labels,
+        manage_url=_manage_url(sub["id"]), unsubscribe_url=_unsubscribe_url(sub["id"]),
+    )
+    text = "Aboneliğiniz onaylandı. Şu konularda e-posta alacaksınız:\n\n" + "\n".join(f"- {l}" for l in enabled_labels)
+    outbox.enqueue("transactional", sub["email"], "Aboneliğiniz onaylandı — The Eurovillage Herald", text,
+                    html_body=html, idempotency_key=f"subscribe_confirmed:{sub['id']}")
     return render_template("subscribe_result.html", ok=True, message="Aboneliğiniz onaylandı. Teşekkürler!")
 
 
 @app.route("/abone-ol/cik/<token>", methods=["GET", "POST"])
 def unsubscribe_page(token):
-    """GET shows a confirmation page rather than acting immediately --
-    a bare state-changing GET behind an emailed link is exactly the kind
-    of request an email client's link-prefetcher or a security scanner
-    can trigger without the recipient ever clicking anything."""
+    """GET shows a confirmation page rather than acting immediately -- a
+    bare state-changing GET behind an emailed link is exactly the kind of
+    request an email client's link-prefetcher or a security scanner can
+    trigger without the recipient ever clicking anything. An optional
+    ?kategori=<key> unsubscribes from just that one preference instead of
+    everything -- the link a bulletin's own footer uses for "I don't want
+    THIS kind of mail anymore"."""
     sub_id = subscriptions.subscription_id_from_unsubscribe_token(app.secret_key, token)
     if not sub_id:
         abort(404)
+    category = request.values.get("kategori")
+    category_label = subscriptions.PREFERENCE_LABELS.get(category)
     if request.method == "POST":
-        subscriptions.unsubscribe(sub_id)
-        return render_template("subscribe_result.html", ok=True, message="Abonelikten çıkışınız tamamlandı.")
+        if category and category_label:
+            subscriptions.unsubscribe_one(sub_id, category)
+            message = f'"{category_label}" bildirimlerinden çıkışınız tamamlandı.'
+        else:
+            subscriptions.unsubscribe(sub_id)
+            message = "Abonelikten çıkışınız tamamlandı."
+        return render_template("subscribe_result.html", ok=True, message=message)
     sub = store.get_subscription_by_id(sub_id)
-    return render_template("unsubscribe_confirm.html", email=sub["email"] if sub else None)
+    return render_template("unsubscribe_confirm.html", email=sub["email"] if sub else None,
+                            category_label=category_label if category else None)
+
+
+@app.route("/abone-ol/tercihler/<token>", methods=["GET", "POST"])
+def subscription_manage(token):
+    """No-login preference management -- a reader can enable/disable any
+    category or unsubscribe from everything, using the same link every
+    time (see app/subscriptions.py:manage_token)."""
+    sub_id = subscriptions.subscription_id_from_manage_token(app.secret_key, token)
+    if not sub_id:
+        abort(404)
+    sub = store.get_subscription_by_id(sub_id)
+    if not sub or sub["status"] == "unsubscribed":
+        return render_template("subscribe_result.html", ok=False,
+                                message="Bu abonelik artık aktif değil.")
+    if request.method == "POST":
+        preferences = {key: bool(request.form.get(f"pref_{key}")) for key, _ in subscriptions.PREFERENCE_CHOICES}
+        subscriptions.update_preferences(sub_id, preferences)
+        flash("Tercihleriniz güncellendi.", "success")
+        return redirect(url_for("subscription_manage", token=token))
+    return render_template("subscription_manage.html", sub=sub, preference_choices=subscriptions.PREFERENCE_CHOICES,
+                            token=token)
 
 
 @app.route("/ara")
@@ -905,6 +996,11 @@ def search():
             if q in haystack:
                 results.append(a)
     return render_template("search.html", q=q, results=results)
+
+
+@app.route("/gizlilik")
+def privacy_notice():
+    return render_template("privacy_notice.html", notice_version=PRIVACY_NOTICE_VERSION)
 
 
 @app.route("/iletisim", methods=["GET", "POST"])
@@ -961,8 +1057,12 @@ def iletisim():
                                     form=request.form)
 
         messages = store.load_messages()
+        now = datetime.now()
+        ref = store.next_ticket_ref(messages, now.year)
+        mid = uuid.uuid4().hex[:10]
         messages.append({
-            "id": uuid.uuid4().hex[:10],
+            "id": mid,
+            "ref": ref,
             "name": name,
             "email": email,
             "category": category,
@@ -971,10 +1071,34 @@ def iletisim():
             "follow_up_consent": follow_up_consent,
             "images": images_meta,
             "status": "new",
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "date": now.strftime("%Y-%m-%d %H:%M"),
+            "resolution": None, "resolved_at": None, "resolved_by": None,
+            "acknowledgement_sent_at": None, "resolution_sent_at": None,
         })
         store.save_messages(messages)
-        flash("Mesajınız için teşekkürler! Okur İlişkileri departmanımız en kısa sürede inceleyecektir.", "success")
+
+        # The submission itself has already succeeded and is persisted by
+        # this point -- queuing the acknowledgement can never lose the
+        # ticket, and a provider outage only delays the email (the outbox
+        # retries it), never the website response below.
+        if email:
+            html = _render_email_html(
+                "contact_ack.html", subject="Mesajınızı aldık", name=name, ref=ref,
+                category=category, date=now.strftime("%d.%m.%Y %H:%M"),
+            )
+            text = (
+                f"Mesajınızı aldık.\n\nReferans No: {ref}\nKategori: {category}\n"
+                f"Tarih: {now.strftime('%d.%m.%Y %H:%M')}\n\n"
+                "Bu e-postaya doğrudan yanıt verirseniz mesajınız Okur İlişkileri ekibimize ulaşır."
+            )
+            job = outbox.enqueue(
+                "transactional", email, "Mesajınızı aldık — The Eurovillage Herald", text, html_body=html,
+                reply_to=mailer.EMAIL_CONTACT_REPLY_TO, idempotency_key=f"contact_ack:{mid}",
+            )
+            messages[-1]["acknowledgement_sent_at"] = job["created_at"]
+            store.save_messages(messages)
+
+        flash(f"Mesajınız için teşekkürler! Referans numaranız: {ref}. Okur İlişkileri departmanımız en kısa sürede inceleyecektir.", "success")
         return redirect(url_for("iletisim"))
 
     return render_template("iletisim.html", subjects=subjects, contact=contact_settings,
@@ -1185,7 +1309,12 @@ MESSAGES_PER_PAGE = 10
 @admin_bp.route("/mesajlar")
 @permission_required("messages")
 def messages_list():
+    view = request.args.get("view", "open")
     all_messages = store.all_messages_sorted()
+    if view == "open":
+        all_messages = [m for m in all_messages if m["status"] in OPEN_TICKET_STATUSES]
+    elif view == "resolved":
+        all_messages = [m for m in all_messages if m["status"] not in OPEN_TICKET_STATUSES]
     total = len(all_messages)
     page_count = max(1, -(-total // MESSAGES_PER_PAGE))  # ceil division
     page = request.args.get("sayfa", 1, type=int)
@@ -1194,7 +1323,7 @@ def messages_list():
     messages = all_messages[start:start + MESSAGES_PER_PAGE]
     return render_template("admin/messages_list.html", messages=messages, total=total,
                             page=page, page_count=page_count, status_labels=MESSAGE_STATUS_LABELS,
-                            active="messages")
+                            view=view, active="messages")
 
 
 @admin_bp.route("/mesaj/<mid>/sil", methods=["POST"])
@@ -1214,9 +1343,14 @@ def message_delete(mid):
 @admin_bp.route("/mesaj/<mid>/durum", methods=["POST"])
 @permission_required("messages")
 def message_set_status(mid):
-    """The reader-message status workflow (Yeni/İnceleniyor/Yanıtlandı/
-    Arşivlendi) -- reuses the message's own `status` field rather than a
-    second parallel state system; never deletes the message."""
+    """The ticket status workflow (Yeni/İnceleniyor/Ek Bilgi Bekleniyor/
+    Çözüldü/Kapatıldı) -- reuses the message's own `status` field rather
+    than a second parallel state system; never deletes the message. An
+    optional, explicit "bilgilendirme e-postası gönder" checkbox sends a
+    short status email ONLY for the two transitions that are actually
+    useful to a reader (in_review/waiting) -- every other transition is
+    silent, per-design, to avoid mail noise (requirement: do not email on
+    every internal status change)."""
     actor = _resolve_logged_in_user()
     messages = store.load_messages()
     idx = next((i for i, m in enumerate(messages) if m["id"] == mid), None)
@@ -1225,12 +1359,66 @@ def message_set_status(mid):
     new_status = request.form.get("status", "")
     if new_status not in MESSAGE_STATUS_LABELS:
         abort(400)
+    old_status = messages[idx]["status"]
     messages[idx]["status"] = new_status
     messages[idx]["status_updated_at"] = _now_iso()
     messages[idx]["status_updated_by"] = actor["email"]
+
+    if request.form.get("notify") and new_status in STATUS_EMAIL_COPY and messages[idx].get("email"):
+        subject_line, body_template = STATUS_EMAIL_COPY[new_status]
+        text = body_template.format(ref=messages[idx].get("ref", mid))
+        outbox.enqueue(
+            "transactional", messages[idx]["email"], f"[{messages[idx].get('ref', mid)}] {subject_line}", text,
+            reply_to=mailer.EMAIL_CONTACT_REPLY_TO,
+            idempotency_key=f"contact_status:{mid}:{new_status}:{messages[idx]['status_updated_at']}",
+        )
+
     store.save_messages(messages)
-    store.append_audit(actor["email"], "reader_message_status_changed", mid, {"status": new_status})
-    flash("Mesaj durumu güncellendi.", "success")
+    store.append_audit(actor["email"], "reader_message_status_changed", mid, {"from": old_status, "to": new_status})
+    flash("Talep durumu güncellendi.", "success")
+    return redirect(url_for("admin.messages_list", sayfa=request.form.get("sayfa", 1), view=request.form.get("view", "open")))
+
+
+@admin_bp.route("/mesaj/<mid>/cozum", methods=["POST"])
+@permission_required("messages")
+def message_send_resolution(mid):
+    """Writing a resolution and saving it never sends anything by itself
+    -- only this explicit action does. Requires the ticket to have an
+    email on file (an anonymous tip has nothing to send a resolution
+    to -- resolve it via the status dropdown instead)."""
+    actor = _resolve_logged_in_user()
+    messages = store.load_messages()
+    idx = next((i for i, m in enumerate(messages) if m["id"] == mid), None)
+    if idx is None:
+        abort(404)
+    resolution_text = request.form.get("resolution", "").strip()
+    if not resolution_text:
+        flash("Çözüm metni boş olamaz.", "error")
+        return redirect(url_for("admin.messages_list", sayfa=request.form.get("sayfa", 1)))
+    if not messages[idx].get("email"):
+        flash("Bu talep e-posta adresi olmadan gönderildi -- çözüm e-postası gönderilemez.", "error")
+        return redirect(url_for("admin.messages_list", sayfa=request.form.get("sayfa", 1)))
+
+    ref = messages[idx].get("ref", mid)
+    messages[idx]["resolution"] = resolution_text
+    messages[idx]["resolved_at"] = _now_iso()
+    messages[idx]["resolved_by"] = actor["email"]
+    messages[idx]["status"] = "resolved"
+
+    html = _render_email_html(
+        "contact_resolution.html", subject=f"[{ref}] Talebiniz sonuçlandırıldı",
+        name=messages[idx].get("name"), ref=ref, category=messages[idx].get("category", ""),
+        resolution_text=resolution_text,
+    )
+    text = f"[{ref}] Talebiniz sonuçlandırıldı.\n\n{resolution_text}"
+    job = outbox.enqueue(
+        "transactional", messages[idx]["email"], f"[{ref}] Talebiniz sonuçlandırıldı", text, html_body=html,
+        reply_to=mailer.EMAIL_CONTACT_REPLY_TO, idempotency_key=f"contact_resolution:{mid}",
+    )
+    messages[idx]["resolution_sent_at"] = job["created_at"]
+    store.save_messages(messages)
+    store.append_audit(actor["email"], "reader_message_resolved", ref)
+    flash("Çözüm e-postası gönderim kuyruğuna alındı.", "success")
     return redirect(url_for("admin.messages_list", sayfa=request.form.get("sayfa", 1)))
 
 
@@ -1672,30 +1860,72 @@ def _audit_issue_schedule_change(actor_email, before, after):
         store.append_audit(actor_email, "issue_schedule_cancelled", after["title"], {"new_status": after["status"]})
 
 
+def _bulletin_footer_links(subscriber, target_preference):
+    """(manage_url, unsubscribe_url, category_unsubscribe_url) -- '#'
+    placeholders for a test send, which has no real subscriber id."""
+    if not subscriber or subscriber.get("id") == "test":
+        return "#", "#", "#"
+    sid = subscriber["id"]
+    cat_url = url_for("unsubscribe_page", token=subscriptions.unsubscribe_token(app.secret_key, sid),
+                       kategori=target_preference, _external=True)
+    return _manage_url(sid), _unsubscribe_url(sid), cat_url
+
+
+def _render_bulletin(bulletin, subscriber):
+    """The render_fn bulletins.py's send_campaign()/send_test() call once
+    per recipient. Content (article headlines/images/issue cover) is
+    resolved fresh here, not baked into the bulletin record."""
+    lead, others = bulletins.resolve_articles(bulletin)
+    manage_url, unsub_url, cat_unsub_url = _bulletin_footer_links(subscriber, bulletin["target_preference"])
+    subject = bulletin["subject"]
+
+    if bulletin["kind"] == "new_issue" and bulletin.get("issue_id"):
+        issue = store.get_issue(bulletin["issue_id"]) or {}
+        issue_url = url_for("gazete_oku", issue_id=issue.get("id"), _external=True) if issue else "#"
+        html = render_template(
+            "email/bulletin_new_issue.html", subject=subject, preheader=bulletin.get("preheader"),
+            issue=issue, issue_url=issue_url, bulletin=bulletin, lead_article=lead, other_articles=others,
+            privacy_url=_privacy_url(), manage_url=manage_url, unsubscribe_url=unsub_url,
+        )
+        lines = [f"THE EUROVILLAGE HERALD — SAYI {issue.get('no')} YAYINDA", "", issue.get("title", ""), ""]
+        if bulletin.get("intro_text"):
+            lines += [bulletin["intro_text"], ""]
+        lines += [f"Gazeteyi oku: {issue_url}", ""]
+        if lead or others:
+            lines.append("BU SAYIDAN:")
+            for a in ([lead] if lead else []) + others:
+                lines.append(f"- {a['title']} — " + url_for("article_page", slug=a["slug"], _external=True))
+    else:
+        kind_label = bulletins.BULLETIN_KIND_LABELS.get(bulletin["kind"], bulletin["kind"])
+        html = render_template(
+            "email/bulletin_generic.html", subject=subject, preheader=bulletin.get("preheader"),
+            kind_label=kind_label, bulletin=bulletin, lead_article=lead, other_articles=others,
+            privacy_url=_privacy_url(), manage_url=manage_url, unsubscribe_url=unsub_url,
+        )
+        lines = [f"THE EUROVILLAGE HERALD — {kind_label.upper()}", "", bulletin["internal_title"], ""]
+        if bulletin.get("intro_text"):
+            lines += [bulletin["intro_text"], ""]
+        for a in ([lead] if lead else []) + others:
+            lines.append(f"- {a['title']} — " + url_for("article_page", slug=a["slug"], _external=True))
+
+    lines += ["", f"Tercihlerimi yönet: {manage_url}", f"Abonelikten çık: {unsub_url}"]
+    return subject, "\n".join(lines), html
+
+
 def _on_issue_published(issue):
     """Fires exactly once per issue -- see store.load_issues()'s
     announcement_sent_at self-heal and _process_due_issues() below for
-    how "exactly once, restart-safe" is guaranteed. Sends the "new issue"
-    email to every confirmed new_issue subscriber and generates the
-    announcement draft bundle for editorial review. Never publishes or
-    sends anything beyond the transactional notification itself -- the
-    draft this creates always has status="draft"."""
-    issue_url = url_for("gazete_oku", issue_id=issue["id"], _external=True)
-    title = issue.get("title") or f"Sayı {issue.get('no')}"
-    subject = f"Yeni Sayı: {title} — The Eurovillage Herald"
-    for sub in store.confirmed_subscribers("new_issue"):
-        unsub_url = url_for(
-            "unsubscribe_page",
-            token=subscriptions.unsubscribe_token(app.secret_key, sub["id"]),
-            _external=True,
-        )
-        text_body = (
-            f"The Eurovillage Herald'ın yeni sayısı yayında: {title}\n\n"
-            f"Okumak için: {issue_url}\n\n"
-            "Bu e-postayı, yeni sayı bildirimleri için abone olduğunuz için alıyorsunuz.\n"
-            f"Abonelikten çıkmak için: {unsub_url}"
-        )
-        mailer.send(sub["email"], subject, text_body)
+    how "exactly once, restart-safe" is guaranteed. Auto-creates (if
+    needed) and sends a NEW_ISSUE bulletin to every confirmed new_issue
+    subscriber, via the durable outbox (so a provider outage delays
+    delivery, it never blocks or fails issue publication itself), and
+    generates the announcement draft bundle for editorial review. The
+    bulletin uses every article associated with the issue as its default
+    "Bu Sayıdan" selection -- an editor can still review/resend a
+    corrected version manually from the Bültenler admin afterward."""
+    bulletin = bulletins.create_new_issue_bulletin_if_needed(issue)
+    if bulletin["status"] == "draft":
+        bulletins.send_campaign(bulletin["id"], "system", _render_bulletin)
     drafts.generate_issue_announcement_if_needed(issue)
 
 
@@ -1703,12 +1933,15 @@ def _process_due_issues():
     """Timestamp-driven, restart-safe -- no background scheduler.
     store.load_issues() already flips a scheduled issue to "published" the
     moment its publish_at has passed, on every read; this additionally
-    fires the one-time "announce it" side effects (email + draft) for any
-    issue that is published/archived but hasn't been announced yet, then
-    stamps announcement_sent_at so a later call -- even after a full
-    redeploy mid-flight -- is a no-op for that issue. Called from the
-    routes that actually touch issues (public archive/reader, admin
-    dashboard/issue list), not on every request site-wide."""
+    fires the one-time "announce it" side effects (bulletin + draft) for
+    any issue that is published/archived but hasn't been announced yet,
+    then stamps announcement_sent_at so a later call -- even after a full
+    redeploy mid-flight -- is a no-op for that issue. Also drains any
+    scheduled bulletins that have come due and processes a batch of the
+    email outbox, for the same reason: called from routes that actually
+    touch issues/the public site, not on every request site-wide, but
+    opportunistically enough that a real deploy keeps things moving
+    without a background worker."""
     issues = store.load_issues()
     changed = False
     for i in issues:
@@ -1718,6 +1951,8 @@ def _process_due_issues():
             changed = True
     if changed:
         store.save_issues(issues)
+    bulletins.process_scheduled_bulletins(_render_bulletin)
+    outbox.process_outbox(limit=25)
 
 
 def _issue_form_common_fields(form, existing=None):
@@ -3280,7 +3515,215 @@ def subscribers_list():
     counts = {"pending": 0, "confirmed": 0, "unsubscribed": 0}
     for s in subs:
         counts[s.get("status", "pending")] = counts.get(s.get("status", "pending"), 0) + 1
-    return render_template("admin/subscribers_list.html", subs=subs, counts=counts, active="subscribers")
+    return render_template("admin/subscribers_list.html", subs=subs, counts=counts,
+                            preference_labels=subscriptions.PREFERENCE_LABELS, active="subscribers")
+
+
+# ------------------------------------------------------ admin: bulletins --
+# The editorial bulletin/newsletter CMS. Saving a draft never sends
+# anything -- only /gonder-onayla's explicit POST (send_campaign) does.
+
+@admin_bp.route("/bultenler")
+@permission_required("bulletins")
+def bulletins_list():
+    all_bulletins = sorted(store.load_bulletins(), key=lambda b: b.get("created_at", ""), reverse=True)
+    return render_template("admin/bulletins_list.html", bulletins=all_bulletins,
+                            kind_labels=bulletins.BULLETIN_KIND_LABELS,
+                            preference_labels=subscriptions.PREFERENCE_LABELS, active="bulletins")
+
+
+@admin_bp.route("/bultenler/yeni", methods=["GET", "POST"])
+@permission_required("bulletins")
+def bulletin_new():
+    actor = _resolve_logged_in_user()
+    if request.method == "POST":
+        kind = request.form.get("kind", "custom")
+        article_slugs = [s for s in request.form.getlist("article_slugs") if store.get_article(s, published_only=True)]
+        lead = request.form.get("lead_article_slug") or (article_slugs[0] if article_slugs else None)
+        bulletin = bulletins.create_draft(
+            kind, actor["email"],
+            internal_title=request.form.get("internal_title", "").strip(),
+            subject=request.form.get("subject", "").strip(),
+            preheader=request.form.get("preheader", "").strip(),
+            target_preference=request.form.get("target_preference", "new_issue"),
+            issue_id=request.form.get("issue_id") or None,
+            intro_text=request.form.get("intro_text", "").strip(),
+            lead_article_slug=lead, article_slugs=article_slugs,
+        )
+        flash("Bülten taslağı oluşturuldu.", "success")
+        return redirect(url_for("admin.bulletin_edit", bulletin_id=bulletin["id"]))
+
+    kind = request.args.get("kind", "custom")
+    suggested_slugs = []
+    if kind == "popular_stories":
+        top = analytics.top_article_slugs(days=7, limit=15)
+        suggested_slugs = [slug for slug, _ in top]
+    articles = store.all_articles_sorted(published_only=True)
+    return render_template("admin/bulletin_form.html", bulletin=None, kind=kind,
+                            kind_labels=bulletins.BULLETIN_KIND_LABELS,
+                            preference_choices=subscriptions.PREFERENCE_CHOICES,
+                            articles=articles, suggested_slugs=suggested_slugs,
+                            issues=store.all_issues_sorted(), active="bulletins")
+
+
+@admin_bp.route("/bultenler/<bulletin_id>/duzenle", methods=["GET", "POST"])
+@permission_required("bulletins")
+def bulletin_edit(bulletin_id):
+    bulletin = store.get_bulletin(bulletin_id)
+    if not bulletin:
+        abort(404)
+    if request.method == "POST":
+        if bulletin["status"] not in ("draft", "scheduled"):
+            flash("Gönderilmiş veya iptal edilmiş bir bülten düzenlenemez.", "error")
+            return redirect(url_for("admin.bulletins_list"))
+        article_slugs = [s for s in request.form.getlist("article_slugs") if store.get_article(s, published_only=True)]
+        lead = request.form.get("lead_article_slug") or (article_slugs[0] if article_slugs else None)
+        scheduled_at = None
+        if request.form.get("schedule_choice") == "scheduled":
+            scheduled_at = editorial_tz.local_input_to_utc_iso(request.form.get("scheduled_at", ""))
+        bulletins.update_draft(
+            bulletin_id, internal_title=request.form.get("internal_title", "").strip(),
+            subject=request.form.get("subject", "").strip(), preheader=request.form.get("preheader", "").strip(),
+            target_preference=request.form.get("target_preference", bulletin["target_preference"]),
+            issue_id=request.form.get("issue_id") or None, intro_text=request.form.get("intro_text", "").strip(),
+            lead_article_slug=lead, article_slugs=article_slugs, scheduled_at=scheduled_at,
+        )
+        flash("Bülten güncellendi.", "success")
+        return redirect(url_for("admin.bulletin_edit", bulletin_id=bulletin_id))
+
+    articles = store.all_articles_sorted(published_only=True)
+    suggested_slugs = [s for s, _ in analytics.top_article_slugs(days=7, limit=15)] if bulletin["kind"] == "popular_stories" else []
+    return render_template("admin/bulletin_form.html", bulletin=bulletin, kind=bulletin["kind"],
+                            kind_labels=bulletins.BULLETIN_KIND_LABELS,
+                            preference_choices=subscriptions.PREFERENCE_CHOICES,
+                            articles=articles, suggested_slugs=suggested_slugs,
+                            issues=store.all_issues_sorted(), active="bulletins")
+
+
+@admin_bp.route("/bultenler/<bulletin_id>/onizle")
+@permission_required("bulletins")
+def bulletin_preview(bulletin_id):
+    bulletin = store.get_bulletin(bulletin_id)
+    if not bulletin:
+        abort(404)
+    fake_subscriber = {"id": "test", "email": "onizleme@eurovillageherald.com"}
+    subject, text_body, html_body = _render_bulletin(bulletin, fake_subscriber)
+    audience = bulletins.audience_preview(bulletin)
+    return render_template("admin/bulletin_preview.html", bulletin=bulletin, subject=subject,
+                            html_body=html_body, text_body=text_body, audience=audience,
+                            sender=mailer.EMAIL_BULLETIN_FROM, active="bulletins")
+
+
+@admin_bp.route("/bultenler/<bulletin_id>/test-gonder", methods=["POST"])
+@permission_required("bulletins")
+def bulletin_send_test(bulletin_id):
+    bulletin = store.get_bulletin(bulletin_id)
+    if not bulletin:
+        abort(404)
+    raw = request.form.get("test_addresses", "")
+    addresses = [a.strip() for a in re.split(r"[,\s]+", raw) if a.strip() and "@" in a]
+    if not addresses:
+        flash("Geçerli en az bir test adresi girin.", "error")
+        return redirect(url_for("admin.bulletin_preview", bulletin_id=bulletin_id))
+    count = bulletins.send_test(bulletin_id, addresses, _render_bulletin)
+    outbox.process_outbox(limit=len(addresses) + 5)
+    store.append_audit(_resolve_logged_in_user()["email"], "bulletin_test_sent", bulletin["internal_title"],
+                        {"addresses": addresses})
+    flash(f"{count} test e-postası gönderim kuyruğuna alındı (gerçek abonelere gönderilmedi).", "success")
+    return redirect(url_for("admin.bulletin_preview", bulletin_id=bulletin_id))
+
+
+@admin_bp.route("/bultenler/<bulletin_id>/gonder-onayla")
+@permission_required("bulletins")
+def bulletin_send_confirm(bulletin_id):
+    """The explicit audience-safety screen -- required before send_campaign
+    can be called. Shows exactly who will/won't receive this before any
+    real subscriber mail is queued."""
+    bulletin = store.get_bulletin(bulletin_id)
+    if not bulletin or bulletin["status"] not in ("draft", "scheduled"):
+        abort(404)
+    audience = bulletins.audience_preview(bulletin)
+    return render_template("admin/bulletin_send_confirm.html", bulletin=bulletin, audience=audience,
+                            sender=mailer.EMAIL_BULLETIN_FROM,
+                            preference_label=subscriptions.PREFERENCE_LABELS.get(bulletin["target_preference"]),
+                            active="bulletins")
+
+
+@admin_bp.route("/bultenler/<bulletin_id>/gonder", methods=["POST"])
+@permission_required("bulletins")
+def bulletin_send(bulletin_id):
+    actor = _resolve_logged_in_user()
+    bulletin = bulletins.send_campaign(bulletin_id, actor["email"], _render_bulletin)
+    if not bulletin:
+        flash("Bu bülten gönderilemedi (zaten gönderilmiş veya iptal edilmiş olabilir).", "error")
+        return redirect(url_for("admin.bulletins_list"))
+    store.append_audit(actor["email"], "bulletin_sent", bulletin["internal_title"],
+                        {"recipients": bulletin["recipients_total"]})
+    flash(f"Bülten {bulletin['recipients_total']} aboneye gönderim kuyruğuna alındı.", "success")
+    return redirect(url_for("admin.bulletins_list"))
+
+
+@admin_bp.route("/bultenler/<bulletin_id>/iptal", methods=["POST"])
+@permission_required("bulletins")
+def bulletin_cancel(bulletin_id):
+    if bulletins.cancel(bulletin_id):
+        flash("Zamanlanmış bülten iptal edildi.", "success")
+    else:
+        flash("Bu bülten iptal edilemedi (zamanlanmış durumda değil).", "error")
+    return redirect(url_for("admin.bulletins_list"))
+
+
+# --------------------------------------------------- admin: email system --
+# Non-secret operational visibility only -- never renders EMAIL_API_KEY or
+# SMTP_PASSWORD. Deliberately gated by the same "bulletins" permission as
+# the bulletin CMS (an editor who can send campaigns needs to see whether
+# they're actually going out).
+
+@admin_bp.route("/eposta-sistemi")
+@permission_required("bulletins")
+def email_system_health():
+    return render_template("admin/email_system.html", identities=mailer.sender_identities(),
+                            outbox_stats=outbox.stats(), failed=outbox.failed_jobs(), active="email_system")
+
+
+@admin_bp.route("/eposta-sistemi/yeniden-dene/<job_id>", methods=["POST"])
+@permission_required("bulletins")
+def email_job_retry(job_id):
+    if outbox.retry_job(job_id):
+        outbox.process_outbox(limit=1)
+        flash("Gönderim yeniden denendi.", "success")
+    else:
+        flash("Bu iş yeniden denenemedi (başarısız durumda değil).", "error")
+    return redirect(url_for("admin.email_system_health"))
+
+
+@admin_bp.route("/eposta-sistemi/kuyruk-isle", methods=["POST"])
+@permission_required("bulletins")
+def email_process_now():
+    count = outbox.process_outbox(limit=100)
+    flash(f"{count} gönderim işlendi.", "success")
+    return redirect(url_for("admin.email_system_health"))
+
+
+# Optional: an unauthenticated-by-session, bearer-token-protected endpoint
+# a Railway Cron job can hit periodically to drain the outbox on a site
+# whose natural traffic doesn't visit admin/public pages often enough to
+# rely on the opportunistic processing in _process_due_issues() alone.
+# See .env.example's EMAIL_OUTBOX_CRON_TOKEN and the deployment docs this
+# feature adds for exact setup -- unset by default, so this route 404s
+# (not "500" or "silently accepts anything") until deliberately enabled.
+EMAIL_OUTBOX_CRON_TOKEN = os.environ.get("EMAIL_OUTBOX_CRON_TOKEN", "").strip()
+
+
+@app.route("/internal/e-posta/isle", methods=["POST"])
+def internal_process_outbox():
+    if not EMAIL_OUTBOX_CRON_TOKEN:
+        abort(404)
+    provided = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    if not provided or not secrets.compare_digest(provided, EMAIL_OUTBOX_CRON_TOKEN):
+        abort(403)
+    count = outbox.process_outbox(limit=200)
+    return jsonify(processed=count)
 
 
 # ----------------------------------------------------------- admin: roles --

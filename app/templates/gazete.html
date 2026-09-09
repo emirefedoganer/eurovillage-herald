@@ -41,12 +41,26 @@
 
 <div class="subscribe-widget">
   <div class="subscribe-widget-text">
-    <strong>Yeni sayı yayımlandığında haberdar olun.</strong>
-    <p>E-posta adresinizi bırakın, yeni bir sayı çıktığında size haber verelim.</p>
+    <strong>The Eurovillage Herald'a abone olun</strong>
+    <p>Yeni sayılar ve seçili haberler yayımlandığında haberiniz olsun.</p>
   </div>
   <form method="post" action="{{ url_for('subscribe_submit') }}" class="subscribe-widget-form">
     <input type="email" name="email" placeholder="e-posta adresiniz" required maxlength="200">
-    <input type="hidden" name="pref_new_issue" value="1">
+    <div style="display:flex; flex-wrap:wrap; gap:4px 18px; margin:10px 0; font-family:var(--font-sans); font-size:13px;">
+      {% for key, label in preference_choices %}
+      <label style="display:flex; align-items:center; gap:6px; font-weight:400;">
+        <input type="checkbox" name="pref_{{ key }}" value="1" style="width:auto;" {{ 'checked' if key == 'new_issue' else '' }}>
+        {{ label }}
+      </label>
+      {% endfor %}
+    </div>
+    <label style="display:flex; align-items:flex-start; gap:8px; font-family:var(--font-sans); font-size:12px; margin:10px 0; font-weight:400;">
+      <input type="checkbox" name="privacy_ack" value="1" required style="width:auto; margin-top:2px;">
+      <span>
+        <a href="{{ url_for('privacy_notice') }}" target="_blank" style="text-decoration:underline; color: var(--red);">Gizlilik Bildirimi</a>'ni
+        okudum, e-posta adresimin bu amaçla işlenmesini onaylıyorum.
+      </span>
+    </label>
     <div style="margin: 10px 0;">{{ turnstile_widget() }}</div>
     <button class="btn btn-red" type="submit">Abone Ol</button>
   </form>

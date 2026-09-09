@@ -1,0 +1,81 @@
+{#
+Shared HTML email layout for The Eurovillage Herald.
+
+Deliberately NOT the site stylesheet -- table-based, inline-styled,
+web-safe fonts only (Georgia/Times New Roman for the editorial serif
+voice, Arial/Helvetica for UI text), because email clients (Outlook's
+Word rendering engine especially) do not reliably support flexbox, CSS
+variables, web fonts, or external stylesheets. Every color/spacing value
+here is a direct value, not a var() -- intentional duplication of the
+site's palette (#c8102e red, #131313 near-black, #f4f3f0 warm gray),
+not a maintenance hazard, since email HTML can never actually share a
+stylesheet with the website.
+
+preheader: a short line of pre-header text shown by inbox previews
+(Gmail/Apple Mail list view) right after the subject -- hidden in the
+rendered body via zero-size/display:none-safe tricks.
+#}
+<!doctype html>
+<html lang="tr" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>{{ subject }}</title>
+<!--[if mso]>
+<style type="text/css">
+  table, td { font-family: Georgia, 'Times New Roman', serif; }
+</style>
+<![endif]-->
+</head>
+<body style="margin:0; padding:0; background-color:#f4f3f0; -webkit-text-size-adjust:100%; text-size-adjust:100%;">
+{% if preheader %}
+<div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#f4f3f0;">
+  {{ preheader }}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
+</div>
+{% endif %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f3f0;">
+  <tr>
+    <td align="center" style="padding:24px 12px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:100%; background-color:#ffffff;">
+
+        <!-- masthead -->
+        <tr>
+          <td style="background-color:#131313; padding:22px 30px; text-align:center;">
+            <span style="font-family:Georgia,'Times New Roman',serif; font-size:26px; font-weight:bold; color:#ffffff; letter-spacing:0.5px;">
+              The Eurovillage Herald
+            </span>
+          </td>
+        </tr>
+        <tr><td style="height:4px; background-color:#c8102e; line-height:4px; font-size:0;">&nbsp;</td></tr>
+
+        <!-- content -->
+        <tr>
+          <td style="padding:32px 30px; font-family:Georgia,'Times New Roman',serif; color:#1a1a1a; font-size:16px; line-height:1.55;">
+            {% block content %}{% endblock %}
+          </td>
+        </tr>
+
+        <!-- footer -->
+        <tr>
+          <td style="padding:24px 30px; border-top:1px solid #e2e2e2; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#6b6b6b; line-height:1.6;">
+            {% block footer %}
+            <p style="margin:0 0 8px;">The Eurovillage Herald — Eurovillage'ın ilk ve bağımsız gazetesi</p>
+            <p style="margin:0 0 8px;">
+              Bu e-postayı, aboneliklerinizle ilgili bir işlem gerçekleştirdiğiniz için alıyorsunuz.
+            </p>
+            <p style="margin:0;">
+              <a href="{{ privacy_url }}" style="color:#6b6b6b;">Gizlilik / KVKK</a>
+              {% if manage_url %} · <a href="{{ manage_url }}" style="color:#6b6b6b;">Tercihlerimi Yönet</a>{% endif %}
+              {% if unsubscribe_url %} · <a href="{{ unsubscribe_url }}" style="color:#6b6b6b;">Abonelikten Çık</a>{% endif %}
+            </p>
+            {% endblock %}
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

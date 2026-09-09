@@ -6,11 +6,22 @@
 <div class="section-header"><h1>Abonelikten Çık</h1></div>
 {% if email %}
 <p style="font-family: var(--font-sans); font-size: 15px; max-width: 560px;">
+  {% if category_label %}
+  <strong>{{ email }}</strong> adresini yalnızca <strong>"{{ category_label }}"</strong> bildirimlerinden
+  çıkarmak istediğinize emin misiniz? Diğer abonelik tercihleriniz etkilenmeyecek.
+  {% else %}
   <strong>{{ email }}</strong> adresini bildirim aboneliğinden çıkarmak istediğinize emin misiniz?
+  {% endif %}
 </p>
 <form method="post">
-  <button class="btn btn-red" type="submit">Evet, Abonelikten Çık</button>
+  <button class="btn btn-red" type="submit">{{ 'Evet, Bu Kategoriden Çık' if category_label else 'Evet, Abonelikten Çık' }}</button>
 </form>
+{% if not category_label %}
+<p class="hint" style="max-width:560px;">
+  Tüm bildirimlerden değil, yalnızca belirli bir kategoriden ayrılmak mı istiyorsunuz? Aldığınız
+  e-postaların altındaki "Tercihlerimi Yönet" bağlantısından tek tek kategori seçebilirsiniz.
+</p>
+{% endif %}
 {% else %}
 <p style="font-family: var(--font-sans); font-size: 15px;">Bu abonelik zaten kaldırılmış görünüyor.</p>
 {% endif %}

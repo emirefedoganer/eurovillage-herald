@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Abonelik Tercihlerim — {{ site.name }}{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+
+<div class="section-header"><h1>Abonelik Tercihlerim</h1></div>
+
+<p style="font-family: var(--font-sans); font-size: 15px; max-width: 560px;">
+  <strong>{{ sub.email }}</strong> için bildirim tercihlerinizi buradan güncelleyebilirsiniz.
+  Bir kategoriyi kapatmak, o kategoriye ait e-postaları almayı durdurur; hesap oluşturmanız
+  veya giriş yapmanız gerekmez.
+</p>
+
+<form method="post" style="max-width:480px;">
+  {% for key, label in preference_choices %}
+  <label style="display:flex; align-items:center; gap:10px; font-family:var(--font-sans); font-size:15px; margin-bottom:12px; font-weight:400;">
+    <input type="checkbox" name="pref_{{ key }}" style="width:auto;"
+           {{ 'checked' if (sub.preferences or {}).get(key) else '' }}>
+    {{ label }}
+  </label>
+  {% endfor %}
+  <div class="form-actions" style="margin-top:16px;">
+    <button class="btn btn-red" type="submit">Tercihlerimi Kaydet</button>
+  </div>
+</form>
+
+<p style="font-family: var(--font-sans); font-size: 14px; max-width: 560px; margin-top:28px; color: var(--gray-500);">
+  Hiçbir kutuyu işaretlemeden kaydetmek, tüm editoryal bildirimleri kapatır ancak aboneliğinizi
+  tamamen silmez — istediğiniz zaman buraya dönüp yeniden açabilirsiniz.
+  Gizlilik uygulamalarımız hakkında bilgi için <a href="{{ url_for('privacy_notice') }}">Gizlilik Bildirimi</a>
+  sayfasına bakabilirsiniz.
+</p>
+
+{% endblock %}

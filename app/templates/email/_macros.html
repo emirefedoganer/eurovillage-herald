@@ -1,0 +1,27 @@
+{% macro article_card(article, is_lead=False) %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px; border:1px solid #e2e2e2;">
+  {% if article.image %}
+  <tr>
+    <td>
+      <a href="{{ url_for('article_page', slug=article.slug, _external=True) }}" style="text-decoration:none;">
+        <img src="{{ media_url(article.image, 'img/articles', external=True) }}" width="600" alt="{{ article.title }}" style="display:block; width:100%; max-width:600px; height:auto; border:0;">
+      </a>
+    </td>
+  </tr>
+  {% endif %}
+  <tr>
+    <td style="padding:16px 18px;">
+      {% if article.kicker %}
+      <span style="display:block; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:bold; letter-spacing:0.06em; color:#c8102e; text-transform:uppercase; margin-bottom:6px;">{{ article.kicker }}</span>
+      {% endif %}
+      <a href="{{ url_for('article_page', slug=article.slug, _external=True) }}" style="text-decoration:none; color:#1a1a1a;">
+        <span style="display:block; font-family:Georgia,'Times New Roman',serif; font-size:{{ '22px' if is_lead else '18px' }}; line-height:1.3; margin-bottom:6px;">{{ article.title }}</span>
+      </a>
+      {% if article.dek %}
+      <span style="display:block; font-family:Georgia,'Times New Roman',serif; font-size:14px; color:#444444; line-height:1.5; margin-bottom:10px;">{{ article.dek }}</span>
+      {% endif %}
+      <a href="{{ url_for('article_page', slug=article.slug, _external=True) }}" style="display:inline-block; font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; color:#c8102e; text-decoration:none;">Haberi Oku →</a>
+    </td>
+  </tr>
+</table>
+{% endmacro %}

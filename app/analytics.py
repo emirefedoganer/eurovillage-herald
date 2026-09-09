@@ -141,3 +141,38 @@ def all_issue_summaries():
     """issue_id -> summary for every issue with at least one recorded
     event -- powers the newspaper-wide analytics overview."""
     return {issue_id: issue_summary(issue_id) for issue_id in store.load_issue_analytics()}
+
+
+# ------------------------------------------------------------- article views --
+# Minimal, popularity-only counting -- a per-slug, per-day integer, never
+# anything per-visitor (no reader_id here at all). This exists purely to
+# let the bulletin CMS SUGGEST "most read this week" stories -- it is a
+# suggestion input, never a decision-maker: see app/bulletins.py, which
+# always leaves inclusion/exclusion/order/lead to the editor.
+
+def record_article_view(slug):
+    if not slug:
+        return
+    from datetime import datetime, timezone
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    data = store.load_article_views()
+    per_day = data.setdefault(slug, {})
+    per_day[day] = per_day.get(day, 0) + 1
+    store.save_article_views(data)
+
+
+def top_article_slugs(days=7, limit=10):
+    """[(slug, view_count), ...] sorted by views over the last `days`
+    days, most-viewed first. Empty if there's no view data yet (e.g. a
+    fresh deploy) -- callers must fall back to manual selection in that
+    case, never treat this as an error."""
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_str = cutoff.strftime("%Y-%m-%d")
+    data = store.load_article_views()
+    totals = {}
+    for slug, per_day in data.items():
+        total = sum(count for day, count in per_day.items() if day >= cutoff_str)
+        if total:
+            totals[slug] = total
+    return sorted(totals.items(), key=lambda kv: -kv[1])[:limit]

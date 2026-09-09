@@ -7,6 +7,19 @@
     "description": "Eurovillage Büyükşehir Belediyesi seçimleri, darbe girişimi ve yeni dönemin ilk kapsamlı dosyası. Obgis'in üçüncü dönem zaferinden Akbadain Dükü'nün darbe girişimine, seçim analizinden Bakır Parkı'nın açılışına kadar kentin gündemi bu sayıda.",
     "cover_image": "obgis-baskan-konusma.jpg",
     "pdf": "sayi-01-secim-ozel.pdf",
-    "pages": 8
+    "pages": 8,
+    "slug": "sayi-01-secim-ozel",
+    "status": "published",
+    "issue_type": "regular",
+    "editor_note": "",
+    "publish_at": null,
+    "created_at": "2026-08-08T00:00:00Z",
+    "updated_at": "2026-08-08T00:00:00Z",
+    "published_at": "2026-08-08T00:00:00Z",
+    "preview_token_hash": null,
+    "preview_token_expires_at": null,
+    "preview_token_created_at": null,
+    "file_size": null,
+    "announcement_sent_at": "2026-08-08T00:00:00Z"
   }
 ]
