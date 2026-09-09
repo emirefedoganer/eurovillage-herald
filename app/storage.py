@@ -26,7 +26,14 @@ R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME", "").strip()
 R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
 R2_ENDPOINT_URL = (
     os.environ.get("R2_ENDPOINT_URL", "").strip().rstrip("/")
-    or (f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else "")
+    # Both buckets are EU-jurisdiction R2 buckets, which live on Cloudflare's
+    # EU-specific S3 endpoint (eu.r2.cloudflarestorage.com), not the default
+    # one -- a jurisdiction-mismatched endpoint fails auth even with
+    # otherwise-correct credentials. There is exactly one client (see
+    # _get_client() below), shared by both upload_fileobj() (public bucket)
+    # and upload_private_fileobj() (private bucket), so this single value
+    # is what both paths use -- there is no second endpoint to keep in sync.
+    or (f"https://{R2_ACCOUNT_ID}.eu.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else "")
 )
 
 # Optional separate bucket for private, non-public objects (reader-tip
