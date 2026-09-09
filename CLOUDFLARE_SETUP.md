@@ -22,10 +22,12 @@ guarantee against ever silently falling back again.
    other hostname the public site is reachable on).
 4. Create it, then copy the **Site Key** and **Secret Key** into
    `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` on Railway.
-5. That's it — the same widget protects both the site-wide visitor gate and
-   the contact form (and any future form built with `turnstile.check()`).
-   You do not need a second widget unless you specifically want separate
-   analytics per surface.
+5. That's it — the same widget protects the site-wide visitor gate, the
+   contact form, and the newsletter subscription form on `/gazete` (and any
+   future form built with `turnstile.check()`). You do not need a second
+   widget unless you specifically want separate analytics per surface --
+   this project deliberately reuses one shared verification helper
+   (`app/turnstile.py`) rather than a per-form implementation.
 6. Once both keys are set on Railway and you've confirmed the gate works,
    consider setting `TURNSTILE_REQUIRED=true` as well — this makes the app
    refuse to start in production if these keys are ever unset again (a

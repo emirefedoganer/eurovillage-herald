@@ -48,7 +48,7 @@ UNSUBSCRIBE_SALT = "issue-unsubscribe"
 # reader opted into (the `preferences` dict). The single source of truth
 # for this value; app.py's /gizlilik page imports it directly rather than
 # defining its own copy.
-CURRENT_PRIVACY_NOTICE_VERSION = "2026-09-v1"
+CURRENT_PRIVACY_NOTICE_VERSION = "2026-09-v2"
 
 
 def validate_email(email):

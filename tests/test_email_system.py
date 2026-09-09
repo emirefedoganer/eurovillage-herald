@@ -55,10 +55,25 @@ def _seed_minimal_data(data_dir):
          "status": "active", "password_hash": "x", "must_change_password": False},
         {"id": "custom1", "email": "custom@test.com", "account_role": "custom",
          "status": "active", "password_hash": "x", "must_change_password": False},
+        # A maximally-permissioned NON-master-admin role: every current
+        # PERMISSION_CHOICES entry granted, PLUS the retired "newspaper"/
+        # "bulletins"/"messages" strings a pre-hardening role record might
+        # still carry on disk. Used to prove those old strings are inert,
+        # not just "not yet granted".
+        {"id": "poweruser1", "email": "poweruser@test.com", "account_role": "poweruser",
+         "status": "active", "password_hash": "x", "must_change_password": False},
+        # A genuine author/contributor account (tied to authors.json's
+        # "auth1" below) -- the "ordinary newsroom user" the task asks to
+        # verify is denied, distinct from a custom-role admin account.
+        {"id": "user1", "email": "author@test.com", "account_role": "author",
+         "status": "active", "password_hash": "x", "must_change_password": False},
     ])
     write("roles.json", [
         {"id": "master_admin", "name": "Master Admin", "permissions": [], "system": True},
         {"id": "custom", "name": "Custom", "permissions": [], "system": False},
+        {"id": "poweruser", "name": "Power User",
+         "permissions": ["games", "site_settings", "audit_log", "newspaper", "bulletins", "messages"],
+         "system": False},
     ])
     write("newspaper_management.json", [])
     write("ads.json", [])
@@ -578,40 +593,214 @@ class IssuePublicationBulletinTests(EmailSystemTestCase):
 
 
 class PermissionBoundaryTests(EmailSystemTestCase):
-    def test_bulletins_admin_requires_permission(self):
-        self.login_as("custom1")
-        for path in ("/admin/bultenler", "/admin/bultenler/yeni", "/admin/eposta-sistemi"):
-            r = self.client.get(path)
-            self.assertEqual(r.status_code, 403, path)
+    """Legacy name kept for the two tests that predate the Master-Admin
+    hardening pass; the exhaustive per-route matrix lives in
+    MasterAdminAuthorizationTests below."""
+
+    def test_internal_cron_endpoint_404s_when_token_unset(self):
+        r = self.client.post("/internal/e-posta/isle")
+        self.assertEqual(r.status_code, 404)
 
     def test_master_admin_always_has_bulletin_access(self):
         self.login_as("master1")
         r = self.client.get("/admin/bultenler")
         self.assertEqual(r.status_code, 200)
 
-    def test_granting_bulletins_permission_to_custom_role_works(self):
-        roles = self.load("roles.json")
-        for role in roles:
-            if role["id"] == "custom":
-                role["permissions"] = ["bulletins"]
-        self.save("roles.json", roles)
-        self.login_as("custom1")
-        r = self.client.get("/admin/bultenler")
-        self.assertEqual(r.status_code, 200)
 
-    def test_internal_cron_endpoint_404s_when_token_unset(self):
-        r = self.client.post("/internal/e-posta/isle")
-        self.assertEqual(r.status_code, 404)
+class MasterAdminAuthorizationTests(EmailSystemTestCase):
+    """The hardening pass this class exists for: every privileged surface
+    introduced or extended by the communication system (newspaper/issue
+    administration, bulletin/email administration, subscriber
+    administration, contact/ticket administration) must be reachable ONLY
+    by an account whose account_role is literally "master_admin" --
+    never via a delegable permission, however that permission is named or
+    however a role record happens to be configured on disk.
 
-    def test_subscribers_list_stays_master_admin_only_even_with_bulletins_permission(self):
-        roles = self.load("roles.json")
-        for role in roles:
-            if role["id"] == "custom":
-                role["permissions"] = ["bulletins"]
-        self.save("roles.json", roles)
+    Four non-master-admin principals are exercised against every route:
+      - "poweruser1": every CURRENT PERMISSION_CHOICES entry granted, plus
+        the three RETIRED permission strings ("newspaper"/"bulletins"/
+        "messages") a role saved before this hardening pass might still
+        carry -- proves those strings are inert, not just unassigned.
+      - "custom1": a role with zero permissions at all.
+      - "user1": a genuine author/contributor account (account_role
+        "author", tied to a real author profile) -- the ordinary
+        newsroom-user case, distinct from a custom admin role.
+      - no login at all -- must be redirected to the login page, never
+        shown the protected page or its data.
+
+    A master_admin GET must not be blocked (some also assert real content
+    to catch accidental over-restriction); master_admin's ability to
+    actually perform each POST action is already exercised in depth by
+    BulletinCmsTests/ContactTicketTests/AdminTemplateRenderTests/
+    IssuePublicationBulletinTests elsewhere in this file, so POST rows
+    here focus on the authorization boundary itself.
+    """
+
+    DENIED_PRINCIPALS = ("poweruser1", "custom1", "user1")
+
+    def _setup_fixtures(self):
+        import subscriptions
+        import bulletins
+        import drafts as drafts_mod
+
+        s, t = subscriptions.subscribe("authtest@example.com", {"new_issue": True})
+        subscriptions.confirm(t)
+
+        bulletin = bulletins.create_draft("custom", "editor@test.com", "Auth Test Bulletin", "Subject",
+                                           article_slugs=["existing-article"],
+                                           lead_article_slug="existing-article")
+
+        issue = store.get_issue("sayi-01")
+        draft = drafts_mod.generate_issue_announcement_if_needed(issue)
+
+        self.client.post("/iletisim", data={"email": "tickettest@example.com", "category": "Diğer",
+                                             "message": "Auth test ticket."})
+        message = self.load("messages.json")[0]
+
+        return {
+            "issue_id": "sayi-01",
+            "bulletin_id": bulletin["id"],
+            "draft_id": draft["id"] if draft else "no-draft",
+            "mid": message["id"],
+            "idx": 0,
+        }
+
+    def _protected_routes(self, ids):
+        """(method, path) pairs for every route this hardening pass makes
+        master_admin_required. GET-only where a route is read-only;
+        state-changing routes are POST and deliberately exercised with a
+        real target id so a 403 isn't masked by an incidental 404."""
+        return [
+            # -- newspaper / issue administration --
+            ("GET", "/admin/sayilar"),
+            ("GET", "/admin/sayi/yeni"),
+            ("POST", "/admin/sayi/yeni"),
+            ("GET", f"/admin/sayi/{ids['issue_id']}/duzenle"),
+            ("POST", f"/admin/sayi/{ids['issue_id']}/duzenle"),
+            ("POST", f"/admin/sayi/{ids['issue_id']}/sil"),
+            ("POST", f"/admin/sayi/{ids['issue_id']}/onizleme/olustur"),
+            ("POST", f"/admin/sayi/{ids['issue_id']}/onizleme/iptal"),
+            ("GET", "/admin/gazete-analitik"),
+            ("GET", f"/admin/sayi/{ids['issue_id']}/analitik"),
+            ("GET", "/admin/taslaklar"),
+            ("GET", f"/admin/taslaklar/{ids['draft_id']}"),
+            ("POST", f"/admin/taslaklar/{ids['draft_id']}/kullanildi"),
+            ("POST", f"/admin/taslaklar/{ids['draft_id']}/reddet"),
+            # -- bulletin / email administration --
+            ("GET", "/admin/bultenler"),
+            ("GET", "/admin/bultenler/yeni"),
+            ("POST", "/admin/bultenler/yeni"),
+            ("GET", f"/admin/bultenler/{ids['bulletin_id']}/duzenle"),
+            ("POST", f"/admin/bultenler/{ids['bulletin_id']}/duzenle"),
+            ("GET", f"/admin/bultenler/{ids['bulletin_id']}/onizle"),
+            ("POST", f"/admin/bultenler/{ids['bulletin_id']}/test-gonder"),
+            ("GET", f"/admin/bultenler/{ids['bulletin_id']}/gonder-onayla"),
+            ("POST", f"/admin/bultenler/{ids['bulletin_id']}/gonder"),
+            ("POST", f"/admin/bultenler/{ids['bulletin_id']}/iptal"),
+            ("GET", "/admin/eposta-sistemi"),
+            ("POST", "/admin/eposta-sistemi/yeniden-dene/does-not-exist"),
+            ("POST", "/admin/eposta-sistemi/kuyruk-isle"),
+            # -- subscriber administration --
+            ("GET", "/admin/aboneler"),
+            # -- contact / ticket administration --
+            ("GET", "/admin/mesajlar"),
+            ("POST", f"/admin/mesaj/{ids['mid']}/durum"),
+            ("POST", f"/admin/mesaj/{ids['mid']}/cozum"),
+            (
+                "GET",
+                f"/admin/mesaj/{ids['mid']}/gorsel/{ids['idx']}",
+            ),
+            ("POST", f"/admin/mesaj/{ids['mid']}/sil"),
+        ]
+
+    def _call(self, method, path):
+        if method == "GET":
+            return self.client.get(path)
+        return self.client.post(path, data={})
+
+    def test_master_admin_is_never_blocked(self):
+        ids = self._setup_fixtures()
+        self.login_as("master1")
+        for method, path in self._protected_routes(ids):
+            r = self._call(method, path)
+            self.assertNotEqual(r.status_code, 403, f"master_admin got 403 on {method} {path}")
+
+    def test_poweruser_role_with_every_current_and_legacy_permission_is_denied(self):
+        """The critical case: a role granted every real permission choice
+        PLUS the retired "newspaper"/"bulletins"/"messages" strings must
+        still be denied -- proves the old flags are dead, not dormant."""
+        ids = self._setup_fixtures()
+        self.login_as("poweruser1")
+        for method, path in self._protected_routes(ids):
+            r = self._call(method, path)
+            self.assertEqual(r.status_code, 403, f"poweruser got past auth on {method} {path}")
+
+    def test_zero_permission_custom_role_is_denied(self):
+        ids = self._setup_fixtures()
         self.login_as("custom1")
-        r = self.client.get("/admin/aboneler")
-        self.assertEqual(r.status_code, 403)
+        for method, path in self._protected_routes(ids):
+            r = self._call(method, path)
+            self.assertEqual(r.status_code, 403, f"custom role got past auth on {method} {path}")
+
+    def test_author_contributor_is_denied(self):
+        ids = self._setup_fixtures()
+        self.login_as("user1")
+        for method, path in self._protected_routes(ids):
+            r = self._call(method, path)
+            self.assertEqual(r.status_code, 403, f"author got past auth on {method} {path}")
+
+    def test_unauthenticated_is_redirected_to_login_not_shown_content(self):
+        ids = self._setup_fixtures()
+        for method, path in self._protected_routes(ids):
+            r = self._call(method, path)
+            self.assertIn(r.status_code, (302, 401, 403), f"unauthenticated got {r.status_code} on {method} {path}")
+            if r.status_code == 302:
+                self.assertIn("/admin/login", r.headers.get("Location", ""), f"{method} {path}")
+
+    def test_sensitive_admin_nav_hidden_for_non_master_admin(self):
+        labels = ["Bültenler", "E-posta Sistemi", "Gazete Sayıları", "İletişim / Talepler", "Aboneler"]
+        for user_id in ("poweruser1", "custom1", "user1"):
+            self.login_as(user_id)
+            r = self.client.get("/admin/")
+            body = r.data.decode("utf-8")
+            for label in labels:
+                self.assertNotIn(label, body, f"{user_id} sees a privileged nav link: {label}")
+
+    def test_subscriber_data_never_leaked_to_non_master_admin(self):
+        import subscriptions
+        subscriptions.subscribe("secretsubscriber@example.com", {"new_issue": True})
+        for user_id in ("poweruser1", "custom1", "user1"):
+            self.login_as(user_id)
+            r = self.client.get("/admin/aboneler")
+            self.assertEqual(r.status_code, 403)
+            self.assertNotIn(b"secretsubscriber@example.com", r.data)
+
+    def test_bulletin_audience_data_never_leaked_to_non_master_admin(self):
+        import bulletins
+        b = bulletins.create_draft("custom", "editor@test.com", "Leak Test", "Subj")
+        for user_id in ("poweruser1", "custom1", "user1"):
+            self.login_as(user_id)
+            r = self.client.get(f"/admin/bultenler/{b['id']}/gonder-onayla")
+            self.assertEqual(r.status_code, 403)
+
+    def test_email_system_internals_never_leaked_to_non_master_admin(self):
+        import outbox
+        outbox.enqueue("transactional", "internal@example.com", "Subj", "text")
+        for user_id in ("poweruser1", "custom1", "user1"):
+            self.login_as(user_id)
+            r = self.client.get("/admin/eposta-sistemi")
+            self.assertEqual(r.status_code, 403)
+            self.assertNotIn(b"internal@example.com", r.data)
+
+    def test_private_ticket_and_attachment_never_leaked_to_non_master_admin(self):
+        self.client.post("/iletisim", data={"email": "private@example.com", "category": "Diğer",
+                                             "message": "Confidential tip content."})
+        for user_id in ("poweruser1", "custom1", "user1"):
+            self.login_as(user_id)
+            r = self.client.get("/admin/mesajlar")
+            self.assertEqual(r.status_code, 403)
+            self.assertNotIn(b"private@example.com", r.data)
+            self.assertNotIn(b"Confidential tip content.", r.data)
 
 
 class PrivacyPageTests(EmailSystemTestCase):
@@ -623,6 +812,55 @@ class PrivacyPageTests(EmailSystemTestCase):
         self.client.post("/iletisim", data={"email": "notasub@example.com", "category": "Diğer", "message": "hi"},
                           follow_redirects=True)
         self.assertEqual(len(self.load("issue_subscriptions.json")), 0)
+
+    def test_contact_form_has_no_newsletter_consent_checkbox(self):
+        """Contact and newsletter consent must never be merged into one
+        checkbox -- the contact form must not even offer/require a
+        newsletter-flavored consent control."""
+        r = self.client.get("/iletisim")
+        body = r.data.decode("utf-8")
+        self.assertNotIn('name="pref_new_issue"', body)
+        self.assertNotIn('name="privacy_ack"', body)
+
+    def test_privacy_notice_explains_fictional_context(self):
+        r = self.client.get("/gizlilik")
+        body = r.data.decode("utf-8")
+        for phrase in ("kurgusal", "Minecraft", "Eurovillage"):
+            self.assertIn(phrase, body)
+
+    def test_privacy_notice_does_not_falsely_claim_no_data_is_collected(self):
+        r = self.client.get("/gizlilik")
+        body = r.data.decode("utf-8")
+        # The page must not contain a blanket "we collect nothing" claim.
+        self.assertNotIn("hiçbir veri toplamıyoruz", body)
+        self.assertNotIn("hiçbir kişisel veri toplanmaz", body)
+        self.assertNotIn("veri toplamıyoruz", body)
+        # It must instead explicitly acknowledge the real categories.
+        self.assertIn("e-posta adresi", body)
+        self.assertIn("İletişim formu", body)
+
+    def test_privacy_notice_discloses_turnstile(self):
+        r = self.client.get("/gizlilik")
+        body = r.data.decode("utf-8")
+        self.assertIn("Turnstile", body)
+        self.assertIn("Cloudflare", body)
+
+    def test_privacy_notice_keeps_legal_review_placeholders(self):
+        r = self.client.get("/gizlilik")
+        body = r.data.decode("utf-8")
+        self.assertIn("YASAL İNCELEME GEREKLİ", body)
+
+    def test_privacy_notice_analytics_wording_matches_actual_implementation(self):
+        r = self.client.get("/gizlilik")
+        body = r.data.decode("utf-8")
+        # Must describe what analytics.py actually records...
+        self.assertIn("cihaz kategorisi", body)
+        self.assertIn("alan adı", body)
+        self.assertIn("okuyucu belirteci", body)
+        # ...and must explicitly deny (not merely omit) invasive collection
+        # it does not actually do.
+        self.assertIn("saklamaz", body)  # "IP adresinizi ... saklamaz"
+        self.assertNotIn("parmak izi çıkarır", body)
 
 
 class AdminTemplateRenderTests(EmailSystemTestCase):
@@ -790,6 +1028,180 @@ class AdminTemplateRenderTests(EmailSystemTestCase):
         token = subscriptions.unsubscribe_token(self.appmod.app.secret_key, confirmed["id"])
         r = self.client.get(f"/abone-ol/cik/{token}?kategori=weekly_digest")
         self.assertEqual(r.status_code, 200)
+
+
+class TurnstileSubscriptionTests(EmailSystemTestCase):
+    """The subscribe form already reuses the project's one Turnstile
+    helper (app/turnstile.py) via turnstile.check() inside
+    subscribe_submit() -- the same pattern the contact form and the
+    site-wide visitor gate already use. These tests turn Turnstile
+    "on" for the duration of each test by patching turnstile.ENABLED and
+    turnstile.verify_form (never a live network call to Cloudflare), and
+    always restore both afterward so no test bleeds into another."""
+
+    def setUp(self):
+        super().setUp()
+        import turnstile
+        self._turnstile = turnstile
+        self._orig_enabled = turnstile.ENABLED
+        self._orig_verify_form = turnstile.verify_form
+        self._orig_secret_key = turnstile.SECRET_KEY
+
+    def tearDown(self):
+        self._turnstile.ENABLED = self._orig_enabled
+        self._turnstile.verify_form = self._orig_verify_form
+        self._turnstile.SECRET_KEY = self._orig_secret_key
+
+    def _enable_turnstile(self, verify_result):
+        """verify_result: True/False for a deterministic outcome, or an
+        exception instance to simulate a network/provider failure.
+
+        turnstile.ENABLED also gates the unrelated site-wide visitor gate
+        (app.py's enforce_visitor_gate()) -- that is correct production
+        behavior (one flag, one Cloudflare setup), but it means turning
+        Turnstile "on" for this test would otherwise make every request
+        bounce off the gate page before ever reaching /abone-ol. Plant a
+        valid gate cookie so these tests isolate the SUBSCRIBE FORM's own
+        verification, which is what they're actually testing."""
+        self._turnstile.ENABLED = True
+
+        def fake_verify_form(form, remote_ip=None):
+            if isinstance(verify_result, Exception):
+                raise verify_result
+            return verify_result
+        self._turnstile.verify_form = fake_verify_form
+
+        token = self.appmod._gate_serializer().dumps({"v": 1})
+        self.client.set_cookie(self.appmod.GATE_COOKIE_NAME, token, domain="localhost")
+
+    def _subscribe(self, email="turnstiletest@example.com", token="fake-turnstile-token"):
+        data = {"email": email, "pref_new_issue": "1", "privacy_ack": "1"}
+        if token is not None:
+            data["cf-turnstile-response"] = token
+        return self.client.post("/abone-ol", data=data, follow_redirects=True)
+
+    def test_valid_turnstile_creates_pending_subscription(self):
+        self._enable_turnstile(True)
+        r = self._subscribe()
+        self.assertEqual(r.status_code, 200)
+        subs = self.load("issue_subscriptions.json")
+        self.assertEqual(len(subs), 1)
+        self.assertEqual(subs[0]["status"], "pending")
+        self.assertEqual(len(self.load("email_outbox.json")), 1)
+
+    def test_invalid_turnstile_creates_no_subscription(self):
+        self._enable_turnstile(False)
+        r = self._subscribe()
+        self.assertEqual(r.status_code, 200)  # safe redirect back, not a crash
+        self.assertEqual(len(self.load("issue_subscriptions.json")), 0)
+        self.assertEqual(len(self.load("email_outbox.json")), 0)
+
+    def test_missing_token_is_rejected(self):
+        # Deliberately does NOT use _enable_turnstile()'s blanket mock
+        # (which would "verify" true regardless of the token) -- this
+        # exercises the REAL turnstile.verify()'s "not token: return
+        # False" short-circuit, so a missing token is rejected even
+        # before any network call would be made.
+        self._turnstile.ENABLED = True
+        gate_token = self.appmod._gate_serializer().dumps({"v": 1})
+        self.client.set_cookie(self.appmod.GATE_COOKIE_NAME, gate_token, domain="localhost")
+        r = self._subscribe(token=None)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(self.load("issue_subscriptions.json")), 0)
+
+    def test_provider_network_failure_fails_closed_safely(self):
+        self._turnstile.ENABLED = True
+        token = self.appmod._gate_serializer().dumps({"v": 1})
+        self.client.set_cookie(self.appmod.GATE_COOKIE_NAME, token, domain="localhost")
+
+        # turnstile.verify() itself catches network errors internally and
+        # returns False -- exercise that real path (not the mocked
+        # verify_form used elsewhere) to prove the actual fail-closed
+        # behavior, not just a mock returning False.
+        import urllib.request
+        original_urlopen = urllib.request.urlopen
+
+        def failing_urlopen(*a, **k):
+            raise OSError("simulated network failure")
+        urllib.request.urlopen = failing_urlopen
+        try:
+            self._turnstile.SECRET_KEY = "fake-secret-for-test"
+            r = self._subscribe()
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(len(self.load("issue_subscriptions.json")), 0)
+        finally:
+            urllib.request.urlopen = original_urlopen
+
+    def test_no_confirmation_email_queued_after_failed_turnstile(self):
+        self._enable_turnstile(False)
+        self._subscribe()
+        self.assertEqual(len(self.load("email_outbox.json")), 0)
+
+    def test_failed_turnstile_does_not_corrupt_an_existing_pending_record(self):
+        import subscriptions
+        sub, token = subscriptions.subscribe("existing@example.com", {"new_issue": True})
+        before = store.get_subscription_by_id(sub["id"])
+
+        self._enable_turnstile(False)
+        self._subscribe(email="existing@example.com")
+
+        after = store.get_subscription_by_id(sub["id"])
+        self.assertEqual(before, after)
+
+    def test_rate_limiting_still_applies_on_top_of_turnstile(self):
+        self._enable_turnstile(True)
+        for _ in range(5):
+            self._subscribe(email=f"burst{_}@example.com")
+        r = self._subscribe(email="oneMore@example.com")
+        # the 6th attempt within the window must be rate-limited regardless
+        # of a valid Turnstile token
+        subs = self.load("issue_subscriptions.json")
+        self.assertEqual(len(subs), 5)
+
+    def test_successful_turnstile_still_requires_double_opt_in(self):
+        """Turnstile success must never itself confirm a subscription --
+        double opt-in (clicking the emailed link) remains mandatory."""
+        self._enable_turnstile(True)
+        self._subscribe(email="doubleoptin@example.com")
+        subs = self.load("issue_subscriptions.json")
+        self.assertEqual(subs[0]["status"], "pending")
+        self.assertNotIn(subs[0]["email"], [s["email"] for s in store.confirmed_subscribers("new_issue")])
+
+    def test_turnstile_secret_never_appears_in_rendered_html(self):
+        self._turnstile.SECRET_KEY = "super-secret-turnstile-key-value"
+        r = self.client.get("/gazete")
+        self.assertNotIn(b"super-secret-turnstile-key-value", r.data)
+
+    def test_turnstile_site_key_appears_when_configured(self):
+        # Jinja caches compiled templates keyed by name; a template already
+        # rendered once by an earlier test has its `environment.globals`
+        # baked into that cached Template object, so mutating the globals
+        # dict afterward silently has no effect unless the cache is
+        # cleared -- this mirrors how a real deploy only ever sets this
+        # once at startup (before anything is compiled), never mid-process.
+        globals_dict = self.appmod.app.jinja_env.globals
+        original = globals_dict.get("turnstile_site_key")
+        globals_dict["turnstile_site_key"] = "public-site-key-abc"
+        self.appmod.app.jinja_env.cache.clear()
+        try:
+            r = self.client.get("/gazete")
+            self.assertIn(b"public-site-key-abc", r.data)
+            self.assertIn(b"cf-turnstile", r.data)
+        finally:
+            globals_dict["turnstile_site_key"] = original
+            self.appmod.app.jinja_env.cache.clear()
+
+    def test_disabled_turnstile_does_not_render_widget(self):
+        globals_dict = self.appmod.app.jinja_env.globals
+        original = globals_dict.get("turnstile_site_key")
+        globals_dict["turnstile_site_key"] = None
+        self.appmod.app.jinja_env.cache.clear()
+        try:
+            r = self.client.get("/gazete")
+            self.assertNotIn(b"cf-turnstile", r.data)
+        finally:
+            globals_dict["turnstile_site_key"] = original
+            self.appmod.app.jinja_env.cache.clear()
 
 
 if __name__ == "__main__":

@@ -344,13 +344,23 @@ def master_admin_required(view):
 # resetting passwords, changing roles) -- that stays hardcoded to
 # master_admin_required everywhere, never configurable, so no role (however
 # it's later edited) can ever grant itself or anyone else that power.
+#
+# "newspaper" (issue administration), "bulletins" (bulletin/email
+# administration), and "messages" (contact/ticket administration) used to
+# be delegable entries here but were retired in the Master-Admin-only
+# hardening pass: every route they used to gate is high-privilege enough
+# (subscriber PII, private reader attachments, real campaign sends,
+# editorial publishing control) that it is now hardcoded to
+# master_admin_required, the same way author/account management already
+# was. A role record on disk may still list one of these three strings in
+# its "permissions" array from before this change -- it is harmless and
+# silently dropped the next time that role is saved (see role_new()/
+# role_edit(), which only ever persist keys still present in
+# PERMISSION_CHOICES) -- but it no longer grants access to anything.
 PERMISSION_CHOICES = [
     ("games", "Oyunlar"),
-    ("messages", "İletişim Mesajları / Talepler"),
     ("site_settings", "Site Ayarları"),
     ("audit_log", "Denetim Kaydı"),
-    ("newspaper", "Gazete Sayıları (Yükleme, Yayın, Zamanlama)"),
-    ("bulletins", "Bültenler / E-posta Sistemi"),
 ]
 
 
@@ -1307,7 +1317,7 @@ MESSAGES_PER_PAGE = 10
 
 
 @admin_bp.route("/mesajlar")
-@permission_required("messages")
+@master_admin_required
 def messages_list():
     view = request.args.get("view", "open")
     all_messages = store.all_messages_sorted()
@@ -1327,7 +1337,7 @@ def messages_list():
 
 
 @admin_bp.route("/mesaj/<mid>/sil", methods=["POST"])
-@permission_required("messages")
+@master_admin_required
 def message_delete(mid):
     messages = store.load_messages()
     message = next((m for m in messages if m["id"] == mid), None)
@@ -1341,7 +1351,7 @@ def message_delete(mid):
 
 
 @admin_bp.route("/mesaj/<mid>/durum", methods=["POST"])
-@permission_required("messages")
+@master_admin_required
 def message_set_status(mid):
     """The ticket status workflow (Yeni/İnceleniyor/Ek Bilgi Bekleniyor/
     Çözüldü/Kapatıldı) -- reuses the message's own `status` field rather
@@ -1380,7 +1390,7 @@ def message_set_status(mid):
 
 
 @admin_bp.route("/mesaj/<mid>/cozum", methods=["POST"])
-@permission_required("messages")
+@master_admin_required
 def message_send_resolution(mid):
     """Writing a resolution and saving it never sends anything by itself
     -- only this explicit action does. Requires the ticket to have an
@@ -1423,7 +1433,7 @@ def message_send_resolution(mid):
 
 
 @admin_bp.route("/mesaj/<mid>/gorsel/<int:idx>")
-@permission_required("messages")
+@master_admin_required
 def message_image(mid, idx):
     """The ONLY way a reader-tip image is ever shown to anyone: fetched
     server-side (from R2 or the local-dev fallback) and streamed through
@@ -1975,7 +1985,7 @@ def _issue_form_common_fields(form, existing=None):
 
 
 @admin_bp.route("/sayilar")
-@permission_required("newspaper")
+@master_admin_required
 def issues_list():
     _process_due_issues()
     issues = sorted(store.load_issues(), key=lambda i: i.get("date", ""), reverse=True)
@@ -1984,7 +1994,7 @@ def issues_list():
 
 
 @admin_bp.route("/sayi/yeni", methods=["GET", "POST"])
-@permission_required("newspaper")
+@master_admin_required
 def issue_new():
     if request.method == "POST":
         actor = _resolve_logged_in_user()
@@ -2044,7 +2054,7 @@ def issue_new():
 
 
 @admin_bp.route("/sayi/<issue_id>/duzenle", methods=["GET", "POST"])
-@permission_required("newspaper")
+@master_admin_required
 def issue_edit(issue_id):
     actor = _resolve_logged_in_user()
     issues = store.load_issues()
@@ -2109,7 +2119,7 @@ def issue_edit(issue_id):
 
 
 @admin_bp.route("/sayi/<issue_id>/sil", methods=["POST"])
-@permission_required("newspaper")
+@master_admin_required
 def issue_delete(issue_id):
     issues = store.load_issues()
     issue = next((i for i in issues if i["id"] == issue_id), None)
@@ -2123,7 +2133,7 @@ def issue_delete(issue_id):
 
 
 @admin_bp.route("/sayi/<issue_id>/onizleme/olustur", methods=["POST"])
-@permission_required("newspaper")
+@master_admin_required
 def issue_preview_generate(issue_id):
     actor = _resolve_logged_in_user()
     issues = store.load_issues()
@@ -2150,7 +2160,7 @@ def issue_preview_generate(issue_id):
 
 
 @admin_bp.route("/sayi/<issue_id>/onizleme/iptal", methods=["POST"])
-@permission_required("newspaper")
+@master_admin_required
 def issue_preview_revoke(issue_id):
     issues = store.load_issues()
     idx = next((i for i, iss in enumerate(issues) if iss["id"] == issue_id), None)
@@ -3429,7 +3439,7 @@ def site_settings_contact():
 # ------------------------------------------------------ admin: newspaper analytics --
 
 @admin_bp.route("/gazete-analitik")
-@permission_required("newspaper")
+@master_admin_required
 def newspaper_analytics_overview():
     summaries = analytics.all_issue_summaries()
     issues_by_id = {i["id"]: i for i in store.load_issues()}
@@ -3439,7 +3449,7 @@ def newspaper_analytics_overview():
 
 
 @admin_bp.route("/sayi/<issue_id>/analitik")
-@permission_required("newspaper")
+@master_admin_required
 def issue_analytics_view(issue_id):
     issue = store.get_issue(issue_id)
     if not issue:
@@ -3455,14 +3465,14 @@ def issue_analytics_view(issue_id):
 # or publish any article, email, or social post. See app/drafts.py.
 
 @admin_bp.route("/taslaklar")
-@permission_required("newspaper")
+@master_admin_required
 def drafts_list():
     all_drafts = sorted(store.load_drafts(), key=lambda d: d.get("created_at", ""), reverse=True)
     return render_template("admin/drafts_list.html", drafts=all_drafts, active="newspaper")
 
 
 @admin_bp.route("/taslaklar/<draft_id>")
-@permission_required("newspaper")
+@master_admin_required
 def draft_view(draft_id):
     draft = store.get_draft(draft_id)
     if not draft:
@@ -3472,7 +3482,7 @@ def draft_view(draft_id):
 
 
 @admin_bp.route("/taslaklar/<draft_id>/kullanildi", methods=["POST"])
-@permission_required("newspaper")
+@master_admin_required
 def draft_mark_used(draft_id):
     actor = _resolve_logged_in_user()
     all_drafts = store.load_drafts()
@@ -3490,7 +3500,7 @@ def draft_mark_used(draft_id):
 
 
 @admin_bp.route("/taslaklar/<draft_id>/reddet", methods=["POST"])
-@permission_required("newspaper")
+@master_admin_required
 def draft_discard(draft_id):
     all_drafts = store.load_drafts()
     idx = next((i for i, d in enumerate(all_drafts) if d["id"] == draft_id), None)
@@ -3503,10 +3513,11 @@ def draft_discard(draft_id):
 
 
 # ------------------------------------------------------ admin: subscribers --
-# Deliberately master_admin_required (not delegable via the "newspaper"
-# permission like the rest of this section) -- subscriber email addresses
-# are the one dataset in this whole feature set that must never be
-# visible to a broader set of accounts than strictly necessary.
+# master_admin_required, same as every other route in this whole
+# communication-system section (issues, bulletins, email system, contact/
+# tickets) -- subscriber email addresses, private reader attachments, and
+# real campaign sends are all high-privilege enough that none of it is
+# delegable via a custom role.
 
 @admin_bp.route("/aboneler")
 @master_admin_required
@@ -3524,7 +3535,7 @@ def subscribers_list():
 # anything -- only /gonder-onayla's explicit POST (send_campaign) does.
 
 @admin_bp.route("/bultenler")
-@permission_required("bulletins")
+@master_admin_required
 def bulletins_list():
     all_bulletins = sorted(store.load_bulletins(), key=lambda b: b.get("created_at", ""), reverse=True)
     return render_template("admin/bulletins_list.html", bulletins=all_bulletins,
@@ -3533,7 +3544,7 @@ def bulletins_list():
 
 
 @admin_bp.route("/bultenler/yeni", methods=["GET", "POST"])
-@permission_required("bulletins")
+@master_admin_required
 def bulletin_new():
     actor = _resolve_logged_in_user()
     if request.method == "POST":
@@ -3567,7 +3578,7 @@ def bulletin_new():
 
 
 @admin_bp.route("/bultenler/<bulletin_id>/duzenle", methods=["GET", "POST"])
-@permission_required("bulletins")
+@master_admin_required
 def bulletin_edit(bulletin_id):
     bulletin = store.get_bulletin(bulletin_id)
     if not bulletin:
@@ -3601,7 +3612,7 @@ def bulletin_edit(bulletin_id):
 
 
 @admin_bp.route("/bultenler/<bulletin_id>/onizle")
-@permission_required("bulletins")
+@master_admin_required
 def bulletin_preview(bulletin_id):
     bulletin = store.get_bulletin(bulletin_id)
     if not bulletin:
@@ -3615,7 +3626,7 @@ def bulletin_preview(bulletin_id):
 
 
 @admin_bp.route("/bultenler/<bulletin_id>/test-gonder", methods=["POST"])
-@permission_required("bulletins")
+@master_admin_required
 def bulletin_send_test(bulletin_id):
     bulletin = store.get_bulletin(bulletin_id)
     if not bulletin:
@@ -3634,7 +3645,7 @@ def bulletin_send_test(bulletin_id):
 
 
 @admin_bp.route("/bultenler/<bulletin_id>/gonder-onayla")
-@permission_required("bulletins")
+@master_admin_required
 def bulletin_send_confirm(bulletin_id):
     """The explicit audience-safety screen -- required before send_campaign
     can be called. Shows exactly who will/won't receive this before any
@@ -3650,7 +3661,7 @@ def bulletin_send_confirm(bulletin_id):
 
 
 @admin_bp.route("/bultenler/<bulletin_id>/gonder", methods=["POST"])
-@permission_required("bulletins")
+@master_admin_required
 def bulletin_send(bulletin_id):
     actor = _resolve_logged_in_user()
     bulletin = bulletins.send_campaign(bulletin_id, actor["email"], _render_bulletin)
@@ -3664,7 +3675,7 @@ def bulletin_send(bulletin_id):
 
 
 @admin_bp.route("/bultenler/<bulletin_id>/iptal", methods=["POST"])
-@permission_required("bulletins")
+@master_admin_required
 def bulletin_cancel(bulletin_id):
     if bulletins.cancel(bulletin_id):
         flash("Zamanlanmış bülten iptal edildi.", "success")
@@ -3675,19 +3686,19 @@ def bulletin_cancel(bulletin_id):
 
 # --------------------------------------------------- admin: email system --
 # Non-secret operational visibility only -- never renders EMAIL_API_KEY or
-# SMTP_PASSWORD. Deliberately gated by the same "bulletins" permission as
-# the bulletin CMS (an editor who can send campaigns needs to see whether
-# they're actually going out).
+# SMTP_PASSWORD. master_admin_required, same as the rest of the bulletin
+# CMS -- outbox contents and provider status are operational internals,
+# not something a delegable role should see.
 
 @admin_bp.route("/eposta-sistemi")
-@permission_required("bulletins")
+@master_admin_required
 def email_system_health():
     return render_template("admin/email_system.html", identities=mailer.sender_identities(),
                             outbox_stats=outbox.stats(), failed=outbox.failed_jobs(), active="email_system")
 
 
 @admin_bp.route("/eposta-sistemi/yeniden-dene/<job_id>", methods=["POST"])
-@permission_required("bulletins")
+@master_admin_required
 def email_job_retry(job_id):
     if outbox.retry_job(job_id):
         outbox.process_outbox(limit=1)
@@ -3698,7 +3709,7 @@ def email_job_retry(job_id):
 
 
 @admin_bp.route("/eposta-sistemi/kuyruk-isle", methods=["POST"])
-@permission_required("bulletins")
+@master_admin_required
 def email_process_now():
     count = outbox.process_outbox(limit=100)
     flash(f"{count} gönderim işlendi.", "success")

@@ -257,19 +257,24 @@ class PreviewAuthorizationTests(V101TestCase):
         r = self.client.get(f"/gazete/onizleme/{token}")
         self.assertEqual(r.status_code, 404)
 
-    def test_admin_routes_require_newspaper_permission(self):
+    def test_admin_routes_require_master_admin(self):
         self.login_as("custom1")  # role "custom" has no permissions at all
         for path in ("/admin/sayilar", "/admin/sayi/yeni", "/admin/gazete-analitik",
                      "/admin/taslaklar", "/admin/aboneler"):
             r = self.client.get(path)
-            self.assertEqual(r.status_code, 403, f"{path} should require permission")
+            self.assertEqual(r.status_code, 403, f"{path} should require master admin")
 
     def test_master_admin_always_has_newspaper_access(self):
         self.login_as("master1")
         r = self.client.get("/admin/sayilar")
         self.assertEqual(r.status_code, 200)
 
-    def test_granting_newspaper_permission_to_custom_role_works(self):
+    def test_granting_legacy_newspaper_permission_to_custom_role_no_longer_grants_access(self):
+        """Post-hardening: issue/newspaper administration was retired from
+        PERMISSION_CHOICES and hardcoded to master_admin_required (see
+        app.py's PERMISSION_CHOICES comment). A role record that still
+        carries the old "newspaper" string (e.g. saved before this change)
+        must be inert, not a live grant."""
         roles = self.load("roles.json")
         for role in roles:
             if role["id"] == "custom":
@@ -277,8 +282,8 @@ class PreviewAuthorizationTests(V101TestCase):
         self.save("roles.json", roles)
         self.login_as("custom1")
         r = self.client.get("/admin/sayilar")
-        self.assertEqual(r.status_code, 200)
-        # but subscribers stay master_admin-only regardless
+        self.assertEqual(r.status_code, 403)
+        # subscribers were already master_admin-only before this change
         r2 = self.client.get("/admin/aboneler")
         self.assertEqual(r2.status_code, 403)
 
