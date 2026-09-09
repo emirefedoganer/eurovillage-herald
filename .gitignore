@@ -5,3 +5,4 @@ app/data/.secret_key
 .venv/
 app/private_uploads/
 .env
+app/data/.media_migration_backups/
