@@ -1,0 +1,15 @@
+{
+  "mode": "live",
+  "standby_message_type": "maintenance",
+  "standby_title": "",
+  "standby_description": "",
+  "standby_note": "",
+  "standby_reopen_at": null,
+  "standby_button_label": "",
+  "standby_button_url": "",
+  "standby_show_contact_links": true,
+  "redirect_url": "",
+  "redirect_presets": [],
+  "updated_at": null,
+  "updated_by": null
+}

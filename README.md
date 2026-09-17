@@ -28,6 +28,28 @@ kasıtlı olarak **hiçbir yere bağlantı vermez** — üst menüde, altbilgide
 Panelden yeni makale ekleyebilir, mevcut makaleleri düzenleyip silebilir, anasayfada manşet/öne
 çıkan haberleri belirleyebilir ve yeni PDF sayılar yükleyebilirsiniz.
 
+## Site Kontrolü (Canlı / Beklemede / Yönlendirme)
+
+`Yönetim Paneli → Site Kontrolü` (yalnızca Master Admin), genel siteyi üç mod arasında anında
+değiştirir -- yeniden dağıtım (deploy) gerektirmez, `site_control.json`'a kaydedilir ve uygulama
+yeniden başlasa bile kalıcıdır:
+
+- **Canlı**: normal genel site.
+- **Beklemede**: tüm genel sayfaların yerine, sitenin görsel kimliğine uygun, mobil uyumlu bir
+  bakım sayfası gösterilir (HTTP 503, arama motorlarına `noindex, nofollow`). Mesaj türü
+  (bakım/geçici olarak kullanılamıyor/yeni sayı hazırlanıyor/özel mesaj), başlık, açıklama, ek
+  not, tahmini açılış tarihi ve opsiyonel bir buton yönetim panelinden düzenlenir.
+- **Yönlendirme**: ziyaretçiler, panelden girilen bir adrese **geçici** (302, kalıcı değil)
+  olarak yönlendirilir. Adres kod değişikliği gerektirmez, yalnızca `http://`/`https://` kabul
+  edilir ve sitenin kendisine yönlendirme reddedilir.
+
+Yönetim paneli, giriş sayfası, statik dosyalar, `/healthz` ve dahili teknik uç noktalar bu iki
+moddan **her zaman** muaftır -- bu, tek merkezi bir `before_request` denetiminde uygulanır (bkz.
+`app.py`'nin `enforce_site_control()` bölümü), her route'a ayrı ayrı eklenmez. Oturum açmış
+herhangi bir yönetici, genel siteyi doğrudan ziyaret ederek Beklemede/Yönlendirme modundan
+bağımsız olarak her zaman gerçek siteyi görür. Bir ayar kaydı hiç yoksa (ör. ilk kurulum) veya
+okunamıyorsa (bozuk dosya), site güvenli şekilde Canlı kabul edilir.
+
 ## Yazar Profilleri ve Yazar Yönetimi
 
 Site, tek bir kanonik yazar kimliği kullanır: Haberler, Görüş/Köşe Yazıları, Arı Magazin,
@@ -215,6 +237,7 @@ app/
     article_views.json        Haber başına/gün başına görüntülenme sayaçları -- yalnızca "çok okunanlar" bülten ÖNERİSİ için (bkz. analytics.top_article_slugs)
     bulletins.json             Editöryal bülten kayıtları (bkz. bulletins.py)
     email_outbox.json          Kalıcı e-posta gönderim kuyruğu (bkz. outbox.py)
+    site_control.json          Genel site Canlı/Beklemede/Yönlendirme anahtarı (bkz. app.py'nin enforce_site_control() bölümü) -- dosya yoksa güvenli varsayılan olarak Canlı kabul edilir
     editorial_drafts.json      Otomatik hazırlanan, insan onayı bekleyen editöryal taslaklar
     site.json        Site/masthead bilgileri
     users.json       Hesaplar: e-posta, şifre hash'i, hesap rolü (master_admin/author)
@@ -239,7 +262,9 @@ app/
 scripts/
   migrate_media_to_r2.py  Tamamlanmış tek seferlik R2 medya taşıma betiği (bkz. dosyanın kendi başlığı)
 tests/
-  test_v101.py       1.0.1 sürümünün testleri -- izole geçici veri dizini kullanır, gerçek app/data'ya asla dokunmaz
+  test_v101.py           1.0.1 sürümünün testleri -- izole geçici veri dizini kullanır, gerçek app/data'ya asla dokunmaz
+  test_email_system.py   E-posta/abonelik/bülten/iletişim-talep sistemi ve Master-Admin yetkilendirme testleri
+  test_site_control.py   Site Kontrolü (Canlı/Beklemede/Yönlendirme) testleri
 .env.example          Tüm ortam değişkenlerinin listesi (yer tutucu değerlerle)
 CLOUDFLARE_SETUP.md    Cloudflare panelinde elle yapılması gereken adımların kontrol listesi
 CHANGELOG.md           Sürüm notları
@@ -251,6 +276,8 @@ CHANGELOG.md           Sürüm notları
 cd app  # veya doğrudan repo kökünden: python3 -m unittest tests.test_v101 -v
 python3 -m unittest discover -s ../tests -t ..
 ```
+
+(Aynı şekilde `tests.test_email_system` ve `tests.test_site_control` de tek başına çalıştırılabilir.)
 
 Testler tamamen izole, geçici bir veri dizininde çalışır — gerçek `app/data/*.json`
 dosyalarını hiçbir zaman okumaz veya değiştirmez, bu yüzden gerçek (üretim şekilli)

@@ -1,5 +1,36 @@
 # Changelog
 
+## The Eurovillage Herald 1.2.0
+
+**Site Control (TEH Admin → Site Kontrolü).** A single, database-backed
+(`site_control.json`) switch between three public-site modes: Live
+(normal), Standby (a polished, branded maintenance page in the site's own
+visual identity, returned with HTTP 503 and `noindex, nofollow`), and
+Redirect (a temporary 302 to an admin-entered URL, never hardcoded).
+Implemented as one centralized `before_request` hook rather than a
+per-view check, so no route needed to change. Defaults safely to Live
+when no settings record exists yet, and a corrupt/unreadable settings
+file also fails open to Live rather than locking the public site (or an
+admin) out.
+
+The admin panel, login, static assets, `/healthz`, and every other
+technical endpoint are always excluded from Standby/Redirect -- enforced
+server-side, not by hiding navigation. Any authenticated admin session
+additionally sees the real public site during Standby/Redirect, via the
+existing login cookie (never a guessable query parameter). Master-Admin
+-only, consistent with the newspaper/bulletin/subscriber administration
+hardening in the previous release.
+
+Redirect destinations are validated server-side (http/https only, no
+`javascript:`/other dangerous schemes, never the Herald's own host),
+always a temporary redirect (302, never 301), and include a short-lived
+bounce-detection cookie that breaks a mutual loop if the destination
+itself redirects back to the Herald. JSON/API endpoints (analytics
+beacons, crossword/sudoku check endpoints) always get a JSON 503 during
+Standby/Redirect, never the HTML standby page. Recent redirect
+destinations are offered back as quick-fill presets, never activated
+automatically.
+
 ## The Eurovillage Herald 1.1.0
 
 The production communication system: a provider-agnostic email layer, a

@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Site Kontrolü — {{ site.name }}{% endblock %}
+{% block content %}
+
+<div class="admin-wrap">
+  {% include "admin/_nav.html" with context %}
+
+  <div class="admin-header">
+    <h1>Site Kontrolü</h1>
+  </div>
+
+  <div class="admin-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+      <div>
+        <span class="badge {{ 'badge-lead' if control.mode == 'live' else 'badge-breaking' }}" style="font-size:14px; padding:6px 14px;">
+          {{ mode_labels.get(control.mode, control.mode) }}
+        </span>
+        {% if control.mode == 'redirect' and control.redirect_url %}
+        <span class="hint">— <a href="{{ control.redirect_url }}" target="_blank" rel="noopener noreferrer">{{ control.redirect_url }}</a></span>
+        {% endif %}
+      </div>
+      <form method="post" action="{{ url_for('admin.site_control_go_live') }}">
+        <button class="btn btn-red" type="submit" {{ 'disabled' if control.mode == 'live' else '' }}>Canlıya Al</button>
+      </form>
+    </div>
+    <p class="hint" style="margin-top:12px;">
+      {% if control.updated_at %}
+      Son değişiklik: {{ to_editorial_display(control.updated_at) }} ({{ editorial_timezone_name }})
+      {% if control.updated_by %}— {{ control.updated_by }}{% endif %}
+      {% else %}
+      Henüz bir değişiklik yapılmadı.
+      {% endif %}
+    </p>
+    <p class="hint">
+      Yönetim paneli, giriş sayfası, statik dosyalar ve teknik uç noktalar Beklemede/Yönlendirme
+      modlarından her zaman muaf tutulur — bu ayarlar yönetici erişimini asla etkilemez. Ayrıca
+      oturum açmış herhangi bir yönetici, genel siteyi doğrudan ziyaret ederek her zaman gerçek
+      halini görebilir.
+    </p>
+  </div>
+
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); margin-top:0;">Beklemede Sayfası</h2>
+    <form method="post" action="{{ url_for('admin.site_control_save_standby') }}" id="standby-form">
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label for="standby_message_type">Mesaj Türü</label>
+          <select id="standby_message_type" name="standby_message_type">
+            {% for key, label in message_type_labels.items() %}
+            <option value="{{ key }}" {{ 'selected' if control.standby_message_type == key else '' }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="standby_reopen_at">Tahmini Açılış (opsiyonel) — {{ editorial_timezone_name }}</label>
+          <input type="datetime-local" id="standby_reopen_at" name="standby_reopen_at"
+                 value="{{ to_editorial_input(control.standby_reopen_at) if control.standby_reopen_at else '' }}">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label for="standby_title">Başlık</label>
+        <input type="text" id="standby_title" name="standby_title" maxlength="160"
+               value="{{ control.standby_title }}" placeholder="ör. Bakımdayız">
+      </div>
+
+      <div class="form-row">
+        <label for="standby_description">Ana Mesaj</label>
+        <textarea id="standby_description" name="standby_description" rows="3" maxlength="2000">{{ control.standby_description }}</textarea>
+        <div class="hint">Mesaj türünü değiştirdiğinizde başlık/mesaj boşsa önerilen metinle doldurulur — istediğiniz gibi düzenleyebilirsiniz.</div>
+      </div>
+
+      <div class="form-row">
+        <label for="standby_note">Ek Not (opsiyonel)</label>
+        <textarea id="standby_note" name="standby_note" rows="2" maxlength="500">{{ control.standby_note }}</textarea>
+      </div>
+
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label for="standby_button_label">Buton Metni (opsiyonel)</label>
+          <input type="text" id="standby_button_label" name="standby_button_label" maxlength="60"
+                 value="{{ control.standby_button_label }}" placeholder="ör. Bizi Takip Edin">
+        </div>
+        <div class="form-row">
+          <label for="standby_button_url">Buton Adresi (opsiyonel)</label>
+          <input type="url" id="standby_button_url" name="standby_button_url" maxlength="2000"
+                 value="{{ control.standby_button_url }}" placeholder="https://...">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label style="font-weight:400; display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="standby_show_contact_links" name="standby_show_contact_links" value="1"
+                 style="width:auto;" {{ 'checked' if control.standby_show_contact_links else '' }}>
+          İletişim bilgilerini beklemede sayfasında göster
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-outline" type="submit" name="action" value="save">Kaydet</button>
+        <button class="btn btn-red" type="submit" name="action" value="activate"
+                onclick="return confirm('Genel site şimdi BEKLEMEDE moduna alınacak ve tüm ziyaretçilere bakım sayfası gösterilecek. Onaylıyor musunuz?');">
+          Kaydet ve Beklemedeyi Etkinleştir
+        </button>
+        <button class="btn btn-outline" type="submit"
+                formaction="{{ url_for('admin.site_control_preview_standby') }}" formmethod="get" formtarget="_blank"
+                formnovalidate>
+          Önizle
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="admin-panel">
+    <h2 style="font-family: var(--font-headline); margin-top:0;">Yönlendirme</h2>
+    <form method="post" action="{{ url_for('admin.site_control_save_redirect') }}">
+      <div class="form-row">
+        <label for="redirect_url">Yönlendirme Adresi</label>
+        <input type="url" id="redirect_url" name="redirect_url" maxlength="2000"
+               value="{{ control.redirect_url }}" placeholder="https://www.eurovillagebb.com">
+        <div class="hint">
+          Yalnızca <code>http://</code> veya <code>https://</code> ile başlayan adresler kabul edilir.
+          Geçici bir yönlendirme (302) kullanılır — kalıcı değildir ve istediğiniz zaman kaldırılabilir.
+        </div>
+        <div class="hint">
+          Önizleme:
+          <a id="redirect-preview-link" href="{{ control.redirect_url or '#' }}" target="_blank" rel="noopener noreferrer">
+            {{ control.redirect_url or '(adres girilmedi)' }}
+          </a>
+        </div>
+      </div>
+
+      {% if control.redirect_presets %}
+      <div class="form-row">
+        <label>Son Kullanılan Adresler</label>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          {% for preset in control.redirect_presets %}
+          <button type="button" class="btn btn-outline" style="font-size:12px; padding:4px 10px;"
+                  onclick="document.getElementById('redirect_url').value={{ preset|tojson }}; document.getElementById('redirect_url').dispatchEvent(new Event('input'));">
+            {{ preset }}
+          </button>
+          {% endfor %}
+        </div>
+        <div class="hint">Bunlar yalnızca hızlı doldurma içindir — etkinleştirmeden önce her zaman kontrol edin.</div>
+      </div>
+      {% endif %}
+
+      <div class="form-actions">
+        <button class="btn btn-outline" type="submit" name="action" value="save">Kaydet</button>
+        <button class="btn btn-red" type="submit" name="action" value="activate"
+                onclick="return confirm('Genel site şimdi bu adrese YÖNLENDİRİLECEK ve ziyaretçiler siteyi göremeyecek. Onaylıyor musunuz?');">
+          Kaydet ve Yönlendirmeyi Etkinleştir
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  var presets = {{ message_presets|tojson }};
+  var typeSelect = document.getElementById("standby_message_type");
+  var titleInput = document.getElementById("standby_title");
+  var descInput = document.getElementById("standby_description");
+  if (typeSelect) {
+    typeSelect.addEventListener("change", function () {
+      var preset = presets[typeSelect.value];
+      if (!preset) return;
+      if (!titleInput.value.trim()) titleInput.value = preset.title;
+      if (!descInput.value.trim()) descInput.value = preset.description;
+    });
+  }
+
+  var redirectInput = document.getElementById("redirect_url");
+  var previewLink = document.getElementById("redirect-preview-link");
+  if (redirectInput && previewLink) {
+    redirectInput.addEventListener("input", function () {
+      var value = redirectInput.value.trim();
+      previewLink.href = value || "#";
+      previewLink.textContent = value || "(adres girilmedi)";
+    });
+  }
+})();
+</script>
+
+{% endblock %}

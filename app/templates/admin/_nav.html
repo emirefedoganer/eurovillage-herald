@@ -1,3 +1,13 @@
+{% if site_control and site_control.mode != 'live' %}
+<div class="site-status-banner">
+  {% if site_control.mode == 'standby' %}
+  ⚠ Genel site şu anda <strong>BEKLEMEDE</strong> — ziyaretçilere bakım sayfası gösteriliyor.
+  {% else %}
+  ⚠ Genel site şu anda <strong>YÖNLENDİRİLİYOR</strong> — ziyaretçiler {{ site_control.redirect_url }} adresine gönderiliyor.
+  {% endif %}
+  <a href="{{ url_for('admin.site_control') }}">Site Kontrolü'ne git →</a>
+</div>
+{% endif %}
 <nav class="admin-subnav">
   <a href="{{ url_for('admin.dashboard') }}" class="{{ 'active' if active == 'dashboard' else '' }}">İçerik</a>
   {% if 'games' in perms %}
@@ -10,6 +20,7 @@
   <a href="{{ url_for('admin.audit_log_view') }}" class="{{ 'active' if active == 'audit' else '' }}">Denetim Kaydı</a>
   {% endif %}
   {% if is_master_admin %}
+  <a href="{{ url_for('admin.site_control') }}" class="{{ 'active' if active == 'site_control' else '' }}">Site Kontrolü{% if site_control and site_control.mode != 'live' %} ⚠{% endif %}</a>
   <a href="{{ url_for('admin.issues_list') }}" class="{{ 'active' if active == 'newspaper' else '' }}">Gazete Sayıları</a>
   <a href="{{ url_for('admin.messages_list') }}" class="{{ 'active' if active == 'messages' else '' }}">İletişim / Talepler</a>
   <a href="{{ url_for('admin.bulletins_list') }}" class="{{ 'active' if active == 'bulletins' else '' }}">Bültenler</a>

@@ -2,11 +2,13 @@ import os
 import re
 import secrets
 import string
+import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from urllib.parse import urlsplit
 
-from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, abort, flash, jsonify, send_file, Response, g
+from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, abort, flash, jsonify, send_file, Response, g, make_response
 from itsdangerous import URLSafeTimedSerializer, URLSafeSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -35,7 +37,7 @@ from sections import (
 # the admin footer and available to any template as `app_version`. Not to
 # be confused with site.json's `issue_no`/`issue_label`, which describe
 # the current PRINTED newspaper issue, a completely different concept.
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # These five are passed to uploads.py's save_*() functions purely as the
@@ -292,6 +294,11 @@ def inject_globals():
         "author_preview_json": author_preview_json(),
         "publication_context": getattr(g, "publication_context", "main"),
         "app_version": APP_VERSION,
+        # Cheap (one JSON read, same cost as `site` above) and needed on
+        # every admin page for the "Standby/Redirect active" banner in
+        # admin/_nav.html -- computed here once rather than in every
+        # individual admin view.
+        "site_control": _load_site_control_safe() if user else None,
     }
 
 
@@ -1157,6 +1164,265 @@ def forbidden(e):
     return render_template("403.html"), 403
 
 
+@app.route("/healthz")
+def healthz():
+    """Infrastructure health check -- deliberately outside every gate below
+    (Turnstile visitor gate, Site Control standby/redirect) so a deploy
+    platform's health probe never reports the app unhealthy just because
+    the PUBLIC site is intentionally in Standby or Redirect mode."""
+    return "ok", 200
+
+
+# ------------------------------------------------------------- site control --
+# A single admin-controlled switch (see admin.site_control_* routes near the
+# end of this file) between three public-site operating modes: "live"
+# (normal), "standby" (regular pages replaced by a maintenance page,
+# HTTP 503), and "redirect" (visitors sent to an admin-entered external
+# URL). Persisted in store.py's site_control.json -- a JSON read on every
+# request, same cost/consistency model as every other *_PATH file this app
+# already reads per-request (site.json included), so this needs no cache
+# invalidation step: there is no cache, the file IS the source of truth,
+# and it's already shared across every gunicorn worker/instance via the
+# same persistent volume start.sh already symlinks the whole data/
+# directory onto (see start.sh; no changes needed there for a new file).
+#
+# Implemented as a single before_request hook -- registered ABOVE
+# enforce_visitor_gate() below so it takes priority (Flask runs app-level
+# before_request functions in registration order, stopping at the first
+# one that returns a response) -- rather than a per-view check, per the
+# "centralized request-handling point" requirement: no route needs to know
+# this feature exists.
+
+STANDBY_MESSAGE_TYPE_LABELS = {
+    "maintenance": "Bakım çalışması",
+    "unavailable": "Geçici olarak kullanılamıyor",
+    "next_issue": "Yeni sayı hazırlanıyor",
+    "custom": "Özel mesaj",
+}
+SITE_CONTROL_MODE_LABELS = {"live": "Canlı", "standby": "Beklemede", "redirect": "Yönlendiriliyor"}
+# Sensible default title/description per predefined message type -- also
+# used to pre-fill the admin form's fields via a small onchange script
+# (see admin/site_control.html), and the admin may freely overwrite either
+# field for ANY type, predefined or custom, before saving.
+STANDBY_MESSAGE_PRESETS = {
+    "maintenance": {
+        "title": "Bakımdayız",
+        "description": (
+            "Sitemiz şu anda planlı bir bakım çalışması nedeniyle geçici olarak "
+            "kullanılamıyor. Kısa süre içinde geri döneceğiz."
+        ),
+    },
+    "unavailable": {
+        "title": "Geçici Olarak Kullanılamıyor",
+        "description": (
+            "Sitemiz şu anda teknik bir nedenle geçici olarak erişime kapalı. "
+            "Anlayışınız için teşekkür ederiz."
+        ),
+    },
+    "next_issue": {
+        "title": "Yeni Sayımız Hazırlanıyor",
+        "description": "Ekibimiz bir sonraki sayı üzerinde çalışıyor. Yayımlandığında burada olacak.",
+    },
+    "custom": {"title": "", "description": ""},
+}
+
+# A visitor bounced straight back to us right after we sent them to the
+# redirect destination almost certainly means that destination redirects
+# back to the Herald -- a mutual loop we cannot prevent on the other
+# site's end, only detect and break on ours. Short-lived, non-essential,
+# never read by any other feature.
+REDIRECT_BOUNCE_COOKIE = "eh_redirect_bounce"
+REDIRECT_BOUNCE_MAX_AGE = 20
+
+
+def _load_site_control_safe():
+    """Never let a corrupt/unreadable site_control.json take the public
+    site down with it or lock an admin out -- log the failure and fall
+    back to live-mode defaults, exactly like a missing file would."""
+    try:
+        return store.load_site_control()
+    except Exception as exc:
+        print(f"[site_control] okuma hatası, güvenli varsayılana (live) dönülüyor: {exc}", file=sys.stderr)
+        return dict(store.DEFAULT_SITE_CONTROL)
+
+
+def _own_site_hosts():
+    """Hostnames that would make a Redirect destination point back at this
+    very site -- the configured production SERVER_NAME (with/without
+    www.) plus whatever host the current request actually arrived on
+    (covers local dev and any not-yet-canonicalized hostname)."""
+    hosts = set()
+    if SERVER_NAME:
+        hosts.add(SERVER_NAME.lower())
+        hosts.add("www." + SERVER_NAME.lower())
+    current_host = (request.host or "").split(":")[0].lower()
+    if current_host:
+        hosts.add(current_host)
+        hosts.add(current_host[4:] if current_host.startswith("www.") else "www." + current_host)
+    return hosts
+
+
+REDIRECT_ALLOWED_SCHEMES = {"http", "https"}
+
+
+def _validate_http_url(raw_url, required=True):
+    """Shared scheme/host validation for any admin-entered destination URL
+    (Redirect's target, the optional standby CTA button) -- an allowlist
+    of http/https, not a blocklist, so javascript:/data:/vbscript: etc.
+    are rejected by construction. Returns (normalized_url, error);
+    normalized_url is None when `required` is False and the input was
+    blank (a legitimate "not set" for an optional field)."""
+    url = (raw_url or "").strip()
+    if not url:
+        return (None, "Adres boş olamaz.") if required else (None, None)
+    if len(url) > 2000:
+        return None, "Adres çok uzun."
+    parsed = urlsplit(url)
+    if (parsed.scheme or "").lower() not in REDIRECT_ALLOWED_SCHEMES:
+        return None, "Yalnızca http:// veya https:// ile başlayan adresler kabul edilir."
+    if not parsed.hostname:
+        return None, "Geçerli bir adres girin (ör. https://ornek.com)."
+    return url, None
+
+
+def validate_redirect_url(raw_url):
+    """Redirect mode's destination additionally may never point back at
+    the Herald itself -- the one piece of loop-prevention that's actually
+    knowable in advance (a third-party site redirecting back to us is
+    handled separately, at request time -- see _safe_redirect_response())."""
+    url, error = _validate_http_url(raw_url, required=True)
+    if error:
+        return None, error
+    if urlsplit(url).hostname.lower() in _own_site_hosts() | {"localhost", "127.0.0.1"}:
+        return None, "Yönlendirme adresi bu sitenin kendisi olamaz."
+    return url, None
+
+
+def _is_api_style_path(path):
+    """Endpoints that always return JSON, never HTML -- Standby/Redirect
+    must answer these with a JSON 503, never the HTML standby page (a
+    fetch()/XHR caller must never have to guess-parse HTML as JSON)."""
+    return path.startswith("/api/") or path.endswith(("/kontrol", "/ipucu"))
+
+
+def _site_control_bypassed():
+    """Routes/sessions Standby and Redirect must never touch. Any
+    authenticated admin session additionally bypasses BOTH modes entirely
+    on the public site (not just /admin) -- this is the "secure
+    administrator-only preview/bypass" the spec calls for: it rides on the
+    real session-cookie login that already gates /admin, so there is no
+    new predictable, publicly-guessable bypass parameter."""
+    if request.blueprint == "admin":
+        return True
+    if request.endpoint in ("static", "healthz", "gate_verify") or request.endpoint is None:
+        return True
+    if request.path.startswith("/internal/"):
+        return True
+    if _resolve_logged_in_user():
+        return True
+    return False
+
+
+def _resolve_standby_content(control):
+    """The one place a standby-shaped dict is turned into what actually
+    gets rendered into standby.html -- every caller (the persisted
+    settings, or the unsaved-preview route's ad-hoc dict built straight
+    from request.values) MUST go through this before the template ever
+    sees it. In particular button_url is re-validated (http/https only)
+    HERE, not trusted from the caller: the preview route in particular
+    renders directly from unsaved, unvalidated query/form input, so a
+    dangerous scheme (javascript:/data:) must be stripped at this single
+    chokepoint rather than relying on every producer to remember to."""
+    msg_type = control.get("standby_message_type") or "maintenance"
+    preset = STANDBY_MESSAGE_PRESETS.get(msg_type, STANDBY_MESSAGE_PRESETS["maintenance"])
+    reopen_at = control.get("standby_reopen_at")
+    button_url, _ = _validate_http_url(control.get("standby_button_url") or "", required=False)
+    return {
+        "message_type": msg_type,
+        "title": control.get("standby_title") or preset["title"] or STANDBY_MESSAGE_PRESETS["maintenance"]["title"],
+        "description": control.get("standby_description") or preset["description"],
+        "note": control.get("standby_note") or "",
+        "reopen_at": reopen_at,
+        "reopen_display": editorial_tz.utc_iso_to_local_display(reopen_at, fmt="%d.%m.%Y %H:%M") if reopen_at else "",
+        "button_label": control.get("standby_button_label") or "",
+        "button_url": button_url or "",
+        "show_contact_links": bool(control.get("standby_show_contact_links", True)),
+        "contact_email": mailer.EMAIL_CONTACT_REPLY_TO,
+    }
+
+
+def _standby_response(content, status=503):
+    resp = make_response(render_template("standby.html", **content), status)
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["X-Robots-Tag"] = "noindex, nofollow"
+    if content.get("reopen_at"):
+        try:
+            reopen_dt = datetime.strptime(content["reopen_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            seconds = int((reopen_dt - datetime.now(timezone.utc)).total_seconds())
+            if seconds > 0:
+                resp.headers["Retry-After"] = str(seconds)
+        except ValueError:
+            pass
+    return resp
+
+
+def _safe_redirect_response(url):
+    """A single 302 (never 301 -- this is explicitly meant to be
+    reversible with zero client-side caching risk), with a short-lived
+    bounce-detection cookie to break a mutual loop if `url` itself
+    redirects straight back to the Herald: a visitor arriving with that
+    cookie already set was just sent away by us moments ago, so showing
+    them another redirect would bounce forever."""
+    if request.cookies.get(REDIRECT_BOUNCE_COOKIE):
+        content = {
+            "message_type": "custom",
+            "title": "Yönlendirme Tamamlanamadı",
+            "description": (
+                f"Ziyaretinizi {url} adresine yönlendirmeye çalıştık, ancak tarayıcınız hemen "
+                "siteye geri döndü. Lütfen birkaç dakika sonra tekrar deneyin."
+            ),
+            "note": "", "reopen_at": None, "reopen_display": "",
+            "button_label": "", "button_url": "", "show_contact_links": True,
+            "contact_email": mailer.EMAIL_CONTACT_REPLY_TO,
+        }
+        resp = _standby_response(content)
+        resp.delete_cookie(REDIRECT_BOUNCE_COOKIE)
+        return resp
+    resp = make_response(redirect(url, code=302))
+    resp.set_cookie(
+        REDIRECT_BOUNCE_COOKIE, "1", max_age=REDIRECT_BOUNCE_MAX_AGE,
+        httponly=True, samesite="Lax", secure=bool(SERVER_NAME),
+    )
+    return resp
+
+
+@app.before_request
+def enforce_site_control():
+    if _site_control_bypassed():
+        return None
+    control = _load_site_control_safe()
+    mode = control.get("mode", "live")
+    if mode == "live":
+        return None
+
+    if _is_api_style_path(request.path):
+        return jsonify(ok=False, error=f"site_{mode}"), 503
+
+    if mode == "standby":
+        return _standby_response(_resolve_standby_content(control))
+
+    if mode == "redirect":
+        url, error = validate_redirect_url(control.get("redirect_url", ""))
+        if error or not url:
+            # Misconfigured (shouldn't happen -- validated on save) --
+            # fail to a visible standby message rather than a broken
+            # redirect or a raw error page.
+            return _standby_response(_resolve_standby_content(control))
+        return _safe_redirect_response(url)
+
+    return None
+
+
 # ------------------------------------------------------- visitor gate (Turnstile) --
 # A once-per-visit(-ish) Cloudflare Turnstile check in front of the public
 # site only -- never the admin panel, which Cloudflare Access protects
@@ -1310,7 +1576,8 @@ def dashboard():
     issues = sorted(store.load_issues(), key=lambda i: i.get("date", ""), reverse=True)[:5]
     message_count = len(store.load_messages())
     return render_template("admin/dashboard.html", articles=articles, issues=issues,
-                            message_count=message_count, status_labels=ISSUE_STATUS_LABELS, active="dashboard")
+                            message_count=message_count, status_labels=ISSUE_STATUS_LABELS,
+                            site_control_mode_labels=SITE_CONTROL_MODE_LABELS, active="dashboard")
 
 
 MESSAGES_PER_PAGE = 10
@@ -4160,6 +4427,184 @@ def placement_delete(pid):
     store.append_audit(actor["email"], "ad_placement_deleted", ad["internal_name"] if ad else placement["ad_id"])
     flash("Yerleşim kaldırıldı.", "success")
     return redirect(url_for("admin.placements_list"))
+
+
+# --------------------------------------------------------- admin: site control --
+# The public site's Live/Standby/Redirect switch (see enforce_site_control()
+# near the top of this file for how it's applied). master_admin_required on
+# every route here -- not a permission_required() custom-role permission --
+# for the same reason author/role/ad management already are: putting the
+# entire public site into maintenance or redirecting every visitor
+# elsewhere is exactly the kind of capability no delegable role should be
+# able to grant itself or anyone else.
+
+SITE_CONTROL_PRESET_LIMIT = 8
+
+
+def _site_control_stamp(control, actor):
+    control["updated_at"] = _now_iso()
+    control["updated_by"] = actor["email"]
+
+
+def _add_redirect_preset(control, url):
+    presets = [p for p in (control.get("redirect_presets") or []) if p != url]
+    presets.insert(0, url)
+    control["redirect_presets"] = presets[:SITE_CONTROL_PRESET_LIMIT]
+
+
+@admin_bp.route("/site-kontrolu")
+@master_admin_required
+def site_control():
+    control = store.load_site_control()
+    return render_template(
+        "admin/site_control.html", control=control,
+        mode_labels=SITE_CONTROL_MODE_LABELS,
+        message_type_labels=STANDBY_MESSAGE_TYPE_LABELS,
+        message_presets=STANDBY_MESSAGE_PRESETS,
+        active="site_control",
+    )
+
+
+@admin_bp.route("/site-kontrolu/canli", methods=["POST"])
+@master_admin_required
+def site_control_go_live():
+    actor = _resolve_logged_in_user()
+    control = store.load_site_control()
+    previous_mode = control["mode"]
+    control["mode"] = "live"
+    _site_control_stamp(control, actor)
+    store.save_site_control(control)
+    if previous_mode != "live":
+        store.append_audit(actor["email"], "site_control_mode_changed", "live", {"from": previous_mode})
+    flash("Site canlıya alındı. Ziyaretçiler artık normal siteyi görüyor.", "success")
+    return redirect(url_for("admin.site_control"))
+
+
+def _standby_fields_from_form(form):
+    """Shared by the save route and the unsaved-form preview route -- both
+    need to turn the exact same set of submitted fields into a resolved,
+    display-ready standby content dict, without persisting anything.
+
+    A blank title/description for a PREDEFINED type (the admin picked a
+    message type but never touched the text, e.g. JS-disabled or an
+    immediate submit) falls back to that type's preset text here, at the
+    point of saving -- not just at public-render time -- so the record on
+    disk and the form the admin sees when they come back always agree on
+    what's actually being shown to visitors. A "custom" message has no
+    such fallback (see the required-title check at the call site).
+
+    standby_button_url is returned RAW (trimmed only) -- not validated
+    here -- so the save route can still surface a real "your button URL
+    was rejected" error to the admin instead of silently swallowing it.
+    The scheme/host allowlist is instead enforced at the one place that
+    actually renders it into an `<a href>`: see _resolve_standby_content(),
+    which every caller (the save route's persisted dict AND the
+    unsaved-preview route's ad-hoc dict) is required to pass through
+    before touching standby.html -- so a dangerous scheme can never reach
+    the template regardless of which caller forgets to re-validate."""
+    msg_type = form.get("standby_message_type", "maintenance")
+    if msg_type not in STANDBY_MESSAGE_PRESETS:
+        msg_type = "maintenance"
+    preset = STANDBY_MESSAGE_PRESETS[msg_type]
+    title = form.get("standby_title", "").strip()[:160]
+    description = form.get("standby_description", "").strip()[:2000]
+    if msg_type != "custom":
+        title = title or preset["title"]
+        description = description or preset["description"]
+    reopen_at = editorial_tz.local_input_to_utc_iso(form.get("standby_reopen_at", ""))
+    return {
+        "mode": "standby",
+        "standby_message_type": msg_type,
+        "standby_title": title,
+        "standby_description": description,
+        "standby_note": form.get("standby_note", "").strip()[:500],
+        "standby_reopen_at": reopen_at,
+        "standby_button_label": form.get("standby_button_label", "").strip()[:60],
+        "standby_button_url": form.get("standby_button_url", "").strip()[:2000],
+        "standby_show_contact_links": bool(form.get("standby_show_contact_links")),
+    }
+
+
+@admin_bp.route("/site-kontrolu/beklemede", methods=["POST"])
+@master_admin_required
+def site_control_save_standby():
+    actor = _resolve_logged_in_user()
+    action = request.form.get("action", "save")  # "save" | "activate"
+    fields = _standby_fields_from_form(request.form)
+
+    if fields["standby_message_type"] == "custom" and not fields["standby_title"]:
+        flash("Özel mesaj için bir başlık girmelisiniz.", "error")
+        return redirect(url_for("admin.site_control"))
+
+    button_url, error = _validate_http_url(fields["standby_button_url"], required=False)
+    if error:
+        flash(f"Buton adresi geçersiz: {error}", "error")
+        return redirect(url_for("admin.site_control"))
+    fields["standby_button_url"] = button_url or ""
+
+    control = store.load_site_control()
+    control.update(fields)
+    if action == "activate":
+        control["mode"] = "standby"
+    _site_control_stamp(control, actor)
+    store.save_site_control(control)
+
+    store.append_audit(actor["email"], "site_control_standby_updated", fields["standby_message_type"],
+                        {"activated": action == "activate"})
+    flash("Beklemede sayfası etkinleştirildi." if action == "activate" else "Beklemede sayfası ayarları kaydedildi.",
+          "success")
+    return redirect(url_for("admin.site_control"))
+
+
+@admin_bp.route("/site-kontrolu/onizleme/beklemede", methods=["GET", "POST"])
+@master_admin_required
+def site_control_preview_standby():
+    """Renders the standby page from whatever is currently in the form --
+    saved or not -- so an admin can see it before ever activating
+    anything. GET (no params) falls back to the currently saved settings;
+    a POST/GET carrying the standby_* fields (the admin form's own submit
+    button, via formaction) previews those instead."""
+    source = request.values if request.values.get("standby_title") is not None else None
+    if source is not None:
+        fields = _standby_fields_from_form(request.values)
+        content = _resolve_standby_content({
+            "standby_message_type": fields["standby_message_type"],
+            "standby_title": fields["standby_title"],
+            "standby_description": fields["standby_description"],
+            "standby_note": fields["standby_note"],
+            "standby_reopen_at": fields["standby_reopen_at"],
+            "standby_button_label": fields["standby_button_label"],
+            "standby_button_url": fields["standby_button_url"],
+            "standby_show_contact_links": fields["standby_show_contact_links"],
+        })
+    else:
+        content = _resolve_standby_content(store.load_site_control())
+    return render_template("standby.html", **content)
+
+
+@admin_bp.route("/site-kontrolu/yonlendirme", methods=["POST"])
+@master_admin_required
+def site_control_save_redirect():
+    actor = _resolve_logged_in_user()
+    action = request.form.get("action", "save")  # "save" | "activate"
+    raw_url = request.form.get("redirect_url", "")
+    url, error = validate_redirect_url(raw_url)
+
+    if error:
+        flash(f"Yönlendirme adresi kabul edilmedi: {error}", "error")
+        return redirect(url_for("admin.site_control"))
+
+    control = store.load_site_control()
+    control["redirect_url"] = url
+    _add_redirect_preset(control, url)
+    if action == "activate":
+        control["mode"] = "redirect"
+    _site_control_stamp(control, actor)
+    store.save_site_control(control)
+
+    store.append_audit(actor["email"], "site_control_redirect_updated", url, {"activated": action == "activate"})
+    flash("Yönlendirme etkinleştirildi." if action == "activate" else "Yönlendirme adresi kaydedildi.", "success")
+    return redirect(url_for("admin.site_control"))
 
 
 app.register_blueprint(admin_bp)

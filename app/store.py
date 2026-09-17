@@ -26,6 +26,7 @@ EDITORIAL_DRAFTS_PATH = os.path.join(DATA_DIR, "editorial_drafts.json")
 EMAIL_OUTBOX_PATH = os.path.join(DATA_DIR, "email_outbox.json")
 BULLETINS_PATH = os.path.join(DATA_DIR, "bulletins.json")
 ARTICLE_VIEWS_PATH = os.path.join(DATA_DIR, "article_views.json")
+SITE_CONTROL_PATH = os.path.join(DATA_DIR, "site_control.json")
 
 TR_MAP = str.maketrans({
     "ç": "c", "Ç": "c", "ğ": "g", "Ğ": "g", "ı": "i", "I": "i",
@@ -1036,3 +1037,49 @@ def load_article_views():
 
 def save_article_views(data):
     _save(ARTICLE_VIEWS_PATH, data)
+
+
+# -------------------------------------------------------------- site control --
+# The single, singleton record controlling the public site's operating mode
+# (live / standby / redirect) -- see app/app.py's enforce_site_control()
+# for how it's applied. Deliberately a dedicated file (not folded into
+# site.json, which is masthead/legal copy, not an operational switch) so
+# the two concerns stay independently editable and the safe-default logic
+# below lives in exactly one place.
+#
+# "Default safely to Live mode if no settings record exists yet" is the
+# whole reason this loader merges onto DEFAULT_SITE_CONTROL rather than
+# just returning whatever is on disk: a missing file, a partially-written
+# file (mid-crash), or a record saved before a new field was introduced
+# all resolve to "live" and every field having a safe, present value --
+# never an exception, never an unexpectedly-locked-down public site.
+DEFAULT_SITE_CONTROL = {
+    "mode": "live",  # "live" | "standby" | "redirect"
+    "standby_message_type": "maintenance",  # "maintenance" | "unavailable" | "next_issue" | "custom"
+    "standby_title": "",
+    "standby_description": "",
+    "standby_note": "",
+    "standby_reopen_at": None,  # UTC ISO8601 or None
+    "standby_button_label": "",
+    "standby_button_url": "",
+    "standby_show_contact_links": True,
+    "redirect_url": "",
+    "redirect_presets": [],
+    "updated_at": None,
+    "updated_by": None,
+}
+SITE_CONTROL_MODES = ("live", "standby", "redirect")
+
+
+def load_site_control():
+    raw = _load(SITE_CONTROL_PATH, {})
+    control = dict(DEFAULT_SITE_CONTROL)
+    if isinstance(raw, dict):
+        control.update(raw)
+    if control.get("mode") not in SITE_CONTROL_MODES:
+        control["mode"] = "live"
+    return control
+
+
+def save_site_control(control):
+    _save(SITE_CONTROL_PATH, control)

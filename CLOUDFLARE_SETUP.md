@@ -193,3 +193,11 @@ Railway service as before; Cloudflare's more specific R2 custom domain for
 `admin.eurovillageherald.com` take precedence over the wildcard
 automatically because Cloudflare matches the most specific hostname
 record.
+
+**Health check path:** if Railway's deploy health check is configured
+against `/` (or left at its default), consider pointing it at `/healthz`
+instead once Site Control ships — `/` intentionally returns HTTP 503
+while the site is in Standby or Redirect mode (by design: that's what
+tells a real visitor and any monitoring the site is deliberately down),
+which a health check aimed at `/` would otherwise misread as a broken
+deploy. `/healthz` always returns 200 regardless of Site Control's mode.

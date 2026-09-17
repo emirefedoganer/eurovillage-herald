@@ -690,6 +690,12 @@ body.drawer-open{ overflow: hidden; }
 .admin-subnav{ display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 2px solid var(--black); font-family: var(--font-sans); }
 .admin-subnav a{ padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--gray-700); border-bottom: 2px solid transparent; margin-bottom: -2px; }
 .admin-subnav a.active, .admin-subnav a:hover{ color: var(--ink); border-bottom-color: var(--red); }
+.site-status-banner{
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  background: var(--red); color: #fff; font-family: var(--font-sans); font-size: 13.5px;
+  padding: 10px 16px; margin-bottom: 16px; border-radius: 4px;
+}
+.site-status-banner a{ color: #fff; text-decoration: underline; font-weight: 600; white-space: nowrap; }
 .admin-stat-grid{ display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 14px; margin-bottom: 24px; }
 .admin-stat-card{ border: 1px solid var(--gray-300); padding: 16px; text-align: center; background: #fff; }
 .admin-stat-card .n{ font-family: var(--font-headline); font-weight: 900; font-size: 30px; display: block; }

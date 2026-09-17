@@ -14,6 +14,23 @@
 
   <div class="admin-panel">
     <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h2 style="font-family: var(--font-headline); margin:0 0 6px;">Genel Site Durumu</h2>
+        {% if site_control %}
+        <span class="badge {{ 'badge-lead' if site_control.mode == 'live' else 'badge-breaking' }}">
+          {{ site_control_mode_labels.get(site_control.mode, site_control.mode) }}
+        </span>
+        {% if site_control.updated_at %}
+        <span class="hint">— son değişiklik: {{ to_editorial_display(site_control.updated_at) }} ({{ editorial_timezone_name }}){% if site_control.updated_by %}, {{ site_control.updated_by }}{% endif %}</span>
+        {% endif %}
+        {% endif %}
+      </div>
+      <a class="btn btn-outline" href="{{ url_for('admin.site_control') }}">Site Kontrolü</a>
+    </div>
+  </div>
+
+  <div class="admin-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
       <h2 style="font-family: var(--font-headline); margin:0;">İletişim Mesajları ({{ message_count }})</h2>
       <a class="btn btn-outline" href="{{ url_for('admin.messages_list') }}">Tümünü Gör</a>
     </div>
