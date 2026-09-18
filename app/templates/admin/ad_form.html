@@ -71,6 +71,20 @@
       <div class="form-row">
         <label for="priority">Öncelik (opsiyonel)</label>
         <input type="number" id="priority" name="priority" value="{{ form.priority if form else 0 }}">
+        <div class="hint">Aynı yerleşim seviyesinde (ör. iki bölüme özel reklam) daha yüksek öncelikli olan kazanır.</div>
+      </div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="weight">Ağırlık (opsiyonel)</label>
+        <input type="number" id="weight" name="weight" min="1" value="{{ form.weight if form and form.weight else 1 }}">
+        <div class="hint">Öncelik eşitliğinde, bu reklamın dönüşümlü gösterimde ne sıklıkla seçileceğini belirler (varsayılan 1).</div>
+      </div>
+      <div class="form-row">
+        <label for="alt_text">Erişilebilirlik Etiketi (alt metin, opsiyonel)</label>
+        <input type="text" id="alt_text" name="alt_text" maxlength="150" value="{{ form.alt_text if form else '' }}"
+               placeholder="Görsel için kısa açıklama — boş bırakılırsa başlık kullanılır">
       </div>
     </div>
 

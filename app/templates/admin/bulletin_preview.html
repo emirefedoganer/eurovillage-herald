@@ -11,7 +11,8 @@
   </div>
 
   <div class="admin-panel">
-    <table class="admin-table" style="margin-bottom:0;">
+    <div class="table-scroll">
+<table class="admin-table" style="margin-bottom:0;">
       <tbody>
         <tr><td style="width:160px;"><strong>Gönderen</strong></td><td>{{ sender }}</td></tr>
         <tr><td><strong>Konu</strong></td><td>{{ subject }}</td></tr>
@@ -20,6 +21,7 @@
         <tr><td><strong>Durum</strong></td><td>{{ bulletin.status }}</td></tr>
       </tbody>
     </table>
+</div>
   </div>
 
   <div class="admin-panel" style="display:flex; flex-wrap:wrap; gap:24px; align-items:flex-start;">

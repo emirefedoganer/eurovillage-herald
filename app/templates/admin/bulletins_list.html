@@ -17,7 +17,8 @@
 
   <div class="admin-panel">
     {% if bulletins %}
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <thead>
         <tr><th>Başlık</th><th>Tür</th><th>Hedef Kitle</th><th>Durum</th><th>Alıcı</th><th>Tarih</th><th></th></tr>
       </thead>
@@ -56,6 +57,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
     {% else %}
     <p style="font-family: var(--font-sans); color: var(--gray-500); margin:0;">Henüz bülten oluşturulmadı.</p>
     {% endif %}

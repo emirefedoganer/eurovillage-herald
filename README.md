@@ -212,7 +212,7 @@ app/
   app.py             Flask uygulaması, versiyon sabiti (APP_VERSION) ve tüm route'lar
   store.py           JSON veri okuma/yazma yardımcıları + tüm self-healing yükleyiciler
   sections.py        Bölüm (Politika, Şehir, Kültür...) tanımları
-  ads.py             Reklam/yerleşim mantığı (öncelik çözümleme, istatistikler)
+  ads.py             Reklam slot kayıt defteri + hedefleme/seçim algoritması (özgüllük, öncelik, ağırlık, cihaz hedefleme, tekilleştirme, sayfa başı üst sınır)
   analytics.py       Gazete sayısı analitiği (okuma oturumu/sayfa/indirme kaydı ve özetleri)
   subscriptions.py   Bülten abonelik sistemi (çoklu tercih kategorisi, çifte onay, tercih yönetimi/abonelikten çıkma token'ları, KVKK onay sürümü)
   bulletins.py       Editöryal bülten/newsletter CMS (taslak->zamanlanmış->gönderildi/iptal, manuel haber seçimi, test gönderimi, yeni-sayı bülteni otomasyonu)

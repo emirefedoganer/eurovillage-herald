@@ -10,6 +10,7 @@
     <a class="btn btn-outline" href="{{ url_for('admin.placements_list') }}">← Listeye Dön</a>
   </div>
 
+  <div class="placement-form-layout">
   <form class="admin-panel" method="post" id="placement-form">
     <div class="form-row">
       <label for="ad_id">Reklam</label>
@@ -39,6 +40,7 @@
         {% endfor %}
         </optgroup>
       </select>
+      <div class="hint">Örn. "Makale — Kenar Çubuğu" seçmek, makalenin yanındaki kenar çubuğu konumunu anlatır — bir şablon adı ya da route girmeniz gerekmez.</div>
     </div>
 
     <div class="form-row">
@@ -70,12 +72,41 @@
       </select>
     </div>
 
+    <div class="form-row">
+      <label for="device_target">Cihaz Hedefi</label>
+      <select id="device_target" name="device_target">
+        {% for key, label in device_choices %}
+        <option value="{{ key }}" {{ 'selected' if form and form.device_target == key else ('selected' if not form and key == 'all' else '') }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <div class="hint">"Tüm cihazlar" dışında bir seçim yaparsanız, aynı konum için farklı bir cihaza özel ayrı bir yerleşim de oluşturabilirsiniz (ör. masaüstünde bir görsel, mobilde başka biri).</div>
+    </div>
+
+    <div class="form-row" id="mobile-fallback-row" hidden>
+      <label for="mobile_fallback">Mobil / Dar Ekran Davranışı</label>
+      <select id="mobile_fallback" name="mobile_fallback">
+        {% for key, label in mobile_fallback_labels.items() %}
+        <option value="{{ key }}" {{ 'selected' if form and form.mobile_fallback == key else '' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <div class="hint">Bu slotun kenar çubuğu, yeterli genişlik olmayan ekranlarda var olamaz — bu seçim, o durumda ne olacağını belirler.</div>
+    </div>
+
     <div class="form-actions">
       <button class="btn btn-red" type="submit">Yerleşimi Kaydet</button>
     </div>
   </form>
+
+  <aside class="admin-panel placement-preview" id="placement-preview" aria-live="polite">
+    <h3 style="font-family:var(--font-sans); font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--gray-500); margin:0 0 12px;">Konum Önizlemesi</h3>
+    <div id="placement-preview-body">
+      <p class="hint">Önizlemeyi görmek için yukarıdan bir slot seçin.</p>
+    </div>
+  </aside>
+  </div>
 </div>
 
+<script id="ad-slots-data" type="application/json">{{ slots_json | safe }}</script>
 <script src="{{ versioned_static('js/ad-placement-form.js') }}"></script>
 
 {% endblock %}

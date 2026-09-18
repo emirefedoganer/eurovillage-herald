@@ -21,7 +21,8 @@
   </p>
 
   <div class="admin-panel">
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <thead><tr><th>E-posta</th><th>Tercihler</th><th>Durum</th><th>Kayıt</th><th>Onay</th><th>Gizlilik Metni / Yöntem</th></tr></thead>
       <tbody>
         {% for s in subs %}
@@ -48,6 +49,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 </div>
 

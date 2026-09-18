@@ -111,6 +111,7 @@ def _seed_minimal_data(data_dir):
     write("email_outbox.json", [])
     write("bulletins.json", [])
     write("article_views.json", {})
+    write("site_control.json", {})
 
 
 REDIRECTED_PATHS = {
@@ -122,6 +123,7 @@ REDIRECTED_PATHS = {
     "ISSUE_SUBSCRIPTIONS_PATH": "issue_subscriptions.json", "ISSUE_ANALYTICS_PATH": "issue_analytics.json",
     "EDITORIAL_DRAFTS_PATH": "editorial_drafts.json", "EMAIL_OUTBOX_PATH": "email_outbox.json",
     "BULLETINS_PATH": "bulletins.json", "ARTICLE_VIEWS_PATH": "article_views.json",
+    "SITE_CONTROL_PATH": "site_control.json",
 }
 
 
@@ -1543,6 +1545,136 @@ class TurnstileSubscriptionTests(EmailSystemTestCase):
         finally:
             globals_dict["turnstile_site_key"] = original
             self.appmod.app.jinja_env.cache.clear()
+
+
+class NewsletterVisibilityTests(EmailSystemTestCase):
+    """The subscription backend (double opt-in, Turnstile, rate limiting,
+    preferences) already existed and is exercised in depth elsewhere in
+    this file -- these tests only check that it's actually reachable from
+    the public site, and that every entry point posts to the SAME
+    subscribe_submit() endpoint rather than a second, competing form."""
+
+    def test_nav_has_a_subscribe_link(self):
+        r = self.client.get("/")
+        body = r.data.decode("utf-8")
+        self.assertIn("Bültene Abone Ol", body)
+        self.assertIn('href="/bultene-abone-ol"', body)
+
+    def test_footer_has_a_subscribe_link_on_an_unrelated_page(self):
+        r = self.client.get("/hakkimizda")
+        body = r.data.decode("utf-8")
+        self.assertIn('href="/bultene-abone-ol"', body)
+
+    def test_standalone_subscribe_landing_page_renders_the_real_form(self):
+        r = self.client.get("/bultene-abone-ol")
+        self.assertEqual(r.status_code, 200)
+        body = r.data.decode("utf-8")
+        self.assertIn(f'action="/abone-ol"', body)
+        self.assertIn('name="email"', body)
+        self.assertIn('name="privacy_ack"', body)
+
+    def test_homepage_has_a_dedicated_subscribe_section(self):
+        r = self.client.get("/")
+        body = r.data.decode("utf-8")
+        self.assertIn('class="subscribe-widget', body)
+        self.assertIn('action="/abone-ol"', body)
+
+    def test_article_page_has_a_compact_subscribe_cta(self):
+        r = self.client.get("/makale/existing-article")
+        body = r.data.decode("utf-8")
+        self.assertIn("article-subscribe-cta", body)
+        self.assertIn("subscribe-widget-compact", body)
+        self.assertIn('action="/abone-ol"', body)
+
+    def test_every_entry_point_posts_to_the_one_real_subscribe_endpoint(self):
+        """No competing/duplicate subscription implementation -- every
+        instance of the form, wherever it's embedded, targets the exact
+        same route."""
+        for path in ("/", "/makale/existing-article", "/gazete", "/bultene-abone-ol"):
+            r = self.client.get(path)
+            body = r.data.decode("utf-8")
+            form_count = body.count('action="/abone-ol"')
+            self.assertGreaterEqual(form_count, 1, path)
+
+    def test_gazete_page_still_has_its_existing_widget_unchanged(self):
+        r = self.client.get("/gazete")
+        body = r.data.decode("utf-8")
+        self.assertIn('action="/abone-ol"', body)
+        self.assertIn('name="privacy_ack"', body)
+
+    def test_standby_page_has_no_subscribe_form_by_default(self):
+        import store
+        control = dict(store.DEFAULT_SITE_CONTROL)
+        control["mode"] = "standby"
+        store.save_site_control(control)
+        try:
+            r = self.client.get("/")
+            self.assertEqual(r.status_code, 503)
+            body = r.data.decode("utf-8")
+            # Checked against the actual form markup, not a bare
+            # substring -- the "standby-subscribe" CSS rules themselves
+            # are always present in <style>, whether or not the form's
+            # HTML is ever rendered.
+            self.assertNotIn('class="standby-subscribe"', body)
+            self.assertNotIn('action="/abone-ol"', body)
+        finally:
+            control["mode"] = "live"
+            store.save_site_control(control)
+
+    def test_standby_page_shows_subscribe_form_when_enabled(self):
+        import store
+        control = dict(store.DEFAULT_SITE_CONTROL)
+        control["mode"] = "standby"
+        control["standby_show_subscribe_form"] = True
+        store.save_site_control(control)
+        try:
+            r = self.client.get("/")
+            self.assertEqual(r.status_code, 503)
+            body = r.data.decode("utf-8")
+            self.assertIn('class="standby-subscribe"', body)
+            self.assertIn('action="/abone-ol"', body)
+        finally:
+            control["mode"] = "live"
+            control["standby_show_subscribe_form"] = False
+            store.save_site_control(control)
+
+    def test_standby_subscribe_form_actually_creates_a_pending_subscription(self):
+        """The form is exempted from the standby gate specifically so it
+        actually works -- not just visible, functional."""
+        import store
+        control = dict(store.DEFAULT_SITE_CONTROL)
+        control["mode"] = "standby"
+        control["standby_show_subscribe_form"] = True
+        store.save_site_control(control)
+        try:
+            r = self.client.post("/abone-ol", data={
+                "email": "standbysignup@example.com", "pref_new_issue": "1", "privacy_ack": "1",
+            })
+            self.assertEqual(r.status_code, 302)
+            subs = [s for s in store.load_subscriptions() if s["email"] == "standbysignup@example.com"]
+            self.assertEqual(len(subs), 1)
+            self.assertEqual(subs[0]["status"], "pending")
+        finally:
+            control["mode"] = "live"
+            control["standby_show_subscribe_form"] = False
+            store.save_site_control(control)
+
+    def test_subscribe_endpoint_stays_gated_during_standby_when_form_disabled(self):
+        import store
+        control = dict(store.DEFAULT_SITE_CONTROL)
+        control["mode"] = "standby"
+        control["standby_show_subscribe_form"] = False
+        store.save_site_control(control)
+        try:
+            r = self.client.post("/abone-ol", data={
+                "email": "shouldnotsignup@example.com", "pref_new_issue": "1", "privacy_ack": "1",
+            })
+            self.assertEqual(r.status_code, 503)
+            subs = [s for s in store.load_subscriptions() if s["email"] == "shouldnotsignup@example.com"]
+            self.assertEqual(len(subs), 0)
+        finally:
+            control["mode"] = "live"
+            store.save_site_control(control)
 
 
 if __name__ == "__main__":

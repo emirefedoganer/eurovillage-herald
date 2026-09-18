@@ -96,6 +96,15 @@
         </label>
       </div>
 
+      <div class="form-row">
+        <label style="font-weight:400; display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="standby_show_subscribe_form" name="standby_show_subscribe_form" value="1"
+                 style="width:auto;" {{ 'checked' if control.standby_show_subscribe_form else '' }}>
+          Beklemede sayfasında bülten abonelik formu göster (opsiyonel)
+        </label>
+        <div class="hint">Ziyaretçiler, site tekrar yayına girdiğinde haber almak için abone olabilir — mevcut çifte onay akışını kullanır, ayrı bir kayıt oluşturmaz.</div>
+      </div>
+
       <div class="form-actions">
         <button class="btn btn-outline" type="submit" name="action" value="save">Kaydet</button>
         <button class="btn btn-red" type="submit" name="action" value="activate"

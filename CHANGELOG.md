@@ -1,5 +1,69 @@
 # Changelog
 
+## The Eurovillage Herald 1.3.0
+
+**Site-wide responsive/overflow pass.** Audited every major public and
+admin page at 320/375/390/768/1024/1280/1440px. Fixed a set of shared,
+structural causes rather than patching individual pages: missing
+`minmax(0, ...)` on several CSS Grid tracks (the classic Grid overflow
+trap, where a bare `1fr`/fixed-px track can still grow past its content's
+intrinsic size), admin data tables with no responsive treatment at all
+(every `<table class="admin-table">` is now wrapped in a horizontally
+scrollable `.table-scroll` container, with cells defaulting to a single
+line so a too-wide table scrolls cleanly instead of every cell wrapping
+into an unreadable column), and a subscribe-widget flex-basis bug that
+left a large blank gap on mobile (caught only through visual screenshot
+review, not the automated overflow check — see below).
+
+**Redesigned admin navigation (TEH Admin).** The 13+ item single-row
+nav that prompted this pass is now three logical dropdown groups (Gazete
+/ İletişim & Abonelik / Yönetim) built on native `<details>/<summary>` —
+zero new JS framework, keyboard/screen-reader accessible by default,
+collapsing to an accordion on narrow screens. Authorization is
+unchanged: this is presentation only, still enforced server-side by the
+same `master_admin_required`/permission checks as before.
+
+**Playwright responsive smoke tests** (`tests/responsive/`, new
+`requirements-dev.txt`) against a real running instance of the app:
+page-level overflow checks across every major page × 7 widths, PLUS a
+component-scoped check for the main nav specifically — the page-level
+check structurally cannot catch a component with its own
+`overflow-x:auto` silently clipping content, which is exactly the real
+bug this pass found (an 11th nav item pushed the search box off the
+edge at ordinary desktop widths like 1024–1280px).
+
+**Redesigned advertising placement system (`ads.py`).** A slot registry
+where every entry now documents its human-readable Turkish label, where
+it appears, compatible page types, creative aspect ratio, and explicit
+desktop/tablet/mobile behavior — surfaced live in the admin placement
+form via a contextual preview panel/diagram, so choosing "Makale — Kenar
+Çubuğu" shows exactly where that puts the ad, with no route/template
+name ever exposed to an admin. Adds a genuine article sidebar (new
+`.article-layout` grid in `article.html`, only reserving column space
+when a sidebar ad actually exists) with an admin-configurable mobile
+fallback (after the article content, or hidden). The selection algorithm
+now honors priority and weight (a documented, deterministic day-seeded
+rotation — never Python's `random`) within a specificity tier
+(article > section > site-wide, unchanged), adds device targeting
+(desktop/tablet/mobile, coexisting with an "all devices" placement for
+the same slot without conflict), same-page deduplication, and a
+configurable per-page cap. Legacy dotted slot identifiers
+(`homepage.top`) are transparently translated to their new names
+(`homepage_top`) on every read — no data migration required, and a
+genuinely unrecognized slot is flagged in the admin dashboard rather
+than silently dropped.
+
+**Newsletter subscription is now visible on the public site.** The
+subscription backend (double opt-in, Turnstile, rate limiting,
+preferences) already existed but had no public entry point. Reuses it
+unchanged via one shared macro (`_macros.html`: `subscribe_form()`) in
+five places: the main nav and footer (a "Bültene Abone Ol" link), a
+dedicated homepage section, a compact end-of-article prompt, and a new
+standalone `/bultene-abone-ol` landing page — plus an optional,
+admin-controlled (default off) subscribe form on the Standby page (see
+Site Control), which required specifically exempting `subscribe_submit`
+from the standby gate so the form it renders actually works.
+
 ## The Eurovillage Herald 1.2.0
 
 **Site Control (TEH Admin → Site Kontrolü).** A single, database-backed

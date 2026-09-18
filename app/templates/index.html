@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% from "_macros.html" import author_byline, author_avatar %}
+{% from "_macros.html" import author_byline, author_avatar, subscribe_form %}
 {% block title %}{{ site.name }} — {{ site.tagline }}{% endblock %}
 {% block content %}
 
-{{ ad_slot('homepage.top', section='homepage') }}
+{{ ad_slot('homepage_top', section='homepage') }}
 
 <div class="front-grid">
   <div>
@@ -40,7 +40,7 @@
     </div>
     {% endif %}
 
-    {{ ad_slot('homepage.after_news_4', section='homepage') }}
+    {{ ad_slot('homepage_after_news_4', section='homepage') }}
 
     {% if rest %}
     <div class="river">
@@ -66,7 +66,7 @@
   </div>
 
   <aside class="sidebar">
-    {% set sidebar_ad = ad_slot('homepage.sidebar_top', section='homepage') %}
+    {% set sidebar_ad = ad_slot('homepage_sidebar_top', section='homepage') %}
     {% if sidebar_ad %}<div class="sidebar-block">{{ sidebar_ad }}</div>{% endif %}
 
     {% if opinion %}
@@ -138,6 +138,8 @@
   </aside>
 </div>
 
-{{ ad_slot('homepage.bottom', section='homepage') }}
+{{ subscribe_form() }}
+
+{{ ad_slot('homepage_bottom', section='homepage') }}
 
 {% endblock %}

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 from urllib.parse import urlsplit
 
-from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, abort, flash, jsonify, send_file, Response, g, make_response
+from flask import Flask, Blueprint, render_template, request, redirect, url_for, session, abort, flash, jsonify, send_file, Response, g, make_response, get_flashed_messages
 from itsdangerous import URLSafeTimedSerializer, URLSafeSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -37,7 +37,7 @@ from sections import (
 # the admin footer and available to any template as `app_version`. Not to
 # be confused with site.json's `issue_no`/`issue_label`, which describe
 # the current PRINTED newspaper issue, a completely different concept.
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # These five are passed to uploads.py's save_*() functions purely as the
@@ -238,6 +238,12 @@ def media_url(value, legacy_subdir, external=False):
 app.jinja_env.globals["media_url"] = media_url
 app.jinja_env.globals["turnstile_site_key"] = turnstile.SITE_KEY if turnstile.ENABLED else None
 app.jinja_env.globals["ad_slot"] = ads.ad_slot
+# So _macros.html's subscribe_form() can render its preference checkboxes
+# from any template without every single call site having to remember to
+# pass preference_choices=... through its own render_template() call --
+# it's static, site-wide data (see subscriptions.PREFERENCE_CHOICES),
+# exactly like the other Jinja globals registered here.
+app.jinja_env.globals["preference_choices"] = subscriptions.PREFERENCE_CHOICES
 app.jinja_env.globals["max_tip_images"] = uploads.MAX_TIP_IMAGES
 app.jinja_env.globals["editorial_timezone_name"] = editorial_tz.EDITORIAL_TIMEZONE_NAME
 app.jinja_env.globals["to_editorial_input"] = editorial_tz.utc_iso_to_local_input
@@ -895,6 +901,17 @@ def _render_email_html(template_name, **ctx):
 # "Let me know when a new issue is published." See app/subscriptions.py's
 # module docstring for the double opt-in / unsubscribe-token design.
 
+@app.route("/bultene-abone-ol")
+def subscribe_landing():
+    """A dedicated, linkable newsletter page -- what the nav's "Bültene
+    Abone Ol" link and the footer's subscribe prompt point to, so those
+    two entry points don't have to embed a second/third copy of the form
+    (and its Turnstile widget) on every single page. Posts to the exact
+    same subscribe_submit() as the homepage/article/gazete instances of
+    _macros.html's subscribe_form() -- one backend, several doorways."""
+    return render_template("subscribe_landing.html")
+
+
 @app.route("/abone-ol", methods=["POST"])
 def subscribe_submit():
     redirect_to = request.referrer or url_for("gazete")
@@ -1348,10 +1365,21 @@ def _resolve_standby_content(control):
         "button_url": button_url or "",
         "show_contact_links": bool(control.get("standby_show_contact_links", True)),
         "contact_email": mailer.EMAIL_CONTACT_REPLY_TO,
+        "show_subscribe_form": bool(control.get("standby_show_subscribe_form", False)),
     }
 
 
 def _standby_response(content, status=503):
+    # A subscribe attempt submitted FROM the standby page's own optional
+    # form (see enforce_site_control()'s exemption for subscribe_submit)
+    # redirects back here on success/failure exactly like it would on
+    # the real /gazete page -- but standby.html is a fully standalone
+    # template that doesn't extend base.html, so it can't reuse the
+    # site-wide flash-message block. Passing the flashed messages through
+    # explicitly is what lets its mini form show "check your email"/an
+    # error inline, reusing the SAME flash() calls subscribe_submit()
+    # already makes rather than inventing a second feedback mechanism.
+    content = dict(content, flash_messages=get_flashed_messages(with_categories=True))
     resp = make_response(render_template("standby.html", **content), status)
     resp.headers["Cache-Control"] = "no-store"
     resp.headers["X-Robots-Tag"] = "noindex, nofollow"
@@ -1409,6 +1437,16 @@ def enforce_site_control():
         return jsonify(ok=False, error=f"site_{mode}"), 503
 
     if mode == "standby":
+        # The standby page's OWN optional subscribe form (see
+        # standby_show_subscribe_form) posts to this same endpoint -- if
+        # it weren't exempted here, submitting it would just be served
+        # another standby page instead of actually processing the
+        # signup. Only exempted when the admin has actually turned the
+        # standby subscribe form on; otherwise this endpoint stays fully
+        # covered by standby like any other public route, unchanged from
+        # before this feature existed.
+        if request.endpoint == "subscribe_submit" and control.get("standby_show_subscribe_form"):
+            return None
         return _standby_response(_resolve_standby_content(control))
 
     if mode == "redirect":
@@ -4104,6 +4142,19 @@ def role_delete(rid):
 # ran before this decorator even runs -- this is the third, final check in
 # that chain, and it's the one that actually decides authorization.
 
+def _ads_slots_json():
+    """ads.SLOTS, JSON-serializable (its section_contexts values are sets)
+    -- embedded once into the placement form so its "which slot did you
+    pick" preview panel (see admin/placement_form.html) can update
+    instantly from the browser without a round trip, using the exact same
+    descriptions/behaviors this module already documents server-side."""
+    import json as _json
+    return _json.dumps({
+        key: {k: (sorted(v) if isinstance(v, set) else v) for k, v in meta.items()}
+        for key, meta in ads.SLOTS.items()
+    }, ensure_ascii=False)
+
+
 def _ad_form_to_dict(form):
     errors = []
     internal_name = form.get("internal_name", "").strip()[:ads.MAX_LENGTHS["internal_name"]]
@@ -4127,6 +4178,12 @@ def _ad_form_to_dict(form):
         priority = int(form.get("priority", "0") or "0")
     except ValueError:
         priority = 0
+    try:
+        weight = max(1, int(form.get("weight", "1") or "1"))
+    except ValueError:
+        weight = 1
+
+    alt_text = form.get("alt_text", "").strip()[:ads.MAX_LENGTHS["alt_text"]]
 
     data = {
         "internal_name": internal_name,
@@ -4135,7 +4192,9 @@ def _ad_form_to_dict(form):
         "body": body or None,
         "cta_text": cta_text or None,
         "destination_url": destination_url,
+        "alt_text": alt_text or None,
         "priority": priority,
+        "weight": weight,
         "status": "active" if form.get("status") == "active" else "inactive",
         # Same EDITORIAL_TIMEZONE interpretation as article scheduling --
         # see editorial_tz.py. Stored in UTC either way.
@@ -4329,12 +4388,15 @@ def placements_list():
         elif p["scope"] == "content":
             article = store.get_article_by_id(p.get("content_id"))
             target_label = article["title"] if article else "(silinmiş makale)"
+        slot_meta = ads.slot_meta(p["slot"])
         rows.append({
             "placement": p,
             "ad": ad,
-            "slot_label": ads.SLOTS.get(p["slot"], {}).get("label", p["slot"]),
+            "slot_label": (slot_meta["label"] if slot_meta else f"Bilinmeyen/eski slot: {p['slot']}"),
+            "slot_unknown": slot_meta is None,
             "scope_label": ads.SCOPE_LABELS.get(p["scope"], p["scope"]),
             "target_label": target_label,
+            "device_label": ads.DEVICE_LABELS.get((p.get("device_target") or "all"), p.get("device_target")),
         })
 
     filtered_ad = ads_by_id.get(ad_filter) if ad_filter else None
@@ -4355,6 +4417,8 @@ def placement_new():
         scope = request.form.get("scope", "")
         section = request.form.get("section") or None
         content_id = request.form.get("content_id") or None
+        device_target = request.form.get("device_target") or "all"
+        mobile_fallback = request.form.get("mobile_fallback") or "after_content"
 
         errors = []
         if not store.get_ad(ad_id):
@@ -4371,6 +4435,11 @@ def placement_new():
                 errors.append("Bu slot belirli bir sayfaya özel yerleşimi desteklemiyor.")
             elif not store.get_article_by_id(content_id):
                 errors.append("Geçerli bir makale seçin.")
+        if device_target not in ads.DEVICE_LABELS:
+            errors.append("Geçerli bir cihaz hedefi seçin.")
+        fallback_choices = ads.slot_mobile_fallback_choices(slot)
+        if fallback_choices and mobile_fallback not in fallback_choices:
+            errors.append("Geçerli bir mobil davranış seçin.")
 
         if errors:
             for e in errors:
@@ -4378,12 +4447,13 @@ def placement_new():
             return render_template("admin/placement_form.html", placement=None, form=request.form,
                                     all_ads=all_ads, slot_choices=slot_choices, articles=articles,
                                     surface_labels=ads.SURFACE_LABELS, context_labels=ads.CONTEXT_LABELS,
-                                    active="ads")
+                                    device_choices=ads.DEVICE_CHOICES, mobile_fallback_labels=ads.MOBILE_FALLBACK_LABELS,
+                                    slots_json=_ads_slots_json(), active="ads")
 
         now = _now_iso()
         existing = store.find_placement(
             slot, scope, section=section, content_type="article" if scope == "content" else None,
-            content_id=content_id if scope == "content" else None,
+            content_id=content_id if scope == "content" else None, device_target=device_target,
         )
         placements = store.load_placements()
         record = {
@@ -4394,6 +4464,8 @@ def placement_new():
             "section": section if scope == "section" else None,
             "content_type": "article" if scope == "content" else None,
             "content_id": content_id if scope == "content" else None,
+            "device_target": device_target,
+            "mobile_fallback": mobile_fallback if fallback_choices else None,
             "created_at": existing["created_at"] if existing else now,
             "updated_at": now,
             "created_by": existing["created_by"] if existing else actor["email"],
@@ -4411,7 +4483,9 @@ def placement_new():
 
     return render_template("admin/placement_form.html", placement=None, form={}, all_ads=all_ads,
                             slot_choices=slot_choices, articles=articles,
-                            surface_labels=ads.SURFACE_LABELS, context_labels=ads.CONTEXT_LABELS, active="ads")
+                            surface_labels=ads.SURFACE_LABELS, context_labels=ads.CONTEXT_LABELS,
+                            device_choices=ads.DEVICE_CHOICES, mobile_fallback_labels=ads.MOBILE_FALLBACK_LABELS,
+                            slots_json=_ads_slots_json(), active="ads")
 
 
 @admin_bp.route("/reklam/yerlesimler/<pid>/sil", methods=["POST"])
@@ -4522,6 +4596,7 @@ def _standby_fields_from_form(form):
         "standby_button_label": form.get("standby_button_label", "").strip()[:60],
         "standby_button_url": form.get("standby_button_url", "").strip()[:2000],
         "standby_show_contact_links": bool(form.get("standby_show_contact_links")),
+        "standby_show_subscribe_form": bool(form.get("standby_show_subscribe_form")),
     }
 
 

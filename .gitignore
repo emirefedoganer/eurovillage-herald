@@ -6,3 +6,4 @@ app/data/.secret_key
 app/private_uploads/
 .env
 app/data/.media_migration_backups/
+tests/responsive/screenshots/*.png

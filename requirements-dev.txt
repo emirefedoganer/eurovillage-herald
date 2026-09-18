@@ -1,0 +1,13 @@
+# Development/test-only dependencies -- NOT installed in production (see
+# start.sh/Procfile, which only ever install requirements.txt). Covers the
+# Playwright-based responsive smoke tests under tests/responsive/.
+#
+# Install with:
+#   pip install -r requirements.txt -r requirements-dev.txt
+#   playwright install chromium
+#
+# Run the responsive suite with:
+#   python3 -m pytest tests/responsive -v
+pytest>=8.0
+playwright>=1.45
+pytest-playwright>=0.5

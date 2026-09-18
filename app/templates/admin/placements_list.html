@@ -18,8 +18,9 @@
   {% endif %}
 
   <div class="admin-panel">
-    <table class="admin-table">
-      <thead><tr><th>Reklam</th><th>Slot</th><th>Kapsam</th><th>Hedef</th><th></th></tr></thead>
+    <div class="table-scroll">
+<table class="admin-table">
+      <thead><tr><th>Reklam</th><th>Slot</th><th>Kapsam</th><th>Hedef</th><th>Cihaz</th><th></th></tr></thead>
       <tbody>
         {% for row in rows %}
         <tr>
@@ -28,9 +29,10 @@
             <a href="{{ url_for('admin.ad_edit', aid=row.ad.id) }}">{{ row.ad.internal_name }}</a>
             {% else %}<span style="color: var(--red);">(silinmiş reklam)</span>{% endif %}
           </td>
-          <td>{{ row.slot_label }}</td>
+          <td>{{ row.slot_label }}{% if row.slot_unknown %} <span class="badge badge-secondary">bilinmiyor</span>{% endif %}</td>
           <td>{{ row.scope_label }}</td>
           <td>{{ row.target_label }}</td>
+          <td>{{ row.device_label }}</td>
           <td class="admin-actions">
             <form method="post" action="{{ url_for('admin.placement_delete', pid=row.placement.id) }}" onsubmit="return confirm('Bu yerleşimi kaldırmak istediğinize emin misiniz?');">
               <button class="btn btn-danger" type="submit">Kaldır</button>
@@ -38,10 +40,11 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="5">Henüz yerleşim yok.</td></tr>
+        <tr><td colspan="6">Henüz yerleşim yok.</td></tr>
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 </div>
 

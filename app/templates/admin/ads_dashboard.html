@@ -22,12 +22,27 @@
     <div class="admin-stat-card"><span class="n">{{ stats.total_ads }}</span><span class="l">Toplam Reklam</span></div>
   </div>
 
+  {% if stats.unknown_slots %}
+  <div class="admin-panel" style="border-color: var(--red);">
+    <p style="margin:0 0 8px; font-weight:700; color: var(--red-dark);">
+      ⚠ Bilinmeyen/eski slot kimliği kullanan {{ stats.unknown_slots|length }} yerleşim var
+    </p>
+    <p class="hint" style="margin:0 0 8px;">
+      Bu slot kimlikleri artık tanınmıyor (bilinen bir eski isim eşlemesi de yok — bkz. ads.py'nin
+      LEGACY_SLOT_ALIASES sözlüğü) ve bu yerleşimler artık hiçbir sayfada gösterilmiyor.
+      <a href="{{ url_for('admin.placements_list') }}">Yerleşimler</a> sayfasından gözden geçirip
+      geçerli bir slota taşıyın veya silin: {{ stats.unknown_slots|join(', ') }}
+    </p>
+  </div>
+  {% endif %}
+
   <div class="admin-panel">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
       <h2 style="font-family: var(--font-headline); margin:0;">Yakında Süresi Dolacaklar (7 gün)</h2>
       <a class="btn btn-outline" href="{{ url_for('admin.ads_list') }}">Tüm Reklamlar</a>
     </div>
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <thead><tr><th>Dahili İsim</th><th>Sponsor</th><th>Bitiş</th><th></th></tr></thead>
       <tbody>
         {% for ad in stats.expiring_soon %}
@@ -44,6 +59,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 </div>
 

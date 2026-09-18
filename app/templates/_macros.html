@@ -4,4 +4,47 @@
 
 {% macro turnstile_widget() %}{% if turnstile_site_key %}<div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}" data-theme="light"></div><script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>{% endif %}{% endmacro %}
 
-{% macro nav_links(uppercase_opinion=False) %}<a href="{{ url_for('home') }}" class="nav-link mainnav-home">Ana Sayfa</a>{% for s in ['politika', 'sehir', 'kultur', 'roportaj', 'gorus'] %}<a href="{{ url_for('section_page', section=s) }}" class="nav-link">{{ 'OPINION' if (s == 'gorus' and uppercase_opinion) else section_label(s) }}</a>{% endfor %}<a href="{{ url_for('oyun_kosesi') }}" class="nav-link">Oyun Köşesi</a><a href="{{ url_for('magazin') }}" class="nav-link">Arı - Magazin</a><a href="{{ url_for('iletisim') }}" class="nav-link">İletişim</a><a href="{{ url_for('gazete') }}" class="nav-link mainnav-pdf">Gazete (PDF)</a>{% endmacro %}
+{% macro nav_links(uppercase_opinion=False, compact_subscribe=False) %}<a href="{{ url_for('home') }}" class="nav-link mainnav-home">Ana Sayfa</a>{% for s in ['politika', 'sehir', 'kultur', 'roportaj', 'gorus'] %}<a href="{{ url_for('section_page', section=s) }}" class="nav-link">{{ 'OPINION' if (s == 'gorus' and uppercase_opinion) else section_label(s) }}</a>{% endfor %}<a href="{{ url_for('oyun_kosesi') }}" class="nav-link">Oyun Köşesi</a><a href="{{ url_for('magazin') }}" class="nav-link">Arı - Magazin</a><a href="{{ url_for('iletisim') }}" class="nav-link">İletişim</a><a href="{{ url_for('gazete') }}" class="nav-link mainnav-pdf">Gazete (PDF)</a><a href="{{ url_for('subscribe_landing') }}" class="nav-link nav-link-subscribe">{{ 'Abone Ol' if compact_subscribe else 'Bültene Abone Ol' }}</a>{% endmacro %}
+
+{#
+  The ONE subscribe-form implementation, reused wherever the public site
+  offers a newsletter signup (homepage, article end, the standalone
+  /bultene-abone-ol page, gazete.html) so double opt-in / Turnstile /
+  rate limiting / preference handling only ever exist in one place --
+  see app.py's subscribe_submit(), which every instance of this macro
+  posts to unchanged. `variant`: "full" (the boxed .subscribe-widget
+  treatment) or "compact" (a lighter-weight inline version for the end
+  of an article, where a full boxed widget would compete too heavily
+  with "Related stories"). `heading`/`text` let each call site's copy
+  match its context (front page vs. end of a specific article) without
+  forking the form's actual fields or backend logic.
+#}
+{% macro subscribe_form(variant="full", heading="The Eurovillage Herald'a abone olun", text="Yeni sayılar ve seçili haberler yayımlandığında haberiniz olsun.") %}
+<div class="subscribe-widget {{ 'subscribe-widget-compact' if variant == 'compact' else '' }}">
+  <div class="subscribe-widget-text">
+    <strong>{{ heading }}</strong>
+    <p>{{ text }}</p>
+  </div>
+  <form method="post" action="{{ url_for('subscribe_submit') }}" class="subscribe-widget-form">
+    <input type="email" name="email" placeholder="e-posta adresiniz" required maxlength="200">
+    {% if variant != "compact" %}
+    <div class="subscribe-widget-prefs">
+      {% for key, label in preference_choices %}
+      <label>
+        <input type="checkbox" name="pref_{{ key }}" value="1" {{ 'checked' if key == 'new_issue' else '' }}>
+        {{ label }}
+      </label>
+      {% endfor %}
+    </div>
+    {% else %}
+    <input type="hidden" name="pref_new_issue" value="1">
+    {% endif %}
+    <label class="subscribe-widget-consent">
+      <input type="checkbox" name="privacy_ack" value="1" required>
+      <span><a href="{{ url_for('privacy_notice') }}" target="_blank">Gizlilik Bildirimi</a>'ni okudum, e-posta adresimin bu amaçla işlenmesini onaylıyorum.</span>
+    </label>
+    <div class="subscribe-widget-turnstile">{{ turnstile_widget() }}</div>
+    <button class="btn btn-red" type="submit">Abone Ol</button>
+  </form>
+</div>
+{% endmacro %}

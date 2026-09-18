@@ -15,7 +15,8 @@
       Bu işlem, aşağıda listelenen tüm uygun abonelere GERÇEK bir e-posta kampanyası kuyruğa alacaktır.
       Bu işlem geri alınamaz.
     </p>
-    <table class="admin-table" style="margin-bottom:0;">
+    <div class="table-scroll">
+<table class="admin-table" style="margin-bottom:0;">
       <tbody>
         <tr><td style="width:200px;"><strong>Bülten</strong></td><td>{{ bulletin.internal_title }}</td></tr>
         <tr><td><strong>Gönderen</strong></td><td>{{ sender }}</td></tr>
@@ -30,6 +31,7 @@
         {% endif %}
       </tbody>
     </table>
+</div>
   </div>
 
   <form method="post" action="{{ url_for('admin.bulletin_send', bulletin_id=bulletin.id) }}"

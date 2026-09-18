@@ -22,7 +22,8 @@
 
   <div class="admin-panel">
     <h2 style="font-family: var(--font-headline); margin-top:0;">Cihaz Dağılımı</h2>
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <tbody>
         {% for device, count in summary.devices.items() %}
         <tr><td>{{ device }}</td><td>{{ count }}</td></tr>
@@ -31,11 +32,13 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 
   <div class="admin-panel">
     <h2 style="font-family: var(--font-headline); margin-top:0;">En Çok Gelinen Kaynaklar</h2>
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <tbody>
         {% for host, count in summary.top_referrers %}
         <tr><td>{{ host }}</td><td>{{ count }}</td></tr>
@@ -44,6 +47,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 
   <p class="hint">

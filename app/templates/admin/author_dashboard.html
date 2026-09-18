@@ -15,7 +15,8 @@
 
   <div class="admin-panel">
     <h2 style="font-family: var(--font-headline); margin-top:0;">Makalelerim ({{ articles|length }})</h2>
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <thead><tr><th>Başlık</th><th>Bölüm</th><th>Tarih</th><th>Durum</th><th></th></tr></thead>
       <tbody>
         {% for a in articles %}
@@ -44,6 +45,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 </div>
 

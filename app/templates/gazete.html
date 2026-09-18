@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import turnstile_widget %}
+{% from "_macros.html" import subscribe_form %}
 {% block title %}Gazete Arşivi (PDF) — {{ site.name }}{% endblock %}
 {% block meta_description %}The Eurovillage Herald'ın tüm sayılarını PDF olarak okuyun.{% endblock %}
 {% block og_title %}Gazete Arşivi — {{ site.name }}{% endblock %}
@@ -11,7 +11,7 @@
   Her sayının orijinal baskı tasarımını PDF olarak, tarayıcınızda okuyabilirsiniz.
 </p>
 
-{{ ad_slot('newspaper_archive.top', section='gazete') }}
+{{ ad_slot('newspaper_archive_top', section='gazete') }}
 
 {% if issues %}
 <div class="issues-grid">
@@ -39,31 +39,6 @@
 <p class="section-empty">Henüz yüklenmiş bir sayı yok.</p>
 {% endif %}
 
-<div class="subscribe-widget">
-  <div class="subscribe-widget-text">
-    <strong>The Eurovillage Herald'a abone olun</strong>
-    <p>Yeni sayılar ve seçili haberler yayımlandığında haberiniz olsun.</p>
-  </div>
-  <form method="post" action="{{ url_for('subscribe_submit') }}" class="subscribe-widget-form">
-    <input type="email" name="email" placeholder="e-posta adresiniz" required maxlength="200">
-    <div style="display:flex; flex-wrap:wrap; gap:4px 18px; margin:10px 0; font-family:var(--font-sans); font-size:13px;">
-      {% for key, label in preference_choices %}
-      <label style="display:flex; align-items:center; gap:6px; font-weight:400;">
-        <input type="checkbox" name="pref_{{ key }}" value="1" style="width:auto;" {{ 'checked' if key == 'new_issue' else '' }}>
-        {{ label }}
-      </label>
-      {% endfor %}
-    </div>
-    <label style="display:flex; align-items:flex-start; gap:8px; font-family:var(--font-sans); font-size:12px; margin:10px 0; font-weight:400;">
-      <input type="checkbox" name="privacy_ack" value="1" required style="width:auto; margin-top:2px;">
-      <span>
-        <a href="{{ url_for('privacy_notice') }}" target="_blank" style="text-decoration:underline; color: var(--red);">Gizlilik Bildirimi</a>'ni
-        okudum, e-posta adresimin bu amaçla işlenmesini onaylıyorum.
-      </span>
-    </label>
-    <div style="margin: 10px 0;">{{ turnstile_widget() }}</div>
-    <button class="btn btn-red" type="submit">Abone Ol</button>
-  </form>
-</div>
+{{ subscribe_form() }}
 
 {% endblock %}

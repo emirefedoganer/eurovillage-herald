@@ -8,7 +8,7 @@
 </div>
 
 {% if articles %}
-{% set sidebar_ad = ad_slot('section.sidebar_top', section=section) %}
+{% set sidebar_ad = ad_slot('section_sidebar_top', section=section) %}
 <div class="section-list {{ '' if sidebar_ad else 'section-list--full' }}">
   <div>
     {% for a in articles %}

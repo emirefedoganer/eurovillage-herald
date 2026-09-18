@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import author_byline, author_avatar %}
+{% from "_macros.html" import author_byline, author_avatar, subscribe_form %}
 {% block title %}{{ article.title }} — {{ site.name }}{% endblock %}
 {% block meta_description %}{{ article.dek or site.tagline }}{% endblock %}
 {% block og_title %}{{ article.title }}{% endblock %}
@@ -25,6 +25,9 @@
 </div>
 {% endif %}
 
+{% set ad_sidebar_slot = 'magazine_article_sidebar' if article.section == 'magazin' else 'article_sidebar' %}
+{% set sidebar_ad = ad_slot(ad_sidebar_slot, section=article.section, content_id=article.id) %}
+<div class="article-layout {{ '' if sidebar_ad else 'article-layout--full' }}">
 <article>
   <div class="article-head {{ 'article-head-opinion' if columnist else '' }}">
     <span class="kicker">{{ effective_kicker(article) }}</span>
@@ -57,9 +60,9 @@
   {% endif %}
 
   {% set is_magazin = article.section == 'magazin' %}
-  {% set ad_after_slot = 'magazine.article.after_paragraph_2' if is_magazin else 'article.after_paragraph_3' %}
+  {% set ad_after_slot = 'magazine_article_after_paragraph_2' if is_magazin else 'article_after_paragraph_3' %}
   {% set ad_after_n = 2 if is_magazin else 3 %}
-  {% set ad_bottom_slot = 'magazine.article.bottom' if is_magazin else 'article.bottom' %}
+  {% set ad_bottom_slot = 'magazine_article_bottom' if is_magazin else 'article_bottom' %}
   {% set ns = namespace(p_count=0) %}
   <div class="article-body">
     {% for block in article.body %}
@@ -120,6 +123,17 @@
 
   {{ ad_slot(ad_bottom_slot, section=article.section, content_id=article.id) }}
 </article>
+{% if sidebar_ad %}
+<aside class="article-sidebar">
+  <div class="sidebar-block">{{ sidebar_ad }}</div>
+</aside>
+{% endif %}
+</div>
+
+<div class="article-subscribe-cta">
+  {{ subscribe_form(variant="compact", heading="Bu haberi beğendiniz mi?",
+                     text="Yeni sayılar ve seçili haberler yayımlandığında e-posta ile haberiniz olsun.") }}
+</div>
 
 {% if related %}
 <div class="related-block">

@@ -14,7 +14,8 @@
   </div>
 
   <div class="admin-panel">
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <thead><tr><th>Dahili İsim</th><th>Sponsor</th><th>Durum</th><th>Kullanıldığı Yer</th><th>Güncellendi</th><th></th></tr></thead>
       <tbody>
         {% for ad in ads_list %}
@@ -48,6 +49,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 </div>
 

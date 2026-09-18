@@ -25,7 +25,8 @@
         <a class="btn btn-red" href="{{ url_for('admin.crossword_new') }}">+ Yeni Bulmaca</a>
       </div>
     </div>
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <thead><tr><th>Başlık</th><th>Zorluk</th><th>Durum</th><th>Güncellendi</th><th></th></tr></thead>
       <tbody>
         {% for c in crosswords[:5] %}
@@ -44,6 +45,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 
   <div class="admin-panel">
@@ -55,7 +57,8 @@
         <a class="btn btn-red" href="{{ url_for('admin.sudoku_new') }}">+ Yeni Sudoku</a>
       </div>
     </div>
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <thead><tr><th>Başlık</th><th>Zorluk</th><th>Durum</th><th>Güncellendi</th><th></th></tr></thead>
       <tbody>
         {% for s in sudokus[:5] %}
@@ -74,6 +77,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 </div>
 

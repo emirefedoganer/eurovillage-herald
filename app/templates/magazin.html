@@ -5,7 +5,7 @@
 
 <div class="section-header"><h1>Arı Magazin</h1></div>
 
-{{ ad_slot('magazine.home.top', section='magazin') }}
+{{ ad_slot('magazine_home_top', section='magazin') }}
 
 {% if lead or rest %}
 <div class="section-list">
@@ -37,7 +37,7 @@
       <div class="byline">{{ author_byline(resolve_authors(a)) }} · {{ a.date }}</div>
     </article>
     {% if loop.index == 3 %}
-    {{ ad_slot('magazine.home.after_story_3', section='magazin') }}
+    {{ ad_slot('magazine_home_after_story_3', section='magazin') }}
     {% endif %}
     {% endfor %}
   </div>

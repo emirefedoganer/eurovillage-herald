@@ -10,7 +10,8 @@
   </div>
 
   <div class="admin-panel">
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <thead><tr><th>Zaman</th><th>Yapan</th><th>İşlem</th><th>Hedef</th></tr></thead>
       <tbody>
         {% for e in entries %}
@@ -25,6 +26,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 </div>
 

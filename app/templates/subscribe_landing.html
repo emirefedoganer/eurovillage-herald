@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "_macros.html" import subscribe_form %}
+{% block title %}Bültene Abone Ol — {{ site.name }}{% endblock %}
+{% block meta_description %}The Eurovillage Herald bültenine abone olun: yeni sayılar, çok okunan haberler ve seçili içerikler doğrudan e-postanıza gelsin.{% endblock %}
+{% block content %}
+
+<div class="static-page">
+  <span class="kicker">Bülten</span>
+  <h1>The Eurovillage Herald'a Abone Olun</h1>
+  <p style="font-family: var(--font-body); font-size: 17px; color: var(--gray-700);">
+    Eurovillage'ın gündemini kaçırmayın. Yeni bir gazete sayısı yayımlandığında, editörlerimizin
+    seçtiği en önemli haberler çıktığında ya da Arı Magazin'de yeni bir içerik olduğunda —
+    istediğiniz kategorilerde, doğrudan e-postanıza haber verelim. Hesap oluşturmanız gerekmez ve
+    istediğiniz zaman tek tıkla abonelikten çıkabilirsiniz.
+  </p>
+
+  {{ subscribe_form(variant="full", heading="Abonelik Tercihlerinizi Seçin",
+                     text="Aşağıdaki kategorilerden istediğinizi işaretleyin — istediğiniz zaman değiştirebilirsiniz.") }}
+
+  <p style="font-family: var(--font-sans); font-size: 12.5px; color: var(--gray-500); margin-top: 18px;">
+    E-posta adresinizi onayladıktan sonra, her bültenin altındaki bağlantılarla tercihlerinizi
+    dilediğiniz zaman güncelleyebilir veya abonelikten çıkabilirsiniz. Daha fazla bilgi için
+    <a href="{{ url_for('privacy_notice') }}" style="text-decoration: underline; color: var(--red);">Gizlilik Bildirimi</a>'ni inceleyin.
+  </p>
+</div>
+
+{% endblock %}

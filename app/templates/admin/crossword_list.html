@@ -14,7 +14,8 @@
   </div>
 
   <div class="admin-panel">
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <thead><tr><th>Başlık</th><th>Boyut</th><th>Zorluk</th><th>Durum</th><th>Sayı</th><th>Güncellendi</th><th></th></tr></thead>
       <tbody>
         {% for c in crosswords %}
@@ -46,6 +47,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 </div>
 

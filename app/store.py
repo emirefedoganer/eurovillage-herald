@@ -823,13 +823,22 @@ def placements_for_ad(ad_id):
     return [p for p in load_placements() if p["ad_id"] == ad_id]
 
 
-def find_placement(slot, scope, section=None, content_type=None, content_id=None):
+def find_placement(slot, scope, section=None, content_type=None, content_id=None, device_target=None):
     """Looks up an existing placement occupying the same (slot, scope,
-    target) combination. Used to enforce "at most one placement per slot
-    per target" -- saving a new placement for an already-occupied
-    combination replaces it instead of creating a second, competing one."""
+    target, device_target) combination. Used to enforce "at most one
+    placement per slot per target per device" -- saving a new placement
+    for an already-occupied combination replaces it instead of creating a
+    second, competing one. device_target is part of the uniqueness key
+    (not just scope/target) so a "desktop only" and a "mobile only"
+    placement can coexist on the very same slot+target -- e.g. a
+    differently-cropped creative per device -- without one silently
+    overwriting the other; only two placements with the SAME device
+    targeting (or both "all"/unset) are considered a conflict."""
+    device_target = (device_target or "all").lower()
     for p in load_placements():
         if p["slot"] != slot or p["scope"] != scope:
+            continue
+        if (p.get("device_target") or "all").lower() != device_target:
             continue
         if scope == "section" and p.get("section") == section:
             return p
@@ -1063,6 +1072,11 @@ DEFAULT_SITE_CONTROL = {
     "standby_button_label": "",
     "standby_button_url": "",
     "standby_show_contact_links": True,
+    # Optional -- defaults OFF. The task that introduced this explicitly
+    # calls it optional and admin-controlled; showing a subscribe prompt
+    # on every future standby activation without an explicit opt-in each
+    # time would be a silent default, not a deliberate choice.
+    "standby_show_subscribe_form": False,
     "redirect_url": "",
     "redirect_presets": [],
     "updated_at": None,

@@ -17,7 +17,8 @@
   </p>
 
   <div class="admin-panel">
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <thead><tr><th>Başlık</th><th>Tür</th><th>Oluşturulma</th><th>Durum</th><th></th></tr></thead>
       <tbody>
         {% for d in drafts %}
@@ -39,6 +40,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 </div>
 

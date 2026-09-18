@@ -1,3 +1,4 @@
+{% from "_macros.html" import turnstile_widget %}
 <!doctype html>
 <html lang="tr">
 <head>
@@ -71,12 +72,41 @@
     margin-top: 22px; font-family: var(--font-sans); font-size: 11px;
     color: var(--gray-500);
   }
+  .standby-flash{
+    font-family: var(--font-sans); font-size: 13px; padding: 9px 14px; border-radius: 3px;
+    margin: 0 0 18px; text-align: left;
+  }
+  .standby-flash-success{ background: #e6f4ea; color: #1e7e34; border: 1px solid #b7dfc2; }
+  .standby-flash-error{ background: #fbe7e9; color: #9c0c22; border: 1px solid #f3b9c0; }
+  .standby-subscribe{
+    margin-top: 6px; padding-top: 22px; border-top: 1px solid var(--gray-200); text-align: left;
+  }
+  .standby-subscribe-title{ font-family: var(--font-sans); font-weight: 700; font-size: 14px; margin: 0 0 6px; }
+  .standby-subscribe-text{ font-family: var(--font-sans); font-size: 12.5px; color: var(--gray-500); margin: 0 0 12px; }
+  .standby-subscribe input[type="email"]{
+    width: 100%; padding: 9px 11px; border: 1px solid #ccc; border-radius: 3px;
+    font-family: var(--font-sans); font-size: 14px; margin-bottom: 10px; box-sizing: border-box;
+  }
+  .standby-subscribe label{
+    display: flex; align-items: flex-start; gap: 7px; font-family: var(--font-sans);
+    font-size: 11.5px; color: var(--gray-500); margin-bottom: 10px; font-weight: 400;
+  }
+  .standby-subscribe label input{ width: auto; margin-top: 2px; }
+  .standby-subscribe label a{ color: var(--gray-500); text-decoration: underline; }
+  .standby-subscribe button{
+    display: inline-block; font-family: var(--font-sans); font-weight: 700; font-size: 13px;
+    color: #fff; background: var(--black); border: none; padding: 10px 20px; border-radius: 3px; cursor: pointer;
+  }
+  .standby-subscribe button:hover{ background: var(--red); }
 </style>
 </head>
 <body>
   <main class="standby-card">
     <p class="standby-mast">{{ site.name }}</p>
     <p class="standby-tagline">{{ site.tagline }}</p>
+    {% for category, message in flash_messages %}
+    <div class="standby-flash standby-flash-{{ category }}">{{ message }}</div>
+    {% endfor %}
     <p class="standby-title">{{ title }}</p>
     <p class="standby-text">{{ description }}</p>
     {% if note %}<p class="standby-note">{{ note }}</p>{% endif %}
@@ -90,6 +120,22 @@
     <div class="standby-contact">
       Bize ulaşmak için: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>
       &middot; <a href="{{ site.eurovillage_site_url }}" target="_blank" rel="noopener noreferrer">Eurovillage Büyükşehir Belediyesi</a>
+    </div>
+    {% endif %}
+    {% if show_subscribe_form %}
+    <div class="standby-subscribe">
+      <p class="standby-subscribe-title">Yeniden yayında olduğumuzda haberiniz olsun</p>
+      <p class="standby-subscribe-text">E-posta adresinizi bırakın, tekrar yayına girdiğimizde ve yeni sayılar çıktığında size haber verelim.</p>
+      <form method="post" action="{{ url_for('subscribe_submit') }}">
+        <input type="hidden" name="pref_new_issue" value="1">
+        <input type="email" name="email" placeholder="e-posta adresiniz" required maxlength="200">
+        <label>
+          <input type="checkbox" name="privacy_ack" value="1" required>
+          <span><a href="{{ url_for('privacy_notice') }}" target="_blank">Gizlilik Bildirimi</a>'ni okudum, e-posta adresimin bu amaçla işlenmesini onaylıyorum.</span>
+        </label>
+        {{ turnstile_widget() }}
+        <button type="submit">Haberdar Et</button>
+      </form>
     </div>
     {% endif %}
     <p class="standby-footer">&copy; {{ site.name }}</p>

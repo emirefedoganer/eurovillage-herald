@@ -11,7 +11,8 @@
 
   <div class="admin-panel">
     <h3 style="font-family:var(--font-sans); font-size:14px; margin:0 0 12px;">Sağlayıcı Durumu</h3>
-    <table class="admin-table" style="margin-bottom:0;">
+    <div class="table-scroll">
+<table class="admin-table" style="margin-bottom:0;">
       <tbody>
         <tr><td style="width:260px;"><strong>Aktif Arka Uç</strong></td>
             <td>
@@ -25,6 +26,7 @@
         <tr><td><strong>Yanıt Adresi (Reply-To)</strong></td><td>{{ identities.contact_reply_to }}</td></tr>
       </tbody>
     </table>
+</div>
     <p class="hint" style="margin-top:10px;">
       Bu sayfa yalnızca yapılandırma özetini gösterir. API anahtarları, SMTP şifresi ve diğer gizli
       kimlik bilgileri hiçbir zaman burada veya başka bir yönetim panelinde görüntülenmez.
@@ -45,7 +47,8 @@
         <button class="btn btn-outline" type="submit">Kuyruğu Şimdi İşle</button>
       </form>
     </div>
-    <table class="admin-table" style="margin-bottom:0;">
+    <div class="table-scroll">
+<table class="admin-table" style="margin-bottom:0;">
       <tbody>
         <tr><td style="width:260px;"><strong>Son Başarılı Gönderim</strong></td>
             <td>{{ outbox_stats.last_sent.sent_at if outbox_stats.last_sent else '—' }}</td></tr>
@@ -55,12 +58,14 @@
         <tr><td><strong>Toplam İş Kaydı</strong></td><td>{{ outbox_stats.total }}</td></tr>
       </tbody>
     </table>
+</div>
   </div>
 
   <div class="admin-panel">
     <h3 style="font-family:var(--font-sans); font-size:14px; margin:0 0 12px;">Başarısız Gönderimler ({{ failed|length }})</h3>
     {% if failed %}
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <thead><tr><th>Alıcı</th><th>Konu</th><th>Tür</th><th>Deneme</th><th>Son Hata</th><th></th></tr></thead>
       <tbody>
         {% for job in failed %}
@@ -79,6 +84,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
     {% else %}
     <p class="hint" style="margin:0;">Başarısız gönderim yok.</p>
     {% endif %}

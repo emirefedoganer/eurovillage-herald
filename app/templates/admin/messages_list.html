@@ -17,7 +17,8 @@
 
   <div class="admin-panel">
     {% if messages %}
-    <table class="admin-table">
+    <div class="table-scroll">
+<table class="admin-table">
       <thead>
         <tr><th>Ref</th><th>Tarih</th><th>Kategori</th><th>Gönderen</th><th>Mesaj</th><th>Görseller</th><th>Durum</th><th>E-posta</th><th></th></tr>
       </thead>
@@ -97,6 +98,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
 
     {% if page_count > 1 %}
     <div class="admin-pagination">

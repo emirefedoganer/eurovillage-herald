@@ -129,16 +129,42 @@ body.drawer-open{ overflow: hidden; }
   font-family: var(--font-sans); font-weight: 600; font-size: 13px; letter-spacing: .02em;
 }
 .mainnav-inner a{
-  color: #fff; padding: 0 12px; height: 44px; display: flex; align-items: center;
+  color: #fff; padding: 0 10px; height: 44px; display: flex; align-items: center;
   text-transform: uppercase; white-space: nowrap; flex-shrink: 0;
 }
 .mainnav-inner a:hover{ background: rgba(0,0,0,.18); }
 .mainnav-home{ font-weight: 700; }
 .mainnav-inner .mainnav-pdf{ margin-left: auto; background: rgba(0,0,0,.15); }
-.mainnav-search{ flex-shrink: 0; margin-left: 4px; padding-right: 4px;}
+.mainnav-search{ flex-shrink: 1; min-width: 0; margin-left: 4px; padding-right: 4px;}
 .mainnav-search input{
   border: none; border-radius: 3px; padding: 6px 10px; font-family: var(--font-sans);
-  font-size: 13px; width: 130px; background: rgba(255,255,255,.9);
+  font-size: 13px; width: 100px; min-width: 0; background: rgba(255,255,255,.9);
+}
+/* Above ~1500px there's room to give the search field back its full,
+   more comfortable width without reintroducing the clipped-search-box
+   overflow this replaced (see the nav_links()/mainnav-search history --
+   an 11th nav item, "Bültene Abone Ol", made the previous fixed 130px
+   width overflow at ordinary desktop widths like 1280px). */
+@media (min-width: 1500px){
+  .mainnav-search input{ width: 150px; }
+}
+/* Between the mobile-nav breakpoint and ~1150px, ten nav links + the
+   subscribe CTA genuinely don't fit alongside an inline search box at
+   any width that still reads cleanly -- rather than leaving it to
+   .mainnav-inner's overflow-x:auto scroll (present as a fallback, but a
+   search box silently cut off mid-character at a completely ordinary
+   1024px desktop width is exactly the "technically scrollable but looks
+   broken" case this project's responsive pass is meant to eliminate),
+   the inline box steps out here and is replaced by the SAME
+   click-to-reveal search button + bar the ≤900px mobile header already
+   uses (see mobile-nav.js, which wires .mobile-search-btn unconditionally
+   -- no new JS needed, it just wasn't visible in this width range before). */
+@media (min-width: 901px) and (max-width: 1180px){
+  .mainnav-search{ display: none; }
+  .mobile-search-btn{ display: flex; }
+  .mobile-search-bar:not([hidden]){ display: flex; }
+  .mainnav-inner{ font-size: 11.5px; gap: 0; }
+  .mainnav-inner a{ padding: 0 7px; }
 }
 
 /* ---------- flash ---------- */
@@ -163,7 +189,7 @@ body.drawer-open{ overflow: hidden; }
 .tag-breaking{ background: var(--red); }
 
 /* ---------- homepage ---------- */
-.front-grid{ display: grid; grid-template-columns: 2fr 1fr; gap: 40px; }
+.front-grid{ display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 40px; }
 .lead-story{ border-bottom: 1px solid var(--gray-200); padding-bottom: 28px; margin-bottom: 28px; }
 .lead-story .kicker{ margin-bottom: 8px; display: block; }
 .lead-story h1{
@@ -176,7 +202,7 @@ body.drawer-open{ overflow: hidden; }
 .byline{ font-family: var(--font-sans); font-size: 13px; color: var(--gray-500); }
 .byline b{ color: var(--ink); }
 
-.secondary-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
+.secondary-grid{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin-bottom: 28px; }
 .story-card{ }
 .story-card img{ width: 100%; aspect-ratio: 16/10; object-fit: cover; margin-bottom: 8px; }
 .story-card .kicker{ font-size: 11px; margin-bottom: 4px; display:block; }
@@ -186,7 +212,7 @@ body.drawer-open{ overflow: hidden; }
 
 .river{ border-top: 3px solid var(--black); padding-top: 16px; }
 .river h2.rail-title{ font-family: var(--font-sans); text-transform: uppercase; font-size: 13px; letter-spacing: .08em; margin: 0 0 14px; }
-.river-list{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px 28px; }
+.river-list{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 28px; }
 .river-item{ display: flex; gap: 14px; border-bottom: 1px solid var(--gray-200); padding-bottom: 14px; }
 .river-item img{ width: 96px; height: 72px; object-fit: cover; flex-shrink: 0; }
 .river-item .body{ flex: 1; }
@@ -259,7 +285,7 @@ body.drawer-open{ overflow: hidden; }
 /* ---------- section listing ---------- */
 .section-header{ border-bottom: 3px solid var(--black); margin-bottom: 24px; padding-bottom: 10px; }
 .section-header h1{ font-family: var(--font-headline); font-size: 36px; margin: 0; }
-.section-list{ display: grid; grid-template-columns: 2fr 1fr; gap: 30px 40px; }
+.section-list{ display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 30px 40px; }
 .section-list--full{ grid-template-columns: 1fr; } /* no sidebar ad assigned -- don't reserve empty space for it */
 .section-list .story-card h3{ font-size: 26px; }
 .section-empty{ font-family: var(--font-sans); color: var(--gray-500); padding: 40px 0; }
@@ -291,7 +317,7 @@ body.drawer-open{ overflow: hidden; }
 .article-body .qa .q{ font-weight: 700; margin: 0 0 8px; }
 .article-body .qa .q::before{ content: "■ "; color: var(--red); }
 .article-body .qa .a{ margin: 0; padding-left: 18px; border-left: 2px solid var(--gray-200); color: var(--gray-900); }
-.article-gallery{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-width: 900px; margin: 0 auto 24px; }
+.article-gallery{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; max-width: 900px; margin: 0 auto 24px; }
 .article-gallery img{ width: 100%; aspect-ratio: 4/3; object-fit: cover; }
 .article-tags{ max-width: 700px; margin: 30px auto 0; font-family: var(--font-sans); font-size: 12.5px; }
 .article-tags a{
@@ -299,6 +325,23 @@ body.drawer-open{ overflow: hidden; }
   border-radius: 3px; margin: 0 6px 6px 0;
 }
 .related-block{ max-width: 900px; margin: 50px auto 0; border-top: 3px solid var(--black); padding-top: 18px; }
+
+/* ---------- article sidebar ad (see ads.py's "article_sidebar" slot) ----------
+   Mirrors .section-list/.section-list--full's existing pattern: the grid's
+   second column only exists (and only reserves width for) a genuine ad --
+   an article with nothing configured for this slot renders as a single,
+   centered column exactly as before, never a permanently narrower one
+   with dead empty space. The <aside> sits AFTER <article> in DOM order
+   specifically so the ≤900px collapse to one column is also, for free,
+   the "after article" mobile fallback -- no separate show/hide logic
+   needed for that choice. An admin who instead configured "do not show
+   on mobile" for this placement gets the .ad-slot-hide-narrow class
+   (set by ads.ad_slot()) hidden below the same breakpoint. */
+.article-layout{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 300px); gap: 40px; align-items: start; }
+.article-layout--full{ grid-template-columns: minmax(0, 1fr); }
+.article-layout--full .article-sidebar{ display: none; }
+.article-sidebar{ position: sticky; top: 20px; }
+.article-sidebar .ad-box{ max-width: 300px; margin: 0 auto; }
 
 /* ---------- interview / gorus special box ---------- */
 .column-note{
@@ -331,7 +374,7 @@ body.drawer-open{ overflow: hidden; }
 .issue-article-card h4 a:hover{ text-decoration: underline; }
 
 /* ---------- oyun kosesi / puzzles ---------- */
-.puzzle-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
+.puzzle-grid{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 30px; margin-bottom: 40px; }
 .puzzle-card{ border: 1px solid var(--gray-300); padding: 20px; text-align: center; }
 .puzzle-card h3{ font-family: var(--font-headline); margin-top: 0; }
 .puzzle-card img{ margin: 0 auto; max-width: 340px; border: 1px solid var(--gray-300); }
@@ -341,7 +384,7 @@ body.drawer-open{ overflow: hidden; }
 .crossword-clues li{ margin-bottom: 4px; break-inside: avoid; }
 
 /* ---------- gazete / pdf reader ---------- */
-.issues-grid{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.issues-grid{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
 .issue-card{ border: 1px solid var(--gray-300); }
 .issue-card img{ width: 100%; aspect-ratio: 3/4; object-fit: cover; background: var(--gray-100); }
 .issue-card-body{ padding: 14px; }
@@ -354,18 +397,47 @@ body.drawer-open{ overflow: hidden; }
 }
 .issue-card-desc{ color: var(--gray-700) !important; font-size: 13.5px !important; line-height: 1.5; }
 
-/* ---------- newsletter subscribe widget ---------- */
+/* ---------- newsletter subscribe widget (_macros.html: subscribe_form()) ---------- */
 .subscribe-widget{
   margin-top: 44px; padding: 24px 28px; background: var(--gray-100); border: 1px solid var(--gray-300);
   display: flex; align-items: flex-start; justify-content: space-between; gap: 30px; flex-wrap: wrap;
 }
+.subscribe-widget-text{ min-width: 0; flex: 1 1 260px; }
 .subscribe-widget-text strong{ font-family: var(--font-headline); font-size: 19px; font-weight: 400; }
 .subscribe-widget-text p{ font-family: var(--font-sans); font-size: 13.5px; color: var(--gray-500); margin: 6px 0 0; max-width: 380px; }
-.subscribe-widget-form{ flex: 0 0 auto; min-width: 260px; }
+.subscribe-widget-form{ flex: 1 1 260px; min-width: 0; max-width: 100%; }
 .subscribe-widget-form input[type="email"]{
-  width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); font-family: var(--font-sans);
-  font-size: 14px; margin-bottom: 10px;
+  width: 100%; max-width: 100%; padding: 10px 12px; border: 1px solid var(--gray-300); font-family: var(--font-sans);
+  font-size: 14px; margin-bottom: 10px; box-sizing: border-box;
 }
+.subscribe-widget-prefs{ display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 10px 0; font-family: var(--font-sans); font-size: 13px; }
+.subscribe-widget-prefs label{ display: flex; align-items: center; gap: 6px; font-weight: 400; }
+.subscribe-widget-prefs label input{ width: auto; }
+.subscribe-widget-consent{
+  display: flex; align-items: flex-start; gap: 8px; font-family: var(--font-sans); font-size: 12px;
+  margin: 10px 0; font-weight: 400; color: var(--gray-600);
+}
+.subscribe-widget-consent input{ width: auto; margin-top: 2px; flex-shrink: 0; }
+.subscribe-widget-consent a{ text-decoration: underline; color: var(--red); }
+.subscribe-widget-turnstile{ margin: 10px 0; }
+
+/* Compact variant (article end): a lighter-weight strip, not a boxed
+   panel competing with "Related stories" right below it -- same form,
+   same backend, deliberately less visually heavy. */
+.subscribe-widget-compact{
+  margin-top: 34px; padding: 16px 20px; background: transparent; border: none;
+  border-top: 3px solid var(--black); border-radius: 0; align-items: center;
+}
+.subscribe-widget-compact .subscribe-widget-text strong{ font-size: 16px; }
+.subscribe-widget-compact .subscribe-widget-text p{ font-size: 12.5px; }
+.article-subscribe-cta{ max-width: 700px; margin: 0 auto; }
+
+/* Nav / footer entry points -- a small visual accent (not a full button,
+   to avoid competing with the site's existing red CTA buttons) so
+   "Bültene Abone Ol" reads as a distinct action, not just another link. */
+.nav-link-subscribe{ font-weight: 800 !important; }
+.footer-link-subscribe{ color: var(--red) !important; }
+.footer-link-subscribe:hover{ color: #fff !important; }
 .btn{
   display: inline-block; font-family: var(--font-sans); font-weight: 700; font-size: 13px;
   background: var(--black); color: #fff; padding: 9px 16px; border-radius: 3px; border: none; cursor: pointer;
@@ -379,7 +451,7 @@ body.drawer-open{ overflow: hidden; }
 .btn-danger{ background: #fff; color: var(--red); border: 1.5px solid var(--red); }
 .btn-danger:hover{ background: var(--red); color: #fff; }
 
-.reader-layout{ display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 30px; }
+.reader-layout{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 300px); gap: 30px; }
 .reader-frame-wrap{ border: 1px solid var(--gray-300); background: var(--gray-100); height: 82vh; display: flex; flex-direction: column; min-width: 0; }
 .pdf-toolbar{
   flex-shrink: 0; display: flex; align-items: center; gap: 4px; padding: 8px 12px;
@@ -432,7 +504,7 @@ body.drawer-open{ overflow: hidden; }
 .leadership-intro{ text-align: center; max-width: 640px; margin: 10px auto 50px; }
 .leadership-intro h1{ font-family: var(--font-headline); font-weight: 900; font-size: 44px; margin: 10px 0 14px; }
 .leadership-intro p{ font-family: var(--font-body); font-size: 18px; color: var(--gray-700); }
-.leadership-grid{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; margin-bottom: 60px; }
+.leadership-grid{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; margin-bottom: 60px; }
 .leadership-card{ text-align: center; padding: 40px 28px; border: 1px solid var(--gray-200); border-radius: 8px; background: #fff; transition: box-shadow .2s ease; }
 .leadership-card:hover{ box-shadow: 0 10px 30px rgba(0,0,0,.08); }
 .leadership-avatar{
@@ -451,7 +523,7 @@ body.drawer-open{ overflow: hidden; }
 .contact-intro{ max-width: 640px; margin-bottom: 40px; }
 .contact-intro h1{ font-family: var(--font-headline); font-weight: 900; font-size: 40px; margin: 10px 0 14px; }
 .contact-intro p{ font-family: var(--font-body); font-size: 17px; color: var(--gray-700); }
-.contact-grid{ display: grid; grid-template-columns: 1fr 300px; gap: 50px; }
+.contact-grid{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 300px); gap: 50px; }
 .contact-form{ font-family: var(--font-sans); }
 .contact-form button{ margin-top: 6px; }
 .contact-directory{ border-top: 3px solid var(--black); padding-top: 16px; }
@@ -484,20 +556,70 @@ body.drawer-open{ overflow: hidden; }
 .footer-credit a:hover{ color: #fff; }
 
 /* ---------- admin ---------- */
-.admin-wrap{ max-width: 980px; margin: 0 auto; font-family: var(--font-sans); }
-.admin-header{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.admin-header h1{ font-family: var(--font-headline); font-size: 30px; margin: 0; }
-.admin-panel{ background: #fff; border: 1px solid var(--gray-300); border-radius: 6px; padding: 24px; margin-bottom: 26px; }
+.admin-wrap{ max-width: 980px; margin: 0 auto; font-family: var(--font-sans); min-width: 0; }
+.admin-header{ display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; margin-bottom: 20px; }
+.admin-header h1{ font-family: var(--font-headline); font-size: 30px; margin: 0; overflow-wrap: anywhere; }
+.admin-panel{ background: #fff; border: 1px solid var(--gray-300); border-radius: 6px; padding: 24px; margin-bottom: 26px; min-width: 0; }
+/* Every <table class="admin-table"> is wrapped in this at the template
+   level (see e.g. subscribers_list.html) -- a horizontally scrollable
+   container is the intentional, contained way a data table handles more
+   columns than a narrow viewport can show, rather than forcing the whole
+   page wider. The table itself keeps ordinary table layout (thead/tbody
+   columns stay aligned), unlike the common but broken `table{display:
+   block}` trick. */
+.table-scroll{ width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 4px; }
 .admin-table{ width: 100%; border-collapse: collapse; font-size: 13.5px; }
-.admin-table th{ text-align: left; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; color: var(--gray-500); border-bottom: 2px solid var(--black); padding: 8px 6px; }
-.admin-table td{ padding: 10px 6px; border-bottom: 1px solid var(--gray-200); vertical-align: middle; }
+.admin-table th{ text-align: left; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; color: var(--gray-500); border-bottom: 2px solid var(--black); padding: 8px 6px; white-space: nowrap; }
+/* Cells default to a single line, sized to their natural content width --
+   combined with .table-scroll's overflow-x, a table that's genuinely too
+   wide for the viewport scrolls horizontally with intact, readable rows
+   instead of every cell wrapping into a cramped, hard-to-read column (the
+   worse outcome: overflow-wrap alone doesn't just wrap the occasional
+   long token, it makes ordinary short words wrap too, once the table is
+   squeezed to fit). A cell that genuinely wants prose wrapping (a message
+   body, an error string) already sets its own inline white-space:pre-wrap,
+   which overrides this by CSS specificity as before. */
+.admin-table td{ padding: 10px 6px; border-bottom: 1px solid var(--gray-200); vertical-align: middle; white-space: nowrap; }
 .admin-table tr:hover{ background: var(--gray-100); }
-.admin-actions{ display: flex; gap: 8px; }
+.admin-actions{ display: flex; flex-wrap: wrap; gap: 8px; }
 .admin-actions form{ display: inline; }
 .admin-pagination{ display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 20px; font-family: var(--font-sans); }
 .admin-pagination-status{ font-size: 13px; color: var(--gray-500); }
 .admin-pagination .is-disabled{ opacity: .4; pointer-events: none; }
 .login-card{ max-width: 380px; margin: 60px auto; background: #fff; border: 1px solid var(--gray-300); border-radius: 6px; padding: 32px; }
+
+/* ---------- admin: ad placement form preview ---------- */
+.placement-form-layout{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 300px); gap: 20px; align-items: start; }
+.placement-preview{ position: sticky; top: 20px; }
+.placement-preview-facts{ margin: 0; font-size: 13px; }
+.placement-preview-facts dt{ font-weight: 700; color: var(--gray-700); margin-top: 8px; }
+.placement-preview-facts dd{ margin: 2px 0 0; color: var(--gray-600); }
+
+/* A schematic, not a pixel-accurate render: three shaded zones (top
+   banner / main column with an optional inline slot / bottom banner)
+   plus an optional sidebar column, with the zone matching the currently
+   selected slot highlighted in red -- see ad-placement-form.js's
+   renderDiagram(). */
+.placement-diagram-page{
+  display: grid; grid-template-columns: 1fr; gap: 6px; border: 1px solid var(--gray-300);
+  background: var(--gray-100); padding: 8px; border-radius: 4px;
+}
+.placement-diagram-page.has-sidebar{ grid-template-columns: minmax(0,1fr) 44px; grid-template-rows: 14px auto; }
+.placement-diagram-page.has-sidebar .pd-top{ grid-column: 1 / -1; }
+.pd-zone{ background: #fff; border: 1px solid var(--gray-300); border-radius: 2px; }
+.pd-top{ height: 14px; }
+.pd-bottom{ height: 14px; }
+.pd-main{ display: flex; flex-direction: column; gap: 5px; }
+.pd-line{ height: 6px; background: var(--gray-200); border: none; }
+.pd-line.short{ width: 60%; }
+.pd-inline{ height: 16px; }
+.pd-sidebar{ grid-row: 2; }
+.pd-zone.pd-active{ background: var(--red); border-color: var(--red); opacity: .85; }
+
+@media (max-width: 900px){
+  .placement-form-layout{ grid-template-columns: minmax(0, 1fr); }
+  .placement-preview{ position: static; }
+}
 .login-card h1{ font-family: var(--font-mast); font-size: 34px; text-align: center; margin: 0 0 4px; }
 .login-card .sub{ text-align: center; color: var(--gray-500); font-size: 13px; margin-bottom: 24px; }
 
@@ -511,10 +633,10 @@ body.drawer-open{ overflow: hidden; }
 }
 .form-row textarea{ font-family: var(--font-body); font-size: 15.5px; line-height: 1.5; }
 .form-row .hint{ font-size: 12px; color: var(--gray-500); margin-top: 4px; }
-.form-grid-2{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-grid-2{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
 .checkbox-row{ display: flex; align-items: center; gap: 8px; }
 .checkbox-row input{ width: auto; }
-.form-actions{ display: flex; gap: 10px; margin-top: 22px; }
+.form-actions{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
 .current-image{ display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .current-image img{ width: 90px; height: 66px; object-fit: cover; border: 1px solid var(--gray-300); }
 .badge{ display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
@@ -534,11 +656,14 @@ body.drawer-open{ overflow: hidden; }
   .mainnav{ display: none; }
   .drawer-overlay:not([hidden]){ display: block; }
   .mobile-drawer:not([hidden]){ display: flex; }
-  .front-grid, .section-list, .reader-layout{ grid-template-columns: minmax(0, 1fr); }
+  .front-grid, .section-list, .reader-layout, .article-layout{ grid-template-columns: minmax(0, 1fr); }
+  .article-sidebar{ position: static; margin-top: 30px; }
+  .ad-slot-hide-narrow{ display: none; }
   .reader-frame-wrap{ height: 60vh; }
   .pdf-thumbs{ flex-basis: 72px; }
   .subscribe-widget{ flex-direction: column; }
-  .subscribe-widget-form{ width: 100%; min-width: 0; }
+  .subscribe-widget-text{ flex: 1 1 auto; }
+  .subscribe-widget-form{ width: 100%; min-width: 0; flex: 1 1 auto; }
   .secondary-grid{ grid-template-columns: 1fr; }
   .river-list{ grid-template-columns: 1fr; }
   .lead-story h1{ font-size: 32px; }
@@ -550,6 +675,8 @@ body.drawer-open{ overflow: hidden; }
   .leadership-grid{ grid-template-columns: 1fr; }
   .leadership-intro h1{ font-size: 34px; }
   .contact-grid{ grid-template-columns: 1fr; }
+  .admin-panel{ padding: 16px; }
+  .admin-header h1{ font-size: 24px; }
 }
 @media (max-width: 600px){
   .issues-grid{ grid-template-columns: 1fr; }
@@ -632,7 +759,7 @@ body.drawer-open{ overflow: hidden; }
 }
 .xw-controls{ display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 
-.xw-clues{ display: grid; grid-template-columns: 1fr 1fr; gap: 24px; min-width: 0; }
+.xw-clues{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; min-width: 0; }
 .xw-clue-col h2{ font-size: 13px; }
 .xw-clue-list{ list-style: none; margin: 0; padding: 0; }
 .xw-clue-item{
@@ -687,13 +814,71 @@ body.drawer-open{ overflow: hidden; }
 .sk-paused .sk-grid{ filter: blur(6px); pointer-events: none; }
 
 /* ---------- admin: crossword builder ---------- */
-.admin-subnav{ display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 2px solid var(--black); font-family: var(--font-sans); }
-.admin-subnav a{ padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--gray-700); border-bottom: 2px solid transparent; margin-bottom: -2px; }
-.admin-subnav a.active, .admin-subnav a:hover{ color: var(--ink); border-bottom-color: var(--red); }
+/* Redesigned admin nav: a handful of always-visible top-level links plus
+   three logical dropdown groups (Gazete / İletişim & Abonelik / Yönetim),
+   built on native <details>/<summary> -- the same zero-JS disclosure
+   pattern already used elsewhere in this app (see messages_list.html's
+   "Çözüm Yaz" control). Keyboard-operable and screen-reader-friendly by
+   default; admin-nav.js only adds "close the others when one opens" and
+   click-outside/Escape-to-close, never toggling itself. flex-wrap means
+   that even in a worst case (a very narrow viewport, or a future item
+   added) the bar wraps onto a second line instead of overflowing --
+   belt-and-suspenders alongside the grouping itself. */
+.admin-subnav{
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 18px;
+  border-bottom: 2px solid var(--black); font-family: var(--font-sans); position: relative;
+}
+.admin-subnav > a{
+  padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--gray-700);
+  border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap;
+}
+.admin-subnav > a.active, .admin-subnav > a:hover{ color: var(--ink); border-bottom-color: var(--red); }
+
+.admin-nav-group{ position: relative; margin-bottom: -2px; }
+.admin-nav-group > summary{
+  list-style: none; padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--gray-700);
+  border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; user-select: none;
+  display: flex; align-items: center; gap: 5px;
+}
+.admin-nav-group > summary::-webkit-details-marker{ display: none; }
+.admin-nav-group > summary::after{
+  content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg); margin-top: -3px; opacity: .65; transition: transform .15s ease;
+}
+.admin-nav-group[open] > summary::after{ transform: rotate(-135deg); margin-top: 2px; }
+.admin-nav-group > summary:hover, .admin-nav-group > summary.active{ color: var(--ink); border-bottom-color: var(--red); }
+.admin-nav-group > summary:focus-visible{ outline: 2px solid var(--red); outline-offset: -2px; }
+
+.admin-nav-group-menu{
+  display: flex; flex-direction: column; min-width: 210px; background: #fff;
+  border: 1px solid var(--gray-300); box-shadow: 0 10px 24px rgba(0,0,0,.14); z-index: 40;
+  padding: 6px; margin-top: 2px;
+}
+.admin-nav-group-menu a{
+  padding: 9px 12px; font-size: 13px; font-weight: 600; color: var(--gray-700); border-radius: 4px; white-space: normal;
+}
+.admin-nav-group-menu a:hover{ background: var(--gray-100); color: var(--ink); }
+.admin-nav-group-menu a.active{ background: var(--gray-100); color: var(--red); }
+
+@media (min-width: 641px){
+  /* Floating dropdown once there's room for it to overlay content
+     without fighting the page for horizontal space. */
+  .admin-nav-group-menu{ position: absolute; top: 100%; left: 0; }
+}
+@media (max-width: 640px){
+  /* No room to float a dropdown -- the group's items expand inline like
+     a normal accordion section instead, pushing the rest of the page
+     down rather than overlapping it. */
+  .admin-subnav{ flex-direction: column; align-items: stretch; gap: 0; }
+  .admin-subnav > a{ border-bottom: 1px solid var(--gray-200); margin-bottom: 0; }
+  .admin-nav-group{ width: 100%; border-bottom: 1px solid var(--gray-200); }
+  .admin-nav-group > summary{ border-bottom: none; }
+  .admin-nav-group-menu{ border: none; box-shadow: none; padding: 0 0 6px 14px; margin-top: 0; }
+}
 .site-status-banner{
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
   background: var(--red); color: #fff; font-family: var(--font-sans); font-size: 13.5px;
-  padding: 10px 16px; margin-bottom: 16px; border-radius: 4px;
+  padding: 10px 16px; margin-bottom: 16px; border-radius: 4px; overflow-wrap: anywhere;
 }
 .site-status-banner a{ color: #fff; text-decoration: underline; font-weight: 600; white-space: nowrap; }
 .admin-stat-grid{ display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 14px; margin-bottom: 24px; }
@@ -701,7 +886,7 @@ body.drawer-open{ overflow: hidden; }
 .admin-stat-card .n{ font-family: var(--font-headline); font-weight: 900; font-size: 30px; display: block; }
 .admin-stat-card .l{ font-family: var(--font-sans); font-size: 11.5px; color: var(--gray-500); text-transform: uppercase; letter-spacing: .04em; }
 
-.xw-build-layout{ display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 30px; align-items: start; }
+.xw-build-layout{ display: grid; grid-template-columns: minmax(0,1fr) minmax(0, 340px); gap: 30px; align-items: start; }
 .xw-build-toolbar{ display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; font-family: var(--font-sans); font-size: 13px; align-items: center; }
 .xw-build-toolbar label{ display: flex; align-items: center; gap: 6px; }
 .xwb-cell{
@@ -849,7 +1034,7 @@ body.drawer-open{ overflow: hidden; }
 .author-profile-role{ font-family: var(--font-sans); font-size: 13.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--gray-600); }
 .author-profile-role.is-columnist{ color: var(--red); }
 
-.author-profile-body{ display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 44px; border-top: 3px solid var(--black); padding-top: 30px; }
+.author-profile-body{ display: grid; grid-template-columns: minmax(0,1fr) minmax(0, 300px); gap: 44px; border-top: 3px solid var(--black); padding-top: 30px; }
 .author-profile-bio{ font-family: var(--font-body); font-size: 18px; line-height: 1.6; color: var(--gray-800); max-width: 700px; margin: 0 0 34px; }
 .author-articles-section{ margin-bottom: 40px; }
 .author-articles-section .rail-title{ border-bottom: 1px solid var(--gray-200); padding-bottom: 10px; }
