@@ -5,3 +5,4 @@ boto3>=1.36.0
 PyJWT>=2.8
 cryptography>=42
 tzdata>=2024.1
+resend>=2.0.0,<3.0.0

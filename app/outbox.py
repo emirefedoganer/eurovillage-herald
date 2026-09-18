@@ -65,6 +65,10 @@ def enqueue(kind, to_address, subject, text_body, html_body=None, reply_to=None,
         "last_error": None,
         "created_at": _now_iso(),
         "sent_at": None,
+        # The provider's own message id (e.g. Resend's) once actually
+        # sent -- None for the fake backend, for SMTP (smtplib doesn't
+        # hand one back), and for any job not yet sent.
+        "provider_message_id": None,
     }
     jobs.append(job)
     store.save_email_outbox(jobs)
@@ -72,6 +76,7 @@ def enqueue(kind, to_address, subject, text_body, html_body=None, reply_to=None,
 
 
 def _send_one(job):
+    """Returns (ok, error, message_id, permanent) -- see mailer._send()."""
     if job["kind"] == "transactional":
         return mailer.send_transactional_email(
             job["to"], job["subject"], job["text_body"], job.get("html_body"), reply_to=job.get("reply_to"),
@@ -81,7 +86,14 @@ def _send_one(job):
 
 def process_outbox(limit=50):
     """Sends every currently-queued (or stuck-processing) job, up to
-    `limit`. Returns how many jobs were attempted."""
+    `limit`. Returns how many jobs were attempted.
+
+    A job whose failure mailer.py classified as `permanent` (invalid
+    credentials, an unverified sending domain, a malformed payload -- see
+    mailer._is_permanent_resend_error()) is marked "failed" immediately,
+    on its very first such attempt, rather than being requeued to burn
+    through MAX_ATTEMPTS retries on a condition no retry can fix. Every
+    other failure keeps the original retry-until-MAX_ATTEMPTS behavior."""
     jobs = store.load_email_outbox()
     for job in jobs:
         if job["status"] == "processing":
@@ -95,15 +107,16 @@ def process_outbox(limit=50):
             continue
         attempted += 1
         job["status"] = "processing"
-        ok, error = _send_one(job)
+        ok, error, message_id, permanent = _send_one(job)
         if ok:
             job["status"] = "sent"
             job["sent_at"] = _now_iso()
             job["last_error"] = None
+            job["provider_message_id"] = message_id
         else:
             job["retry_count"] += 1
             job["last_error"] = (error or "")[:500]
-            job["status"] = "failed" if job["retry_count"] >= MAX_ATTEMPTS else "queued"
+            job["status"] = "failed" if permanent or job["retry_count"] >= MAX_ATTEMPTS else "queued"
     if attempted or any(j["status"] == "queued" for j in jobs):
         store.save_email_outbox(jobs)
     return attempted

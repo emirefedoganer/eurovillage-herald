@@ -20,6 +20,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP_DIR = os.path.join(REPO_ROOT, "app")
@@ -170,13 +171,16 @@ class MailerFakeBackendTests(EmailSystemTestCase):
 
     def test_fake_transactional_send_succeeds_without_network(self):
         import mailer
-        ok, error = mailer.send_transactional_email("reader@example.com", "Subj", "body text")
+        ok, error, message_id, permanent = mailer.send_transactional_email("reader@example.com", "Subj", "body text")
         self.assertTrue(ok)
         self.assertIsNone(error)
+        self.assertIsNone(message_id)
+        self.assertFalse(permanent)
 
     def test_fake_bulletin_send_succeeds_without_network(self):
         import mailer
-        ok, error = mailer.send_bulletin_email("reader@example.com", "Subj", "body text", "<p>body</p>")
+        ok, error, message_id, permanent = mailer.send_bulletin_email(
+            "reader@example.com", "Subj", "body text", "<p>body</p>")
         self.assertTrue(ok)
 
     def test_sender_identities_never_exposes_api_key(self):
@@ -186,6 +190,343 @@ class MailerFakeBackendTests(EmailSystemTestCase):
         self.assertNotIn("EMAIL_API_KEY", dumped)
         self.assertNotIn(mailer.EMAIL_API_KEY or "unset-marker", dumped) if mailer.EMAIL_API_KEY else None
         self.assertNotIn("password", dumped.lower())
+
+
+class ResendBackendTests(EmailSystemTestCase):
+    """The Resend transport, exercised entirely via unittest.mock.patch on
+    resend.Emails.send -- NEVER a real network call to Cloudflare/Resend.
+
+    Context: production logged five straight outbox delivery attempts
+    each failing with "HTTP 403 error code: 1010" (Cloudflare: "request
+    blocked based on the client's browser signature"), and nothing ever
+    reached the Resend dashboard -- meaning Cloudflare's edge in front of
+    api.resend.com blocked the request before Resend's own API ever saw
+    it. The prior implementation spoke to the correct, official endpoint
+    (https://api.resend.com/emails) but via raw urllib.request with no
+    explicit User-Agent, which defaults to "Python-urllib/<version>" --
+    a well-known Cloudflare bot-management trigger. Switching to the
+    official SDK (which sends "resend-python:<version>" via `requests`,
+    see resend/request.py) is the actual fix; these tests both prove the
+    SDK is genuinely being used (not just imported) and cover the
+    resulting success/permanent-failure/temporary-failure behavior.
+
+    mailer.BACKEND is monkeypatched to "resend" for the duration of each
+    test and restored in tearDown, the same pattern
+    TurnstileSubscriptionTests already uses for turnstile.ENABLED."""
+
+    def setUp(self):
+        super().setUp()
+        import mailer
+        self._mailer = mailer
+        self._orig_backend = mailer.BACKEND
+        mailer.BACKEND = "resend"
+
+    def tearDown(self):
+        self._mailer.BACKEND = self._orig_backend
+
+    # ---- regression: the SDK is actually used, not urllib -------------
+
+    def test_official_endpoint_is_configured(self):
+        import resend
+        self.assertEqual(resend.api_url, "https://api.resend.com")
+
+    def test_mailer_module_does_not_import_urllib(self):
+        """The previous, broken implementation's smoking gun: no explicit
+        User-Agent on a raw urllib.request call. Asserting the import
+        statement itself is gone (rather than just that resend.Emails.send
+        is called) makes sure nobody quietly reintroduces a second,
+        parallel raw-HTTP path for some future case. Checked against the
+        actual import lines, not a bare substring of the whole source --
+        this module's docstring deliberately explains the old urllib bug
+        in prose, which would otherwise trip a naive "urllib" not-in-source
+        check on the module's own explanation of what was fixed."""
+        import mailer
+        with open(mailer.__file__, encoding="utf-8") as f:
+            lines = [line.strip() for line in f]
+        code_import_lines = [line for line in lines if line.startswith("import ") or line.startswith("from ")]
+        self.assertFalse(any("urllib" in line for line in code_import_lines), code_import_lines)
+        self.assertIn("import resend", code_import_lines)
+
+    def test_email_api_key_env_var_is_not_renamed(self):
+        """Requirement: EMAIL_API_KEY stays the Railway variable name --
+        never RESEND_API_KEY -- even though the resend package itself
+        defaults to reading RESEND_API_KEY from the environment. Checked
+        against the actual os.environ.get(...) call, not a bare substring
+        of the whole source -- this module's comments deliberately
+        mention RESEND_API_KEY once, in prose, to explain precisely why
+        it's NOT used."""
+        import mailer
+        with open(mailer.__file__, encoding="utf-8") as f:
+            lines = f.readlines()
+        env_read_lines = [line for line in lines if "os.environ.get(" in line]
+        self.assertTrue(any('os.environ.get("EMAIL_API_KEY"' in line for line in env_read_lines))
+        self.assertFalse(any('os.environ.get("RESEND_API_KEY"' in line for line in env_read_lines))
+
+    def test_email_api_key_value_is_assigned_onto_the_sdk(self):
+        import mailer
+        import resend
+        self.assertEqual(resend.api_key, mailer.EMAIL_API_KEY)
+
+    def test_send_actually_invokes_the_official_sdk_call(self):
+        """Not just 'the module is imported' -- the real code path calls
+        resend.Emails.send(), the SDK's own documented entry point."""
+        import mailer
+        with unittest.mock.patch("resend.Emails.send", return_value={"id": "re_mocked_12345"}) as mock_send:
+            ok, error, message_id, permanent = mailer.send_transactional_email(
+                "reader@example.com", "Subj", "text body", html_body="<p>hi</p>",
+            )
+        mock_send.assert_called_once()
+        called_params = mock_send.call_args[0][0]
+        self.assertEqual(called_params["to"], ["reader@example.com"])
+        self.assertEqual(called_params["subject"], "Subj")
+        self.assertEqual(called_params["html"], "<p>hi</p>")
+        self.assertTrue(ok)
+        self.assertIsNone(error)
+        self.assertEqual(message_id, "re_mocked_12345")
+        self.assertFalse(permanent)
+
+    # ---- success: the real message id is returned and stored ----------
+
+    def test_successful_send_returns_real_resend_message_id(self):
+        import mailer
+        with unittest.mock.patch("resend.Emails.send", return_value={"id": "re_abc123"}):
+            ok, error, message_id, permanent = mailer.send_bulletin_email(
+                "reader@example.com", "Subj", "text body")
+        self.assertTrue(ok)
+        self.assertEqual(message_id, "re_abc123")
+
+    def test_successful_send_stores_message_id_on_the_outbox_job(self):
+        import outbox
+        outbox.enqueue("transactional", "reader@example.com", "Subj", "text")
+        with unittest.mock.patch("resend.Emails.send", return_value={"id": "re_stored_999"}):
+            outbox.process_outbox(limit=10)
+        job = store.load_email_outbox()[0]
+        self.assertEqual(job["status"], "sent")
+        self.assertEqual(job["provider_message_id"], "re_stored_999")
+
+    # ---- permanent (4xx) failures: not retried indefinitely ------------
+
+    def test_invalid_api_key_is_classified_permanent(self):
+        import mailer
+        import resend
+        exc = resend.exceptions.InvalidApiKeyError(message="API key is invalid", error_type="invalid_api_key", code=403)
+        with unittest.mock.patch("resend.Emails.send", side_effect=exc):
+            ok, error, message_id, permanent = mailer.send_transactional_email(
+                "reader@example.com", "Subj", "text")
+        self.assertFalse(ok)
+        self.assertTrue(permanent)
+        self.assertIsNone(message_id)
+
+    def test_invalid_api_key_fails_the_outbox_job_on_first_attempt(self):
+        """Requirement 14: a permanent 4xx must not be retried indefinitely
+        -- specifically, it should fail on attempt ONE, not after burning
+        through MAX_ATTEMPTS like a genuinely temporary failure would."""
+        import outbox
+        import resend
+        outbox.enqueue("transactional", "reader@example.com", "Subj", "text")
+        exc = resend.exceptions.InvalidApiKeyError(message="API key is invalid", error_type="invalid_api_key", code=403)
+        with unittest.mock.patch("resend.Emails.send", side_effect=exc):
+            outbox.process_outbox(limit=10)
+        job = store.load_email_outbox()[0]
+        self.assertEqual(job["status"], "failed")
+        self.assertEqual(job["retry_count"], 1)
+        self.assertLess(job["retry_count"], outbox.MAX_ATTEMPTS)
+
+    def test_missing_api_key_is_classified_permanent(self):
+        import mailer
+        import resend
+        exc = resend.exceptions.MissingApiKeyError(message="Missing API key", error_type="missing_api_key", code=401)
+        with unittest.mock.patch("resend.Emails.send", side_effect=exc):
+            ok, error, message_id, permanent = mailer.send_transactional_email(
+                "reader@example.com", "Subj", "text")
+        self.assertTrue(permanent)
+
+    def test_validation_error_eg_unverified_domain_is_classified_permanent(self):
+        """Resend surfaces an unverified sending domain as a
+        validation_error -- covered here as the task's explicit
+        'unverified domains' example of a condition retrying can't fix."""
+        import mailer
+        import resend
+        exc = resend.exceptions.ValidationError(
+            message="The noreply@eurovillageherald.com domain is not verified.",
+            error_type="validation_error", code=403,
+        )
+        with unittest.mock.patch("resend.Emails.send", side_effect=exc):
+            ok, error, message_id, permanent = mailer.send_transactional_email(
+                "reader@example.com", "Subj", "text")
+        self.assertTrue(permanent)
+        self.assertIn("not verified", error)
+
+    def test_missing_required_fields_is_classified_permanent(self):
+        import mailer
+        import resend
+        exc = resend.exceptions.MissingRequiredFieldsError(
+            message="Missing `to` field.", error_type="missing_required_field", code=422)
+        with unittest.mock.patch("resend.Emails.send", side_effect=exc):
+            ok, error, message_id, permanent = mailer.send_transactional_email(
+                "reader@example.com", "Subj", "text")
+        self.assertTrue(permanent)
+
+    # ---- temporary failures: still retried ------------------------------
+
+    def test_rate_limit_is_classified_temporary(self):
+        import mailer
+        import resend
+        exc = resend.exceptions.RateLimitError(message="Too many requests", error_type="rate_limit_exceeded", code=429)
+        with unittest.mock.patch("resend.Emails.send", side_effect=exc):
+            ok, error, message_id, permanent = mailer.send_transactional_email(
+                "reader@example.com", "Subj", "text")
+        self.assertFalse(ok)
+        self.assertFalse(permanent)
+
+    def test_server_error_is_classified_temporary(self):
+        import mailer
+        import resend
+        exc = resend.exceptions.ApplicationError(message="Internal error", error_type="application_error", code=500)
+        with unittest.mock.patch("resend.Emails.send", side_effect=exc):
+            ok, error, message_id, permanent = mailer.send_transactional_email(
+                "reader@example.com", "Subj", "text")
+        self.assertFalse(permanent)
+
+    def test_ambiguous_non_json_403_stays_temporary_not_permanent(self):
+        """The safety carve-out this backend relies on: if a 403 ever
+        comes back WITHOUT a parseable Resend JSON body (error_type
+        "application_error" is what the SDK assigns when it can't parse
+        one -- e.g. an edge/proxy response rather than a confirmed
+        rejection from Resend's own API, which is exactly the shape the
+        original Cloudflare-1010 block would have taken had it reached
+        this far), it must NOT be treated as a confirmed permanent
+        rejection -- only a genuinely Resend-classified error type is."""
+        import mailer
+        import resend
+        exc = resend.exceptions.ResendError(
+            code=403, error_type="application_error",
+            message="Expected JSON response but got: text/html", suggested_action="",
+        )
+        with unittest.mock.patch("resend.Emails.send", side_effect=exc):
+            ok, error, message_id, permanent = mailer.send_transactional_email(
+                "reader@example.com", "Subj", "text")
+        self.assertFalse(ok)
+        self.assertFalse(permanent)
+
+    def test_temporary_failure_keeps_job_queued_for_retry(self):
+        import outbox
+        import resend
+        outbox.enqueue("transactional", "reader@example.com", "Subj", "text")
+        exc = resend.exceptions.RateLimitError(message="Too many requests", error_type="rate_limit_exceeded", code=429)
+        with unittest.mock.patch("resend.Emails.send", side_effect=exc):
+            outbox.process_outbox(limit=10)
+        job = store.load_email_outbox()[0]
+        self.assertEqual(job["status"], "queued")
+        self.assertEqual(job["retry_count"], 1)
+
+    def test_unrecognized_exception_defaults_to_temporary(self):
+        """Anything outside the SDK's own exception hierarchy (a bug, an
+        unexpected local error) must never be treated as a confirmed
+        permanent rejection -- fail safe by staying retryable."""
+        import mailer
+        with unittest.mock.patch("resend.Emails.send", side_effect=RuntimeError("unexpected")):
+            ok, error, message_id, permanent = mailer.send_transactional_email(
+                "reader@example.com", "Subj", "text")
+        self.assertFalse(ok)
+        self.assertFalse(permanent)
+
+    # ---- secrets never leak through error handling ----------------------
+
+    def test_resend_error_never_exposes_the_api_key(self):
+        import mailer
+        import resend
+        original_key = resend.api_key
+        try:
+            resend.api_key = "re_super_secret_test_key_value"
+            exc = resend.exceptions.InvalidApiKeyError(
+                message="API key is invalid", error_type="invalid_api_key", code=403)
+            with unittest.mock.patch("resend.Emails.send", side_effect=exc):
+                ok, error, message_id, permanent = mailer.send_transactional_email(
+                    "reader@example.com", "Subj", "text")
+            self.assertNotIn("re_super_secret_test_key_value", error)
+        finally:
+            resend.api_key = original_key
+
+    # ---- preserved flows: subscription/contact/bulletin all still work --
+
+    def test_subscription_confirmation_flow_works_through_resend(self):
+        # Deliberately NOT follow_redirects=True: subscribe_submit()
+        # redirects to /gazete, whose route opportunistically drains the
+        # outbox (_process_due_issues() -> outbox.process_outbox()) --
+        # following that redirect would send the enqueued job through
+        # process_outbox() before this test's mock is even in scope,
+        # making a REAL network call to Resend with no configured API
+        # key. Keeping the whole request+drain inside one mock context
+        # (belt and suspenders with not following the redirect) is what
+        # actually guarantees no real network call ever happens here.
+        with unittest.mock.patch("resend.Emails.send", return_value={"id": "re_sub_confirm"}):
+            r = self.client.post("/abone-ol", data={
+                "email": "resendflow@example.com", "pref_new_issue": "1", "privacy_ack": "1",
+            })
+            self.assertEqual(r.status_code, 302)
+            import outbox
+            outbox.process_outbox(limit=10)
+        jobs = self.load("email_outbox.json")
+        self.assertEqual(jobs[0]["status"], "sent")
+        self.assertEqual(jobs[0]["provider_message_id"], "re_sub_confirm")
+
+    def test_contact_form_acknowledgement_flow_works_through_resend(self):
+        # /iletisim's own redirect target (GET /iletisim) never drains the
+        # outbox, unlike /abone-ol's -- but the whole request is still
+        # kept inside the mock context as a matter of course, so nothing
+        # here could ever make a real network call even if that changed.
+        with unittest.mock.patch("resend.Emails.send", return_value={"id": "re_contact_ack"}):
+            self.client.post("/iletisim", data={
+                "email": "resendcontact@example.com", "category": "Diğer", "message": "Test via Resend.",
+            })
+            import outbox
+            outbox.process_outbox(limit=10)
+        jobs = self.load("email_outbox.json")
+        self.assertEqual(jobs[0]["status"], "sent")
+        self.assertEqual(jobs[0]["provider_message_id"], "re_contact_ack")
+
+    def test_bulletin_send_works_through_resend(self):
+        import subscriptions
+        import bulletins
+        s, t = subscriptions.subscribe("resendbulletin@example.com", {"new_issue": True})
+        subscriptions.confirm(t)
+        b = bulletins.create_draft("custom", "editor@test.com", "T", "S", target_preference="new_issue")
+        with unittest.mock.patch("resend.Emails.send", return_value={"id": "re_bulletin_1"}):
+            bulletins.send_campaign(b["id"], "editor@test.com", lambda bul, sub: ("Subj", "text", "<p>x</p>"))
+            import outbox
+            outbox.process_outbox(limit=10)
+        jobs = self.load("email_outbox.json")
+        self.assertEqual(jobs[0]["status"], "sent")
+        self.assertEqual(jobs[0]["provider_message_id"], "re_bulletin_1")
+
+    def test_test_send_still_works_through_resend(self):
+        import bulletins
+        import outbox
+        b = bulletins.create_draft("custom", "editor@test.com", "T", "S")
+        bulletins.send_test(b["id"], ["tester@example.com"], lambda bul, sub: ("Subj", "text", "<p>x</p>"))
+        with unittest.mock.patch("resend.Emails.send", return_value={"id": "re_test_send"}):
+            outbox.process_outbox(limit=10)
+        jobs = self.load("email_outbox.json")
+        self.assertEqual(jobs[0]["status"], "sent")
+        self.assertEqual(store.get_bulletin(b["id"])["status"], "draft")
+
+    def test_no_network_module_is_ever_touched_by_this_class(self):
+        """Belt-and-suspenders: every test in this class mocks
+        resend.Emails.send directly, so urllib/requests/socket are never
+        exercised -- verified here by patching resend's own HTTP client
+        to raise if it's ever actually invoked, then running a normal
+        mocked send and confirming that patch was never triggered."""
+        import mailer
+        import resend
+        with unittest.mock.patch.object(
+            resend.default_http_client, "request",
+            side_effect=AssertionError("a real HTTP client was invoked during a mocked test"),
+        ):
+            with unittest.mock.patch("resend.Emails.send", return_value={"id": "re_ok"}):
+                ok, error, message_id, permanent = mailer.send_transactional_email(
+                    "reader@example.com", "Subj", "text")
+        self.assertTrue(ok)
 
 
 class OutboxTests(EmailSystemTestCase):
@@ -224,7 +565,7 @@ class OutboxTests(EmailSystemTestCase):
         import outbox
         import mailer
         original = mailer.send_transactional_email
-        mailer.send_transactional_email = lambda *a, **k: (False, "simulated provider outage")
+        mailer.send_transactional_email = lambda *a, **k: (False, "simulated provider outage", None, False)
         try:
             outbox.enqueue("transactional", "a@example.com", "Subj", "text")
             for _ in range(outbox.MAX_ATTEMPTS):
@@ -400,7 +741,7 @@ class ContactTicketTests(EmailSystemTestCase):
     def test_ticket_persists_even_if_email_provider_is_down(self):
         import mailer
         original = mailer.send_transactional_email
-        mailer.send_transactional_email = lambda *a, **k: (False, "simulated outage")
+        mailer.send_transactional_email = lambda *a, **k: (False, "simulated outage", None, False)
         try:
             r = self._submit(email="resilient@example.com")
             self.assertEqual(r.status_code, 200)
@@ -575,7 +916,7 @@ class IssuePublicationBulletinTests(EmailSystemTestCase):
     def test_issue_publication_succeeds_even_if_email_provider_is_down(self):
         import mailer
         original = mailer.send_bulletin_email
-        mailer.send_bulletin_email = lambda *a, **k: (False, "simulated outage")
+        mailer.send_bulletin_email = lambda *a, **k: (False, "simulated outage", None, False)
         try:
             issues = self.load("issues.json")
             issues.append({
@@ -995,7 +1336,7 @@ class AdminTemplateRenderTests(EmailSystemTestCase):
         import outbox
         import mailer
         original = mailer.send_transactional_email
-        mailer.send_transactional_email = lambda *a, **k: (False, "outage")
+        mailer.send_transactional_email = lambda *a, **k: (False, "outage", None, False)
         job = outbox.enqueue("transactional", "a@example.com", "Subj", "text")
         for _ in range(outbox.MAX_ATTEMPTS):
             outbox.process_outbox(limit=10)

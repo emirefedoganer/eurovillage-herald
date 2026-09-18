@@ -22,26 +22,41 @@ Provider abstraction: EMAIL_PROVIDER selects the backend --
     and without ever making a network call or sending real mail.
   - "smtp" -> stdlib smtplib against SMTP_HOST/PORT/USERNAME/PASSWORD.
     Works with nearly any real SMTP-speaking provider or mailbox.
-  - "resend" -> Resend's HTTP API (https://api.resend.com/emails) via
-    urllib.request -- no SDK dependency added for one HTTP POST.
+  - "resend" -> the official `resend` Python SDK (see requirements.txt).
+
+    A previous version of this backend spoke to
+    https://api.resend.com/emails directly via urllib.request. That is
+    the correct, documented endpoint -- the bug was HOW it was called,
+    not where: urllib.request with no explicit User-Agent sends
+    "Python-urllib/<version>" by default, a signature Cloudflare's bot
+    management in front of api.resend.com reliably fingerprints and
+    blocks with error 1010 ("blocked based on the client's browser
+    signature") before the request ever reaches Resend's own API --
+    which is exactly why nothing showed up in the Resend dashboard even
+    though the outbox recorded five failed attempts. The official SDK
+    sends "User-Agent: resend-python:<version>" (see
+    resend/request.py's Request.__get_headers()) via `requests`, a
+    signature Resend's own Cloudflare configuration is tuned to allow.
+    Switching transports fixes the block; the endpoint URL itself
+    (https://api.resend.com/emails) was never wrong.
 
 Callers should use send_transactional_email()/send_bulletin_email() --
-never construct a message or pick a From address directly -- so no route
-or template ever hard-codes a provider call or gets a sending identity
-wrong. Nothing in this module is durable: a caller that needs retries/
-exactly-once semantics across a process restart should go through
-app/outbox.py, which calls these functions per attempt.
+never construct a message, pick a From address, or call a provider SDK
+directly -- so no route or template ever hard-codes a provider call or
+gets a sending identity wrong. Nothing in this module is durable: a
+caller that needs retries/exactly-once semantics across a process
+restart should go through app/outbox.py, which calls these functions per
+attempt and uses the `permanent` flag below to stop retrying a failure
+retrying can never fix.
 """
-import json
 import os
-import re
 import smtplib
 import ssl
 import sys
-import urllib.error
-import urllib.request
 from email.message import EmailMessage
 from email.utils import parseaddr
+
+import resend
 
 EMAIL_PROVIDER = os.environ.get("EMAIL_PROVIDER", "").strip().lower()
 
@@ -53,7 +68,17 @@ EMAIL_TRANSACTIONAL_FROM = os.environ.get("EMAIL_TRANSACTIONAL_FROM", "").strip(
 EMAIL_BULLETIN_FROM = os.environ.get("EMAIL_BULLETIN_FROM", "").strip() or DEFAULT_BULLETIN_FROM
 EMAIL_CONTACT_REPLY_TO = os.environ.get("EMAIL_CONTACT_REPLY_TO", "").strip() or DEFAULT_CONTACT_REPLY_TO
 
+# Deliberately EMAIL_API_KEY, not RESEND_API_KEY -- the provider-agnostic
+# name this module has always used, so the config interface doesn't change
+# depending on which backend is selected. The `resend` package itself
+# defaults to reading RESEND_API_KEY from the environment at import time
+# (see resend/__init__.py); we never rely on that and instead assign
+# EMAIL_API_KEY's value onto resend.api_key ourselves, once, below --
+# EMAIL_API_KEY is the only environment variable Railway needs to set.
 EMAIL_API_KEY = os.environ.get("EMAIL_API_KEY", "").strip()
+resend.api_key = EMAIL_API_KEY
+# Matches this module's previous 15s urllib timeout.
+resend.default_http_client = resend.RequestsClient(timeout=15)
 
 # SMTP backend config (used only when EMAIL_PROVIDER=smtp)
 SMTP_HOST = os.environ.get("SMTP_HOST", "").strip()
@@ -86,7 +111,7 @@ def _send_via_fake(to_address, from_identity, subject, text_body, html_body, rep
         f"from={from_identity} to={to_address} subject={subject!r} reply_to={reply_to}",
         file=sys.stderr,
     )
-    return True, None
+    return True, None, None, False
 
 
 def _send_via_smtp(to_address, from_identity, subject, text_body, html_body, reply_to):
@@ -111,51 +136,103 @@ def _send_via_smtp(to_address, from_identity, subject, text_body, html_body, rep
             with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10, context=context) as server:
                 server.login(SMTP_USERNAME, SMTP_PASSWORD)
                 server.send_message(msg)
-        return True, None
+        # smtplib doesn't hand back a message id, and its failure modes
+        # (auth vs. transient connection issues) aren't reliably
+        # distinguishable without deeper per-provider inspection -- SMTP
+        # keeps its pre-existing always-retryable-until-MAX_ATTEMPTS
+        # behavior unchanged.
+        return True, None, None, False
     except Exception as exc:
-        return False, str(exc)
+        return False, str(exc), None, False
+
+
+# Resend error subtypes that mean "this will never succeed by retrying":
+# a bad/missing API key, or a request Resend's API itself rejected as
+# malformed (a validation error covers, among other things, an unverified
+# sending domain). See resend/exceptions.py for the full hierarchy --
+# every one of these is raised only when Resend's API returned real,
+# parseable JSON identifying the problem, never for an ambiguous/
+# infrastructure-layer response.
+_PERMANENT_RESEND_ERRORS = (
+    resend.exceptions.MissingApiKeyError,
+    resend.exceptions.InvalidApiKeyError,
+    resend.exceptions.ValidationError,
+    resend.exceptions.MissingRequiredFieldsError,
+)
+
+
+def _is_permanent_resend_error(exc):
+    """True only for a CONFIRMED non-retryable rejection from Resend's own
+    API (bad credentials, unverified domain, malformed payload) -- never
+    for a rate limit, a server error, or a response the SDK couldn't even
+    parse as JSON (error_type "application_error", the SDK's catch-all for
+    a non-JSON body -- e.g. an intermediary/edge response rather than a
+    confirmed answer from Resend itself). Those stay retryable, matching
+    the "genuinely temporary network, 429, and 5xx failures" retry
+    contract this function's caller (outbox.process_outbox) relies on."""
+    if isinstance(exc, _PERMANENT_RESEND_ERRORS):
+        return True
+    if not isinstance(exc, resend.exceptions.ResendError):
+        return False
+    try:
+        code = int(exc.code)
+    except (TypeError, ValueError):
+        return False
+    return 400 <= code < 500 and code != 429 and exc.error_type != "application_error"
+
+
+def _resend_error_detail(exc):
+    """A safe, loggable one-line summary of a ResendError -- built only
+    from the SDK's own exception fields (code/error_type/message), which
+    never include the API key (see resend/exceptions.py: none of these
+    classes ever accept or echo back the Authorization header/key)."""
+    code = getattr(exc, "code", "unknown")
+    error_type = getattr(exc, "error_type", "unknown")
+    message = (getattr(exc, "message", "") or str(exc)).strip()[:300]
+    return f"Resend API error {code} ({error_type}): {message}"
 
 
 def _send_via_resend(to_address, from_identity, subject, text_body, html_body, reply_to):
-    payload = {
-        "from": from_identity,
-        "to": [to_address],
-        "subject": subject,
-        "text": text_body,
-    }
+    params = {"from": from_identity, "to": [to_address], "subject": subject, "text": text_body}
     if html_body:
-        payload["html"] = html_body
+        params["html"] = html_body
     if reply_to:
-        payload["reply_to"] = [reply_to]
-    body = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        "https://api.resend.com/emails",
-        data=body,
-        method="POST",
-        headers={"Authorization": f"Bearer {EMAIL_API_KEY}", "Content-Type": "application/json"},
-    )
+        params["reply_to"] = [reply_to]
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            resp.read()
-            return True, None
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:500]
-        return False, f"HTTP {exc.code}: {detail}"
+        result = resend.Emails.send(params)
+        return True, None, result.get("id"), False
+    except resend.exceptions.ResendError as exc:
+        return False, _resend_error_detail(exc), None, _is_permanent_resend_error(exc)
     except Exception as exc:
-        return False, str(exc)
+        # Anything outside the SDK's own error hierarchy (e.g. a genuine
+        # network-level failure the SDK's HTTP client re-raised) is
+        # treated as temporary/retryable -- never permanently give up on
+        # a condition this code doesn't specifically recognize.
+        return False, str(exc)[:300], None, False
 
 
 _BACKENDS = {"fake": _send_via_fake, "smtp": _send_via_smtp, "resend": _send_via_resend}
 
 
 def _send(from_identity, to_address, subject, text_body, html_body, reply_to):
-    """Returns (ok: bool, error: str|None). Never raises."""
+    """Returns (ok, error, message_id, permanent):
+      - ok: bool
+      - error: str|None -- a safe, loggable message; never the API key
+      - message_id: str|None -- Resend's real Message ID on a successful
+        Resend send; None for every other backend/outcome
+      - permanent: bool -- True only for a confirmed non-retryable failure
+        (invalid credentials, unverified domain, malformed payload);
+        outbox.process_outbox() stops retrying such a job immediately
+        instead of burning through MAX_ATTEMPTS on a config problem no
+        retry can fix. Always False for the fake/smtp backends, which
+        keep their pre-existing retry-until-MAX_ATTEMPTS behavior.
+    Never raises."""
     if not to_address or "@" not in to_address:
-        return False, "invalid recipient address"
+        return False, "invalid recipient address", None, True
     try:
         return _BACKENDS[BACKEND](to_address, from_identity, subject, text_body, html_body, reply_to)
     except Exception as exc:
-        return False, str(exc)
+        return False, str(exc), None, False
 
 
 def send_transactional_email(to_address, subject, text_body, html_body=None, reply_to=None):
@@ -163,7 +240,8 @@ def send_transactional_email(to_address, subject, text_body, html_body=None, rep
     etc. Always sent from EMAIL_TRANSACTIONAL_FROM. Pass reply_to
     explicitly for contact-flavored mail (normally
     mailer.EMAIL_CONTACT_REPLY_TO) -- not set by default, since not every
-    transactional email should route replies to the contact mailbox."""
+    transactional email should route replies to the contact mailbox.
+    Returns (ok, error, message_id, permanent) -- see _send()."""
     return _send(EMAIL_TRANSACTIONAL_FROM, to_address, subject, text_body, html_body, reply_to)
 
 
@@ -171,7 +249,8 @@ def send_bulletin_email(to_address, subject, text_body, html_body=None):
     """Editorial newsletters/campaigns. Always sent from
     EMAIL_BULLETIN_FROM. No Reply-To is set -- bulletin@ is not a
     monitored inbox and readers should use the unsubscribe/preferences
-    link, not a reply, to manage their subscription."""
+    link, not a reply, to manage their subscription.
+    Returns (ok, error, message_id, permanent) -- see _send()."""
     return _send(EMAIL_BULLETIN_FROM, to_address, subject, text_body, html_body, None)
 
 
