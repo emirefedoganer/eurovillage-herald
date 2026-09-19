@@ -44,6 +44,9 @@
             {% if b.status in ('draft', 'scheduled') %}
             <a class="btn btn-outline" href="{{ url_for('admin.bulletin_edit', bulletin_id=b.id) }}">Düzenle</a>
             <a class="btn btn-outline" href="{{ url_for('admin.bulletin_preview', bulletin_id=b.id) }}">Önizle</a>
+            <form method="post" action="{{ url_for('admin.bulletin_duplicate', bulletin_id=b.id) }}" style="display:inline;">
+              <button class="btn btn-outline" type="submit">Kopyala</button>
+            </form>
             {% if b.status == 'scheduled' %}
             <form method="post" action="{{ url_for('admin.bulletin_cancel', bulletin_id=b.id) }}" onsubmit="return confirm('Bu zamanlanmış bülteni iptal etmek istediğinize emin misiniz?');" style="display:inline;">
               <button class="btn btn-danger" type="submit">İptal Et</button>

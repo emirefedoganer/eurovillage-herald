@@ -129,42 +129,16 @@ body.drawer-open{ overflow: hidden; }
   font-family: var(--font-sans); font-weight: 600; font-size: 13px; letter-spacing: .02em;
 }
 .mainnav-inner a{
-  color: #fff; padding: 0 10px; height: 44px; display: flex; align-items: center;
+  color: #fff; padding: 0 12px; height: 44px; display: flex; align-items: center;
   text-transform: uppercase; white-space: nowrap; flex-shrink: 0;
 }
 .mainnav-inner a:hover{ background: rgba(0,0,0,.18); }
 .mainnav-home{ font-weight: 700; }
 .mainnav-inner .mainnav-pdf{ margin-left: auto; background: rgba(0,0,0,.15); }
-.mainnav-search{ flex-shrink: 1; min-width: 0; margin-left: 4px; padding-right: 4px;}
+.mainnav-search{ flex-shrink: 0; margin-left: 4px; padding-right: 4px;}
 .mainnav-search input{
   border: none; border-radius: 3px; padding: 6px 10px; font-family: var(--font-sans);
-  font-size: 13px; width: 100px; min-width: 0; background: rgba(255,255,255,.9);
-}
-/* Above ~1500px there's room to give the search field back its full,
-   more comfortable width without reintroducing the clipped-search-box
-   overflow this replaced (see the nav_links()/mainnav-search history --
-   an 11th nav item, "Bültene Abone Ol", made the previous fixed 130px
-   width overflow at ordinary desktop widths like 1280px). */
-@media (min-width: 1500px){
-  .mainnav-search input{ width: 150px; }
-}
-/* Between the mobile-nav breakpoint and ~1150px, ten nav links + the
-   subscribe CTA genuinely don't fit alongside an inline search box at
-   any width that still reads cleanly -- rather than leaving it to
-   .mainnav-inner's overflow-x:auto scroll (present as a fallback, but a
-   search box silently cut off mid-character at a completely ordinary
-   1024px desktop width is exactly the "technically scrollable but looks
-   broken" case this project's responsive pass is meant to eliminate),
-   the inline box steps out here and is replaced by the SAME
-   click-to-reveal search button + bar the ≤900px mobile header already
-   uses (see mobile-nav.js, which wires .mobile-search-btn unconditionally
-   -- no new JS needed, it just wasn't visible in this width range before). */
-@media (min-width: 901px) and (max-width: 1180px){
-  .mainnav-search{ display: none; }
-  .mobile-search-btn{ display: flex; }
-  .mobile-search-bar:not([hidden]){ display: flex; }
-  .mainnav-inner{ font-size: 11.5px; gap: 0; }
-  .mainnav-inner a{ padding: 0 7px; }
+  font-size: 13px; width: 130px; background: rgba(255,255,255,.9);
 }
 
 /* ---------- flash ---------- */
@@ -349,19 +323,8 @@ body.drawer-open{ overflow: hidden; }
   border-left: 3px solid var(--black); font-family: var(--font-sans); font-size: 13.5px; color: var(--gray-700);
 }
 
-/* ---------- "Bu Haber Gazetede" / "Bu Sayıdan" issue-article link ---------- */
-.issue-link-card{
-  max-width: 700px; margin: 26px auto 0; padding: 16px 20px; background: #fff;
-  border: 1px solid var(--gray-300); border-top: 3px solid var(--red);
-}
-.issue-link-kicker{
-  display: block; font-family: var(--font-sans); font-size: 11px; font-weight: 700;
-  letter-spacing: .08em; color: var(--red); margin-bottom: 8px;
-}
-.issue-link-body{
-  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-}
-.issue-link-body strong{ font-family: var(--font-headline); font-size: 17px; font-weight: 400; }
+/* ---------- "Bu Sayıdan" issue-article link (reader page only -- the
+   article-page "Bu Haber Gazetede" box was removed) ---------- */
 .issue-articles-block{ margin-top: 40px; }
 .issue-articles-list{ display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; }
 .issue-article-card{ border: 1px solid var(--gray-300); padding: 14px 16px; }
@@ -432,10 +395,20 @@ body.drawer-open{ overflow: hidden; }
 .subscribe-widget-compact .subscribe-widget-text p{ font-size: 12.5px; }
 .article-subscribe-cta{ max-width: 700px; margin: 0 auto; }
 
+/* Homepage right-hand column: the same compact form, stacked to fit a
+   ~300px sidebar column from the start rather than relying on flex-wrap
+   at exactly the point it runs out of room (see .sidebar-block rhythm in
+   the "homepage" section above -- this matches the other sidebar-block
+   widgets' spacing instead of the boxed/row treatment used elsewhere). */
+.sidebar-block-subscribe .subscribe-widget{
+  margin-top: 0; padding: 0; border: none; flex-direction: column; align-items: stretch; gap: 10px;
+}
+.sidebar-block-subscribe .subscribe-widget-text,
+.sidebar-block-subscribe .subscribe-widget-form{ flex: 1 1 auto; }
+
 /* Nav / footer entry points -- a small visual accent (not a full button,
    to avoid competing with the site's existing red CTA buttons) so
    "Bültene Abone Ol" reads as a distinct action, not just another link. */
-.nav-link-subscribe{ font-weight: 800 !important; }
 .footer-link-subscribe{ color: var(--red) !important; }
 .footer-link-subscribe:hover{ color: #fff !important; }
 .btn{
@@ -463,24 +436,8 @@ body.drawer-open{ overflow: hidden; }
   font-size: 16px; line-height: 1; cursor: pointer; color: var(--ink); flex-shrink: 0;
 }
 .pdf-btn:hover{ background: var(--gray-200); }
-.pdf-btn[aria-pressed="true"]{ background: var(--ink); color: #fff; border-color: var(--ink); }
 .pdf-page-info{ font-size: 12.5px; color: var(--gray-700); min-width: 44px; text-align: center; flex-shrink: 0; }
 .pdf-toolbar-spacer{ flex: 1; min-width: 4px; }
-.pdf-goto-form{ display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.pdf-goto-form input{
-  width: 46px; height: 30px; border: 1px solid var(--gray-300); border-radius: 3px; text-align: center; font-size: 13px;
-}
-.pdf-body{ flex: 1; display: flex; min-height: 0; min-width: 0; }
-.pdf-thumbs{
-  flex: 0 0 96px; overflow-y: auto; border-right: 1px solid var(--gray-300); background: #fff;
-  padding: 8px; display: flex; flex-direction: column; gap: 8px;
-}
-.pdf-thumb{
-  border: 2px solid transparent; background: none; padding: 0; cursor: pointer; position: relative;
-  font-family: var(--font-sans); font-size: 10px; color: var(--gray-500); text-align: center;
-}
-.pdf-thumb canvas{ display: block; width: 100%; border: 1px solid var(--gray-300); margin-bottom: 3px; }
-.pdf-thumb.active{ border-color: var(--red); }
 .pdf-viewport{ flex: 1; overflow: auto; display: flex; justify-content: center; padding: 16px; min-width: 0; min-height: 0; }
 .pdf-viewport:focus-visible{ outline: 2px solid var(--red); outline-offset: -2px; }
 .pdf-viewport canvas{ box-shadow: 0 2px 12px rgba(0,0,0,.18); background: #fff; height: fit-content; flex-shrink: 0; }
@@ -567,6 +524,8 @@ body.drawer-open{ overflow: hidden; }
    page wider. The table itself keeps ordinary table layout (thead/tbody
    columns stay aligned), unlike the common but broken `table{display:
    block}` trick. */
+.admin-table-kv td{ white-space: normal; overflow-wrap: anywhere; }
+.admin-table-kv td[style*="width"]{ width: auto !important; min-width: 120px; }
 .table-scroll{ width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 4px; }
 .admin-table{ width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .admin-table th{ text-align: left; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; color: var(--gray-500); border-bottom: 2px solid var(--black); padding: 8px 6px; white-space: nowrap; }
@@ -645,7 +604,11 @@ body.drawer-open{ overflow: hidden; }
 .badge-breaking{ background: var(--black); color: #fff; }
 
 /* ---------- responsive ---------- */
-@media (max-width: 900px){
+/* The ten-link main nav needs ~1180px of content width (measured), so below
+   1200px it collapses into the same hamburger + drawer + search-button
+   pattern phones use -- every link stays reachable, nothing is shrunk or
+   hidden, and the normal desktop bar above 1200px is untouched. */
+@media (max-width: 1200px){
   .masthead-inner{ display: flex; align-items: center; justify-content: space-between; gap: 6px; text-align: center; padding: 12px 14px; }
   .masthead-logo{ flex: 1; min-width: 0; white-space: normal; font-size: clamp(16px, 5.5vw, 26px); line-height: 1.05; }
   .masthead-logo-ari{ flex: 1; min-width: 0; }
@@ -656,11 +619,16 @@ body.drawer-open{ overflow: hidden; }
   .mainnav{ display: none; }
   .drawer-overlay:not([hidden]){ display: block; }
   .mobile-drawer:not([hidden]){ display: flex; }
+}
+@media (min-width: 901px) and (max-width: 1200px){
+  .masthead-logo{ font-size: 36px; }
+  .masthead-logo-ari img{ height: 36px; }
+}
+@media (max-width: 900px){
   .front-grid, .section-list, .reader-layout, .article-layout{ grid-template-columns: minmax(0, 1fr); }
   .article-sidebar{ position: static; margin-top: 30px; }
   .ad-slot-hide-narrow{ display: none; }
   .reader-frame-wrap{ height: 60vh; }
-  .pdf-thumbs{ flex-basis: 72px; }
   .subscribe-widget{ flex-direction: column; }
   .subscribe-widget-text{ flex: 1 1 auto; }
   .subscribe-widget-form{ width: 100%; min-width: 0; flex: 1 1 auto; }

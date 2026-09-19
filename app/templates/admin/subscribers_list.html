@@ -13,6 +13,9 @@
     <div class="admin-stat-card"><span class="n">{{ counts.confirmed }}</span><span class="l">Onaylı</span></div>
     <div class="admin-stat-card"><span class="n">{{ counts.pending }}</span><span class="l">Onay Bekliyor</span></div>
     <div class="admin-stat-card"><span class="n">{{ counts.unsubscribed }}</span><span class="l">Ayrılmış</span></div>
+    <div class="admin-stat-card"><span class="n">{{ counts.bounced }}</span><span class="l">Geri Dönen</span></div>
+    <div class="admin-stat-card"><span class="n">{{ counts.complained }}</span><span class="l">Şikayet</span></div>
+    <div class="admin-stat-card"><span class="n">{{ counts.suppressed }}</span><span class="l">Engelli</span></div>
   </div>
 
   <p class="hint">
@@ -23,7 +26,7 @@
   <div class="admin-panel">
     <div class="table-scroll">
 <table class="admin-table">
-      <thead><tr><th>E-posta</th><th>Tercihler</th><th>Durum</th><th>Kayıt</th><th>Onay</th><th>Gizlilik Metni / Yöntem</th></tr></thead>
+      <thead><tr><th>E-posta</th><th>Tercihler</th><th>Durum</th><th>Kayıt</th><th>Onay</th><th>Gizlilik Metni / Yöntem</th><th></th></tr></thead>
       <tbody>
         {% for s in subs %}
         <tr>
@@ -36,16 +39,35 @@
           <td>
             {% if s.status == 'confirmed' %}<span class="badge badge-lead">Onaylı</span>
             {% elif s.status == 'pending' %}<span class="badge badge-secondary">Onay Bekliyor</span>
-            {% else %}<span class="badge">Ayrılmış</span>{% endif %}
+            {% else %}<span class="badge">{{ status_labels.get(s.status, s.status) }}</span>{% endif %}
           </td>
           <td>{{ s.created_at[:10] if s.created_at else '' }}</td>
           <td>{{ s.confirmed_at[:10] if s.confirmed_at else '—' }}</td>
           <td>
             <span class="hint">{{ s.privacy_notice_version or '—' }} / {{ s.consent_method or '—' }}</span>
           </td>
+          <td>
+            {% if s.status == 'complained' %}
+            <span class="hint">Şikayet kalıcıdır; kaldırılamaz.</span>
+            {% elif s.status in recoverable %}
+            <details><summary>Engeli kaldır…</summary>
+              <form method="post" action="{{ url_for('admin.subscriber_clear_suppression', sub_id=s.id) }}">
+                <p class="hint">Bu işlem e-posta GÖNDERMEZ ve teslimatı yeniden açmaz. Kayıt "ayrılmış" olur;
+                  adres sahibi kendisi formdan abone olup çift onay vermedikçe kampanya almaz. İşlem denetim kaydına yazılır.</p>
+                <input type="text" name="reason" placeholder="Gerekçe (zorunlu)" required maxlength="300">
+                <label><input type="checkbox" name="understood" value="1" required> Sonuçları okudum</label>
+                <button class="btn btn-outline" type="submit">Engeli Kaldır</button>
+              </form>
+            </details>
+            {% elif s.status in ('confirmed', 'pending') %}
+            <form method="post" action="{{ url_for('admin.subscriber_suppress', sub_id=s.id) }}">
+              <button class="btn btn-outline" type="submit">Engelle</button>
+            </form>
+            {% endif %}
+          </td>
         </tr>
         {% else %}
-        <tr><td colspan="6">Henüz abone yok.</td></tr>
+        <tr><td colspan="7">Henüz abone yok.</td></tr>
         {% endfor %}
       </tbody>
     </table>

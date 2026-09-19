@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- **Reply-To**: verified end to end (call site -> outbox -> mailer -> Resend SDK `reply_to`);
+  subscription verification/confirmation mail now carries it too. Fake backend exposes
+  `mailer.FAKE_SENT`. Outbox retries use backoff with a visible next-retry time.
+- **Newsletter**: new `bounced`/`complained`/`suppressed` states, Svix-verified Resend webhook
+  (`/internal/webhooks/resend`, `RESEND_WEBHOOK_SECRET`), send-time eligibility recheck,
+  admin recovery via fresh double opt-in.
+- **PDF reader** reverted to its pre-1.0.1 interface (commit `7f00944`); security, preview,
+  analytics kept.
+- **Public navbar** restored (no subscribe link); subscription now in homepage right column.
+- Removed the "Bu Haber Gazetede" article box (data relationship kept).
+- Privacy notice rewritten without placeholders; `EMAIL_DNS_SETUP.md` added.
+
 ## The Eurovillage Herald 1.3.0
 
 **Site-wide responsive/overflow pass.** Audited every major public and

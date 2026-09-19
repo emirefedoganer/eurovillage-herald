@@ -4,13 +4,13 @@
 {% block content %}
 
 <div class="section-header"><h1>Abonelikten Çık</h1></div>
-{% if email %}
+{% if active %}
 <p style="font-family: var(--font-sans); font-size: 15px; max-width: 560px;">
   {% if category_label %}
-  <strong>{{ email }}</strong> adresini yalnızca <strong>"{{ category_label }}"</strong> bildirimlerinden
+  Bu adresi yalnızca <strong>"{{ category_label }}"</strong> bildirimlerinden
   çıkarmak istediğinize emin misiniz? Diğer abonelik tercihleriniz etkilenmeyecek.
   {% else %}
-  <strong>{{ email }}</strong> adresini bildirim aboneliğinden çıkarmak istediğinize emin misiniz?
+  Bu adresi bildirim aboneliğinden çıkarmak istediğinize emin misiniz?
   {% endif %}
 </p>
 <form method="post">

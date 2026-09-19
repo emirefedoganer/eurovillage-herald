@@ -288,16 +288,89 @@ class PreviewAuthorizationTests(V101TestCase):
         self.assertEqual(r2.status_code, 403)
 
 
+class RestoredReaderInterfaceTests(V101TestCase):
+    """The PDF reader was reverted to its pre-1.0.1 interface (commit
+    7f00944): a plain Prev/Next + Zoom toolbar, no thumbnails panel, no
+    goto-page input, no fit-width/fit-page toggle, no fullscreen button,
+    no keyboard/swipe handlers, no last-page memory, no share button --
+    while everything added around it for unrelated reasons since then
+    (preview tokens, published-only gating, R2 sourcing, analytics,
+    "Bu Sayıdan") stays in place. See CHANGELOG for the exact commit."""
+
+    def test_old_toolbar_controls_are_present(self):
+        r = self.client.get("/gazete/sayi-01")
+        body = r.data.decode("utf-8")
+        for control_id in ("pdfPrev", "pdfNext", "pdfZoomIn", "pdfZoomOut", "pdfPageInfo", "pdfZoomLevel"):
+            self.assertIn(f'id="{control_id}"', body, control_id)
+
+    def test_post_redesign_controls_are_absent(self):
+        """Thumbnails/goto-page/fit/fullscreen/share were all added in the
+        1.0.1 redesign and must not reappear in the restored interface."""
+        r = self.client.get("/gazete/sayi-01")
+        body = r.data.decode("utf-8")
+        for control_id in ("pdfThumbsToggle", "pdfThumbs", "pdfGotoForm", "pdfGotoInput",
+                            "pdfFitWidth", "pdfFitPage", "pdfFullscreen", "pdfShare"):
+            self.assertNotIn(f'id="{control_id}"', body, control_id)
+
+    def test_download_and_open_in_new_tab_links_present_as_loading_error_fallback(self):
+        """These links are the reader's fallback if PDF.js/CORS fails to
+        load the canvas viewer -- must always be present and must always
+        point at the real (R2-hosted) PDF, never a local static path."""
+        r = self.client.get("/gazete/sayi-01")
+        body = r.data.decode("utf-8")
+        self.assertIn('id="pdfDownloadLink"', body)
+        self.assertIn("matbaa.eurovillageherald.com", body)
+        self.assertNotIn('href="/static/issues/', body)
+
+    def test_missing_pdf_field_does_not_crash_the_reader_page(self):
+        issues = self.load("issues.json")
+        issues.append({"id": "no-pdf-issue", "no": 10, "title": "No PDF", "date": "2026-02-01",
+                        "description": "", "cover_image": None, "pdf": None, "pages": None,
+                        "status": "published"})
+        self.save("issues.json", issues)
+        r = self.client.get("/gazete/no-pdf-issue")
+        self.assertEqual(r.status_code, 200)
+
+    def test_bu_sayidan_list_still_renders_on_the_reader_page(self):
+        """Unrelated to the toolbar redesign -- must survive the revert."""
+        articles = self.load("articles.json")
+        articles[0]["issue_id"] = "sayi-01"
+        articles[0]["issue_page"] = 4
+        self.save("articles.json", articles)
+        r = self.client.get("/gazete/sayi-01")
+        self.assertIn("Bu Sayıdan".encode(), r.data)
+
+    def test_preview_reader_keeps_the_restored_toolbar_too(self):
+        issues = self.load("issues.json")
+        token = "reader-preview-token"
+        issues.append({"id": "preview-reader-issue", "no": 11, "title": "Preview Reader", "date": "2026-02-01",
+                        "description": "", "cover_image": None,
+                        "pdf": "https://matbaa.eurovillageherald.com/x.pdf", "pages": None,
+                        "status": "draft", "preview_token_hash": store.hash_preview_token(token),
+                        "preview_token_expires_at": None})
+        self.save("issues.json", issues)
+        r = self.client.get(f"/gazete/onizleme/{token}")
+        body = r.data.decode("utf-8")
+        self.assertIn('id="pdfPrev"', body)
+        self.assertNotIn('id="pdfFullscreen"', body)
+
+
 class ArticleIssueAssociationTests(V101TestCase):
-    def test_article_shows_linked_issue_and_page(self):
+    """The public-facing "Bu Haber Gazetede" box on the article page was
+    removed (it's no longer rendered anywhere), but the underlying
+    article<->issue relationship (issue_id/issue_page) is kept -- it still
+    drives the reader page's "Bu Sayıdan" list and archive/admin workflows,
+    so these tests check THAT, not the removed box."""
+
+    def test_article_page_no_longer_shows_the_issue_link_box(self):
         articles = self.load("articles.json")
         articles[0]["issue_id"] = "sayi-01"
         articles[0]["issue_page"] = 3
         self.save("articles.json", articles)
         r = self.client.get("/makale/existing-article")
         self.assertEqual(r.status_code, 200)
-        self.assertIn("BU HABER GAZETEDE".encode(), r.data)
-        self.assertIn(b"s. 3", r.data)
+        self.assertNotIn("BU HABER GAZETEDE".encode(), r.data)
+        self.assertNotIn(b"issue-link-card", r.data)
 
     def test_issue_page_shows_bu_sayidan(self):
         articles = self.load("articles.json")
@@ -307,8 +380,12 @@ class ArticleIssueAssociationTests(V101TestCase):
         r = self.client.get("/gazete/sayi-01")
         self.assertIn("Bu Sayıdan".encode(), r.data)
         self.assertIn(b"Existing Article", r.data)
+        self.assertIn(b"s. 2", r.data)
 
-    def test_article_linked_to_unpublished_issue_hides_the_box(self):
+    def test_article_linked_to_unpublished_issue_does_not_error(self):
+        """The article<->issue association surviving an issue going back to
+        draft must never break the article page (it no longer renders
+        anything issue-related at all, so there's nothing to hide)."""
         articles = self.load("articles.json")
         articles[0]["issue_id"] = "sayi-01"
         articles[0]["issue_page"] = 1
@@ -317,6 +394,7 @@ class ArticleIssueAssociationTests(V101TestCase):
         issues[0]["status"] = "draft"
         self.save("issues.json", issues)
         r = self.client.get("/makale/existing-article")
+        self.assertEqual(r.status_code, 200)
         self.assertNotIn("BU HABER GAZETEDE".encode(), r.data)
 
     def test_spoofed_issue_id_is_dropped_on_article_create(self):

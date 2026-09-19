@@ -28,18 +28,121 @@ any send, including for POPULAR_STORIES bulletins.
 import uuid
 from datetime import datetime, timezone
 
+import mailer
 import store
 
 BULLETIN_KINDS = [
     ("new_issue", "Yeni Sayı"),
     ("weekly_digest", "Haftalık Özet"),
-    ("popular_stories", "Çok Okunanlar"),
+    ("popular_stories", "Çok Okunan Haberler"),
     ("editorial_selection", "Editörün Seçtikleri"),
     ("breaking_news", "Son Dakika"),
     ("ari_magazin", "Arı Magazin"),
     ("custom", "Özel"),
 ]
 BULLETIN_KIND_LABELS = dict(BULLETIN_KINDS)
+
+# ---------------------------------------------------------------------
+# The ONE mapping between a bulletin type and the subscriber audience it
+# may target. The audiences are the EXISTING subscription preference
+# categories (subscriptions.PREFERENCE_CHOICES) -- no second audience
+# system. `allowed` has one entry for every type except "custom", which is
+# the only type that genuinely supports free targeting.
+#
+# editorial_selection ("Editörün Seçtikleri") has no preference category of
+# its own and this project deliberately does not invent one; it is a
+# curated round-up, so it goes to the weekly-digest audience.
+KIND_AUDIENCE = {
+    "new_issue": {"default": "new_issue", "allowed": ("new_issue",)},
+    "weekly_digest": {"default": "weekly_digest", "allowed": ("weekly_digest",)},
+    "popular_stories": {"default": "popular_stories", "allowed": ("popular_stories",)},
+    "editorial_selection": {"default": "weekly_digest", "allowed": ("weekly_digest",)},
+    "breaking_news": {"default": "breaking_news", "allowed": ("breaking_news",)},
+    "ari_magazin": {"default": "ari_magazin", "allowed": ("ari_magazin",)},
+    "custom": {"default": "new_issue",
+               "allowed": ("new_issue", "weekly_digest", "popular_stories", "breaking_news", "ari_magazin")},
+}
+
+
+class BulletinAudienceError(ValueError):
+    pass
+
+
+def audience_map():
+    """JSON-serialisable copy of KIND_AUDIENCE for the form's JavaScript."""
+    return {k: {"default": v["default"], "allowed": list(v["allowed"]), "custom": len(v["allowed"]) > 1}
+            for k, v in KIND_AUDIENCE.items()}
+
+
+def default_audience(kind):
+    return KIND_AUDIENCE.get(kind, KIND_AUDIENCE["custom"])["default"]
+
+
+def resolve_audience(kind, requested=None):
+    """The audience to store for `kind`. A blank request means "the type's
+    default"; a request outside the type's allowed set is REJECTED, never
+    silently kept or rewritten."""
+    spec = KIND_AUDIENCE.get(kind)
+    if spec is None:
+        raise BulletinAudienceError(f"Bilinmeyen bülten türü: {kind}")
+    if not requested:
+        return spec["default"]
+    if requested not in spec["allowed"]:
+        raise BulletinAudienceError(
+            f"'{BULLETIN_KIND_LABELS.get(kind, kind)}' türü için bu hedef kitle uygun değil.")
+    return requested
+
+
+def is_compatible(kind, audience):
+    return audience in KIND_AUDIENCE.get(kind, {}).get("allowed", ())
+
+
+POPULAR_MIN_ITEMS = 3
+POPULAR_LIMIT = 10
+
+
+def popular_ranking(limit=POPULAR_LIMIT):
+    """Suggested articles for a "Çok Okunan Haberler" bulletin.
+
+    Metric: first-party article page views (analytics.article_view_totals),
+    summed over the last analytics.POPULAR_PERIOD_DAYS (7) UTC calendar days
+    including today. Only articles a visitor can open right now (published,
+    not scheduled for later, not removed -- store.public_articles) are
+    ranked; unknown/removed slugs are dropped and each article appears once.
+    Order: views descending, then slug A-Z (deterministic). When fewer than
+    POPULAR_MIN_ITEMS articles have views, a warning is returned and the
+    ranking is NOT padded -- nothing is invented. Audience is decided by
+    subscription preferences alone; analytics never infers interests."""
+    import analytics
+    from datetime import datetime, timezone
+    totals = analytics.article_view_totals()
+    public = {a["slug"]: a for a in store.public_articles(store.load_articles())}
+    seen_ids, items = set(), []
+    for slug, views in sorted(totals.items(), key=lambda kv: (-kv[1], kv[0])):
+        art = public.get(slug)
+        if not art or art.get("id") in seen_ids:
+            continue
+        seen_ids.add(art.get("id"))
+        items.append({"slug": slug, "title": art.get("title", slug), "section": art.get("section", ""), "views": views})
+        if len(items) >= limit:
+            break
+    warning = None
+    if len(items) < POPULAR_MIN_ITEMS:
+        warning = (f"Yeterli okunma verisi yok (son {analytics.POPULAR_PERIOD_DAYS} günde yalnızca "
+                   f"{len(items)} yayımlanmış haber görüntülenmiş). Sıralama uydurulmadı; haberleri elle seçin.")
+    return {"items": items, "period_days": analytics.POPULAR_PERIOD_DAYS,
+            "metric": "Haber sayfası görüntülenme sayısı (ilk taraf analitik)",
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "warning": warning}
+
+
+def snapshot_from_ranking(ranking, slugs):
+    """What is stored on the draft: the approved counts as they were when
+    the editor pulled them, so later analytics never change a saved/
+    scheduled bulletin."""
+    counts = {i["slug"]: i["views"] for i in ranking["items"]}
+    return {"metric": ranking["metric"], "period_days": ranking["period_days"],
+            "generated_at": ranking["generated_at"], "counts": {s: counts[s] for s in slugs if s in counts}}
+
 
 BULLETIN_STATUSES = ["draft", "scheduled", "sent", "cancelled"]
 
@@ -48,10 +151,11 @@ def _now_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def create_draft(kind, actor_email, internal_title, subject, preheader="", target_preference="new_issue",
+def create_draft(kind, actor_email, internal_title, subject, preheader="", target_preference=None,
                   issue_id=None, intro_text="", lead_article_slug=None, article_slugs=None):
     if kind not in BULLETIN_KIND_LABELS:
         kind = "custom"
+    target_preference = resolve_audience(kind, target_preference)   # raises BulletinAudienceError
     bulletin = {
         "id": uuid.uuid4().hex[:12],
         "kind": kind,
@@ -76,6 +180,7 @@ def create_draft(kind, actor_email, internal_title, subject, preheader="", targe
         # create_new_issue_bulletin_if_needed()'s dedup check uses --
         # never cleared, never edited.
         "source_issue_id": issue_id if kind == "new_issue" else None,
+        "analytics_snapshot": None,
     }
     bulletins = store.load_bulletins()
     bulletins.append(bulletin)
@@ -90,8 +195,13 @@ def update_draft(bulletin_id, **fields):
     idx = next((i for i, b in enumerate(bulletins) if b["id"] == bulletin_id), None)
     if idx is None or bulletins[idx]["status"] not in ("draft", "scheduled"):
         return None
+    new_kind = fields.get("kind", bulletins[idx]["kind"])
+    if new_kind not in BULLETIN_KIND_LABELS:
+        raise BulletinAudienceError(f"Bilinmeyen bülten türü: {new_kind}")
+    # The audience is always re-resolved against the (possibly new) type.
+    fields["target_preference"] = resolve_audience(new_kind, fields.get("target_preference"))
     allowed = {
-        "internal_title", "subject", "preheader", "target_preference", "issue_id",
+        "kind", "analytics_snapshot", "internal_title", "subject", "preheader", "target_preference", "issue_id",
         "intro_text", "lead_article_slug", "article_slugs", "scheduled_at",
     }
     for key, value in fields.items():
@@ -138,6 +248,7 @@ def audience_preview(bulletin):
     recipients = eligible_recipients(bulletin["target_preference"])
     all_subs = store.load_subscriptions()
     return {
+        "compatible": is_compatible(bulletin["kind"], bulletin["target_preference"]),
         "eligible": len(recipients),
         "pending_excluded": sum(1 for s in all_subs if s.get("status") == "pending"),
         "unsubscribed_excluded": sum(1 for s in all_subs if s.get("status") == "unsubscribed"),
@@ -146,6 +257,12 @@ def audience_preview(bulletin):
 
 def _bulletin_dedup_key(bulletin_id, subscription_id):
     return f"bulletin:{bulletin_id}:{subscription_id}"
+
+
+def _render(render_fn, bulletin, subscriber):
+    """render_fn returns (subject, text, html[, headers])."""
+    result = render_fn(bulletin, subscriber)
+    return result[0], result[1], result[2], (result[3] if len(result) > 3 else None)
 
 
 def send_campaign(bulletin_id, actor_email, render_fn):
@@ -164,14 +281,21 @@ def send_campaign(bulletin_id, actor_email, render_fn):
     if idx is None or bulletins[idx]["status"] not in ("draft", "scheduled"):
         return None
     bulletin = bulletins[idx]
+    if not is_compatible(bulletin["kind"], bulletin["target_preference"]):
+        raise BulletinAudienceError("Bülten türü ile hedef kitle uyumsuz; göndermeden önce düzeltin.")
 
     import outbox  # local import: outbox -> mailer only, no cycle back to bulletins
     recipients = eligible_recipients(bulletin["target_preference"])
     for sub in recipients:
-        subject, text_body, html_body = render_fn(bulletin, sub)
+        subject, text_body, html_body, headers = _render(render_fn, bulletin, sub)
+        # subscriber_id + target_preference let outbox.process_outbox()
+        # re-check eligibility at the moment this job is actually SENT,
+        # not just now at enqueue time -- see store.is_subscriber_eligible().
         outbox.enqueue(
             "bulletin", sub["email"], subject, text_body, html_body=html_body,
             campaign_id=bulletin["id"], idempotency_key=_bulletin_dedup_key(bulletin["id"], sub["id"]),
+            subscriber_id=sub["id"], target_preference=bulletin["target_preference"],
+            reply_to=mailer.EMAIL_CONTACT_REPLY_TO, headers=headers,
         )
 
     bulletins[idx]["status"] = "sent"
@@ -194,10 +318,11 @@ def send_test(bulletin_id, test_addresses, render_fn):
     sent = 0
     for addr in test_addresses:
         fake_recipient["email"] = addr
-        subject, text_body, html_body = render_fn(bulletin, fake_recipient)
+        subject, text_body, html_body, headers = _render(render_fn, bulletin, fake_recipient)
         subject = f"[TEST] {subject}"
         outbox.enqueue("bulletin", addr, subject, text_body, html_body=html_body,
-                        campaign_id=f"test:{bulletin_id}")
+                        campaign_id=f"test:{bulletin_id}", reply_to=mailer.EMAIL_CONTACT_REPLY_TO,
+                        headers=headers)
         sent += 1
     return sent
 
@@ -209,7 +334,10 @@ def process_scheduled_bulletins(render_fn):
     now = _now_iso()
     for b in store.load_bulletins():
         if b["status"] == "scheduled" and b.get("scheduled_at") and b["scheduled_at"] <= now:
-            send_campaign(b["id"], "scheduled", render_fn)
+            try:
+                send_campaign(b["id"], "scheduled", render_fn)
+            except BulletinAudienceError:
+                continue  # never sent to a mismatched audience; stays scheduled until an editor fixes it
 
 
 def create_new_issue_bulletin_if_needed(issue):

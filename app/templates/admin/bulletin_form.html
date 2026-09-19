@@ -10,22 +10,20 @@
     <a class="btn btn-outline" href="{{ url_for('admin.bulletins_list') }}">← Listeye Dön</a>
   </div>
 
-  {% if not bulletin %}
-  <div class="admin-panel" style="margin-bottom:16px;">
-    <div class="form-row">
-      <label for="kind_picker">Bülten Türü</label>
-      <select id="kind_picker" onchange="window.location = '{{ url_for('admin.bulletin_new') }}?kind=' + this.value;">
-        {% for key, label in kind_labels.items() %}
-        <option value="{{ key }}" {{ 'selected' if key == kind else '' }}>{{ label }}</option>
-        {% endfor %}
-      </select>
-      <div class="hint">Tür seçimi, önerilen içerik ve varsayılan hedef kitleyi belirler; aşağıda değiştirilebilir.</div>
-    </div>
-  </div>
-  {% endif %}
-
   <form class="admin-panel" method="post">
-    {% if not bulletin %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}
+    <script id="audience-map" type="application/json">{{ audience_map | tojson }}</script>
+    <script id="audience-labels" type="application/json">{{ dict(preference_choices) | tojson }}</script>
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label for="kind">Bülten Türü</label>
+        <select id="kind" name="kind" data-audience-url="{{ url_for('admin.bulletin_audience_info') }}" data-popular-url="{{ url_for('admin.bulletin_popular_suggestions') }}">
+          {% for key, label in kind_labels.items() %}
+          <option value="{{ key }}" {{ 'selected' if key == kind else '' }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <div class="hint">Tür, hedef kitleyi otomatik belirler. Yalnızca "Özel" türünde hedef kitle elle seçilebilir.</div>
+      </div>
+    </div>
 
     <div class="form-grid-2">
       <div class="form-row">
@@ -36,11 +34,12 @@
       <div class="form-row">
         <label for="target_preference">Hedef Kitle</label>
         <select id="target_preference" name="target_preference">
-          {% for key, label in preference_choices %}
-          <option value="{{ key }}" {{ 'selected' if (bulletin.target_preference if bulletin else 'new_issue') == key else '' }}>{{ label }}</option>
+          {% for key in audience_map[kind].allowed %}
+          <option value="{{ key }}" {{ 'selected' if audience == key else '' }}>{{ dict(preference_choices)[key] }}</option>
           {% endfor %}
         </select>
-        <div class="hint">Yalnızca bu tercihi açık ve ONAYLI aboneler alır.</div>
+        <div class="hint" id="audience-estimate" aria-live="polite">Tahmini alıcı sayısı: <strong id="audience-count">{{ eligible }}</strong></div>
+        <div class="hint">Yalnızca bu tercihi açık ve ONAYLI aboneler alır (gönderim anında yeniden kontrol edilir).</div>
       </div>
     </div>
 
@@ -56,8 +55,7 @@
              value="{{ bulletin.preheader if bulletin else '' }}">
     </div>
 
-    {% if kind == 'new_issue' %}
-    <div class="form-row">
+    <div class="form-row" id="issue-row" {{ '' if kind == 'new_issue' else 'hidden' }}>
       <label for="issue_id">İlgili Sayı</label>
       <select id="issue_id" name="issue_id">
         <option value="">— Seçilmedi —</option>
@@ -68,13 +66,39 @@
         {% endfor %}
       </select>
     </div>
-    {% endif %}
 
     <div class="form-row">
       <label for="intro_text">Giriş Metni (opsiyonel)</label>
       <textarea id="intro_text" name="intro_text" rows="3" maxlength="600">{{ bulletin.intro_text if bulletin else '' }}</textarea>
     </div>
 
+    <div class="form-row" id="popular-panel" {{ '' if kind == 'popular_stories' else 'hidden' }}>
+      <label>Çok Okunan Haberler — onaylanan seçim</label>
+      <div class="hint" id="popular-meta">
+        Ölçüt: <strong>haber sayfası görüntülenme sayısı</strong> (Herald'ın kendi ilk taraf analitiği; okuyucu
+        kimliği kullanılmaz). Dönem: <strong>son {{ ranking.period_days if ranking else 7 }} gün</strong> (UTC takvim günü, bugün dahil).
+        Yalnızca yayımlanmış ve herkese açık haberler; eşitlikte slug A-Z. Analitik yalnızca içeriği önerir;
+        alıcıları abonelik tercihleri belirler.
+        {% if snapshot %}<br>Kayıtlı seçim {{ snapshot.generated_at }} tarihli analitikten alındı; analitik değişse de bu bülten değişmez.{% endif %}
+      </div>
+      <div class="hint" id="popular-warning" style="color:var(--red);" {{ '' if ranking and ranking.warning else 'hidden' }}>{{ ranking.warning if ranking else '' }}</div>
+      <input type="hidden" name="analytics_refreshed" id="analytics_refreshed" value="{{ '' if snapshot else '1' }}" {{ 'disabled' if kind != 'popular_stories' else '' }}>
+      <ol id="popular-list" style="list-style:none; padding:0; margin:8px 0;">
+        {% for a in approved %}
+        <li class="popular-item" style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--gray-100);">
+          <input type="hidden" name="article_slugs" value="{{ a.slug }}" {{ 'disabled' if kind != 'popular_stories' else '' }}>
+          <span style="flex:1;">{{ a.title }} <span class="hint">— {{ a.views if a.views is not none else '—' }} görüntülenme</span></span>
+          <button type="button" class="btn btn-outline" data-move="-1" aria-label="Yukarı taşı">↑</button>
+          <button type="button" class="btn btn-outline" data-move="1" aria-label="Aşağı taşı">↓</button>
+          <button type="button" class="btn btn-outline" data-remove aria-label="Listeden çıkar">Çıkar</button>
+        </li>
+        {% endfor %}
+      </ol>
+      <button type="button" class="btn btn-outline" id="popular-refresh">Analitikten Yenile</button>
+      <span class="hint">Yenilemek yalnızca listeyi günceller; kaydetmeden hiçbir şey değişmez, hiçbir şey gönderilmez veya zamanlanmaz.</span>
+    </div>
+
+    <div id="generic-articles" {{ 'hidden' if kind == 'popular_stories' else '' }}>
     <div class="form-row">
       <label>Haberler</label>
       <div class="hint" style="margin-bottom:8px;">
@@ -90,7 +114,7 @@
         {% set lead_slug = (bulletin.lead_article_slug if bulletin else '') %}
         {% for a in articles %}
         <div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--gray-100);">
-          <input type="checkbox" name="article_slugs" value="{{ a.slug }}" id="art-{{ a.slug }}"
+          <input type="checkbox" name="article_slugs" {{ 'disabled' if kind == 'popular_stories' else '' }} value="{{ a.slug }}" id="art-{{ a.slug }}"
                  style="width:auto;" {{ 'checked' if a.slug in selected_slugs else '' }}>
           <input type="radio" name="lead_article_slug" value="{{ a.slug }}" title="Öne çıkan olarak seç"
                  style="width:auto;" {{ 'checked' if a.slug == lead_slug else '' }}>
@@ -103,6 +127,8 @@
         <p class="hint">Yayımlanmış haber bulunamadı.</p>
         {% endfor %}
       </div>
+    </div>
+
     </div>
 
     {% if bulletin %}
@@ -131,4 +157,5 @@
   </form>
 </div>
 
+<script src="{{ versioned_static('js/bulletin-form.js') }}"></script>
 {% endblock %}

@@ -38,7 +38,7 @@
       if (e.key === "Escape" && !drawer.hidden) closeDrawer();
     });
     window.addEventListener("resize", function () {
-      if (window.innerWidth > 900 && !drawer.hidden) closeDrawer();
+      if (window.innerWidth > 1200 && !drawer.hidden) closeDrawer();
     });
   }
 

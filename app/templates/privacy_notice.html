@@ -9,15 +9,6 @@
     Sürüm: {{ notice_version }}
   </p>
 
-  <div style="border:2px solid var(--red); background:#fff8f8; padding:14px 18px; margin:18px 0; font-family:var(--font-sans); font-size:13px; color:#7a1220;">
-    <strong>Not (yalnızca geliştirme amaçlı):</strong> Bu sayfadaki metin teknik altyapıyı doğru
-    yansıtmak için yazılmıştır ve aşağıda <strong>[YASAL İNCELEME GEREKLİ]</strong> olarak
-    işaretlenmiş yer tutucular içerir. Bu yer tutucular, gerçek veri sorumlusu bilgileri, saklama
-    süreleri, hukuki dayanaklar ve olası yurt dışı aktarım beyanları netleşene kadar bir avukat/KVKK
-    danışmanı tarafından incelenip nihai hale getirilmelidir. Bu metnin var olması, KVKK
-    uyumluluğunun sağlandığı anlamına gelmez.
-  </div>
-
   <h2>1. Bu site nedir?</h2>
   <p style="font-family: var(--font-body); font-size: 16px; color: var(--gray-700);">
     {{ site.name }}, <strong>Eurovillage</strong> adlı kurgusal bir Minecraft topluluğu/şehri için
@@ -58,7 +49,7 @@
   </p>
   <ul style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">
     <li><strong>Bülten aboneliği:</strong> e-posta adresi, seçtiğiniz bildirim kategorileri,
-      abonelik durumu (onay bekliyor/onaylı/ayrılmış), kayıt/onay/ayrılma tarihleri, kayıt sırasında
+      abonelik durumu (onay bekliyor/onaylı/ayrılmış/e-postası geri dönmüş/şikayet bildirilmiş/engellenmiş), kayıt/onay/ayrılma tarihleri, kayıt sırasında
       sunulan bu gizlilik bildiriminin sürüm numarası ve onay yöntemi.</li>
     <li><strong>İletişim formu:</strong> ad (opsiyonel — boş bırakılabilir), e-posta adresi
       (opsiyonel), seçtiğiniz mesaj kategorisi, mesajınızın içeriği, varsa eklediğiniz görseller.</li>
@@ -118,20 +109,21 @@
 
   <h2>8. Üçüncü taraf hizmet sağlayıcılar</h2>
   <p style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">
-    <strong>E-posta gönderimi:</strong> Bülten ve bildirim e-postalarının iletilmesi için üçüncü
-    taraf bir e-posta gönderim sağlayıcısı kullanılır. Bu sağlayıcı yalnızca gönderdiğimiz
-    e-postayı iletmek amacıyla e-posta adresinize ve mesaj içeriğine erişir.
-    [YASAL İNCELEME GEREKLİ: kullanılan sağlayıcının adı, sunucu konumu ve varsa yurt dışına veri
-    aktarımına ilişkin hukuki değerlendirme buraya eklenecektir.]
+    <strong>E-posta gönderimi (Resend):</strong> Bülten ve bildirim e-postaları, e-posta gönderim
+    hizmeti Resend aracılığıyla iletilir. Resend, e-postayı iletebilmek için e-posta adresinize ve
+    mesaj içeriğine erişir ve teslimat sonuçlarını (teslim edildi, geri döndü, spam olarak
+    işaretlendi) sitemize bildirir. Geri dönen veya spam olarak işaretlenen adreslere sonraki
+    kampanyalar gönderilmez. Bu hizmet sitemizin dışındaki bir sağlayıcı tarafından işletilir ve
+    verilerin işlendiği sunucuların konumunu biz belirlemeyiz.
   </p>
   <p style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">
     <strong>Cloudflare Turnstile (kötüye kullanım/bot koruması):</strong> Abonelik formu, otomatik
     / bot kaynaklı kötüye kullanımı engellemek için Cloudflare Turnstile kullanır. Formu
     gönderdiğinizde, Turnstile'ın ürettiği bir doğrulama isteği Cloudflare tarafından işlenir.
     Turnstile insan davranışını değerlendirmek için sınırlı teknik sinyaller kullanır; bu süreç
-    Cloudflare'in kendi altyapısında gerçekleşir ve site tarafında ayrıca saklanmaz.
-    [YASAL İNCELEME GEREKLİ: Cloudflare Turnstile için hukuki dayanak ve varsa yurt dışı aktarım
-    değerlendirmesi buraya eklenecektir.]
+    Cloudflare'in kendi altyapısında gerçekleşir ve site tarafında ayrıca saklanmaz. İletişim
+    formu ekleri ve site dosyaları da Cloudflare R2 üzerinde saklanır; ek görselleri herkese açık
+    bir adresle yayınlanmaz.
   </p>
 
   <h2>9. Tercih değiştirme / abonelikten çıkma</h2>
@@ -146,25 +138,20 @@
   <p style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">
     Verileriniz hakkında sorularınız veya talepleriniz için
     <a href="{{ url_for('iletisim') }}" style="text-decoration: underline; color: var(--red);">iletişim formumuzu</a>
-    kullanabilirsiniz. [YASAL İNCELEME GEREKLİ: KVKK madde 11 kapsamındaki başvuru hakları, veri
-    sorumlusu kimliği/iletişim bilgileri ve varsa ek başvuru yöntemleri (KEP, ıslak imzalı başvuru
-    vb.) buraya eklenecektir.]
+    kullanabilirsiniz veya <a href="mailto:iletisim@eurovillageherald.com" style="text-decoration: underline; color: var(--red);">iletisim@eurovillageherald.com</a>
+    adresine yazabilirsiniz. Kişisel verilerinizin silinmesini, düzeltilmesini veya hangi verilerin
+    tutulduğunu öğrenmeyi talep edebilirsiniz; talepler bu adres üzerinden ele alınır.
   </p>
 
-  <h2>11. Hukuki inceleme gerektiren maddeler</h2>
+  <h2>11. Saklama süreleri ve kapsam</h2>
   <p style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">
-    Aşağıdaki maddeler bilerek boş/yer tutuculu bırakılmıştır; bu sayfa yayından kaldırılmadan önce
-    bir avukat/KVKK danışmanı tarafından tamamlanmalıdır:
+    Abonelik ve iletişim kayıtları, siz silinmesini isteyene veya abonelikten çıkana kadar
+    saklanır; şu anda bu kayıtlar için otomatik bir silme süresi uygulanmamaktadır. Abonelikten
+    çıkan adresler, tekrar e-posta gönderilmemesini güvence altına almak için "ayrılmış" durumuyla
+    kayıtlı kalabilir. Bu bildirim, {{ site.name }} adlı kurgusal topluluk gazetesinin bu web
+    sitesindeki gerçek veri işleme uygulamalarını anlatır; sitenin tescilli bir şirket veya kurum
+    tarafından işletildiği anlamına gelmez.
   </p>
-  <ul style="font-family: var(--font-body); font-size: 15px; color: var(--gray-700);">
-    <li>Veri sorumlusunun tam unvanı, adresi ve iletişim bilgileri.</li>
-    <li>Her işleme faaliyeti için KVKK madde 5 kapsamındaki hukuki dayanak.</li>
-    <li>Her veri kategorisi için somut saklama süresi ve imha yöntemi.</li>
-    <li>E-posta sağlayıcısı ve Cloudflare Turnstile için yurt dışına veri aktarımı değerlendirmesi.</li>
-    <li>Türk elektronik haberleşme/ticari elektronik ileti mevzuatı kapsamında ek yükümlülükler
-      (varsa).</li>
-    <li>KVKK madde 11 başvuru hakları ve başvuru usulünün tam metni.</li>
-  </ul>
 
   <p style="font-family: var(--font-sans); font-size: 13px; color: var(--gray-500); line-height: 1.6;">{{ site.legal }}</p>
 </div>

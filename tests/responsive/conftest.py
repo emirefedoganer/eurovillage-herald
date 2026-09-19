@@ -101,7 +101,12 @@ def live_server():
 
 @pytest.fixture
 def admin_page(live_server, page):
-    """A Playwright page already logged in as the seeded master admin."""
+    """A Playwright page already logged in as the seeded master admin.
+    The app's in-memory login rate limit (10 per 5 minutes per IP) is
+    cleared first: every test logs in afresh from the same loopback address,
+    so without this the Nth login of a long run is legitimately refused."""
+    import ratelimit
+    ratelimit._hits.clear()
     page.goto(live_server["base_url"] + "/admin/login")
     page.fill('.login-card input[name="email"]', TEST_ADMIN_EMAIL)
     page.fill('.login-card input[name="password"]', TEST_ADMIN_PASSWORD)

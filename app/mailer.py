@@ -105,7 +105,17 @@ def _extract_address(identity):
     return parseaddr(identity)[1] or identity
 
 
-def _send_via_fake(to_address, from_identity, subject, text_body, html_body, reply_to):
+# Structured record of what the fake backend "sent" (recipient, From,
+# subject, Reply-To -- never bodies), bounded so it can't grow forever.
+# Lets tests assert on the exact headers instead of parsing stderr.
+FAKE_SENT = []
+_FAKE_SENT_MAX = 200
+
+
+def _send_via_fake(to_address, from_identity, subject, text_body, html_body, reply_to, headers=None):
+    FAKE_SENT.append({"to": to_address, "from": from_identity, "subject": subject, "reply_to": reply_to,
+                      "headers": dict(headers or {})})
+    del FAKE_SENT[:-_FAKE_SENT_MAX]
     print(
         f"[mailer:fake] GÖNDERİLMEDİ (gerçek sağlayıcı yapılandırılmamış) -- "
         f"from={from_identity} to={to_address} subject={subject!r} reply_to={reply_to}",
@@ -114,13 +124,15 @@ def _send_via_fake(to_address, from_identity, subject, text_body, html_body, rep
     return True, None, None, False
 
 
-def _send_via_smtp(to_address, from_identity, subject, text_body, html_body, reply_to):
+def _send_via_smtp(to_address, from_identity, subject, text_body, html_body, reply_to, headers=None):
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = from_identity
     msg["To"] = to_address
     if reply_to:
         msg["Reply-To"] = reply_to
+    for name, value in (headers or {}).items():
+        msg[name] = value
     msg.set_content(text_body)
     if html_body:
         msg.add_alternative(html_body, subtype="html")
@@ -192,12 +204,14 @@ def _resend_error_detail(exc):
     return f"Resend API error {code} ({error_type}): {message}"
 
 
-def _send_via_resend(to_address, from_identity, subject, text_body, html_body, reply_to):
+def _send_via_resend(to_address, from_identity, subject, text_body, html_body, reply_to, headers=None):
     params = {"from": from_identity, "to": [to_address], "subject": subject, "text": text_body}
     if html_body:
         params["html"] = html_body
     if reply_to:
         params["reply_to"] = [reply_to]
+    if headers:
+        params["headers"] = dict(headers)
     try:
         result = resend.Emails.send(params)
         return True, None, result.get("id"), False
@@ -214,7 +228,7 @@ def _send_via_resend(to_address, from_identity, subject, text_body, html_body, r
 _BACKENDS = {"fake": _send_via_fake, "smtp": _send_via_smtp, "resend": _send_via_resend}
 
 
-def _send(from_identity, to_address, subject, text_body, html_body, reply_to):
+def _send(from_identity, to_address, subject, text_body, html_body, reply_to, headers=None):
     """Returns (ok, error, message_id, permanent):
       - ok: bool
       - error: str|None -- a safe, loggable message; never the API key
@@ -230,7 +244,7 @@ def _send(from_identity, to_address, subject, text_body, html_body, reply_to):
     if not to_address or "@" not in to_address:
         return False, "invalid recipient address", None, True
     try:
-        return _BACKENDS[BACKEND](to_address, from_identity, subject, text_body, html_body, reply_to)
+        return _BACKENDS[BACKEND](to_address, from_identity, subject, text_body, html_body, reply_to, headers)
     except Exception as exc:
         return False, str(exc), None, False
 
@@ -245,13 +259,15 @@ def send_transactional_email(to_address, subject, text_body, html_body=None, rep
     return _send(EMAIL_TRANSACTIONAL_FROM, to_address, subject, text_body, html_body, reply_to)
 
 
-def send_bulletin_email(to_address, subject, text_body, html_body=None):
+def send_bulletin_email(to_address, subject, text_body, html_body=None, headers=None, reply_to=None):
     """Editorial newsletters/campaigns. Always sent from
-    EMAIL_BULLETIN_FROM. No Reply-To is set -- bulletin@ is not a
-    monitored inbox and readers should use the unsubscribe/preferences
-    link, not a reply, to manage their subscription.
+    EMAIL_BULLETIN_FROM (never replaced by the contact mailbox), with
+    Reply-To defaulting to EMAIL_CONTACT_REPLY_TO so a reader's reply
+    reaches the real, monitored inbox. `headers` carries List-Unsubscribe
+    /List-Unsubscribe-Post for real subscriber sends.
     Returns (ok, error, message_id, permanent) -- see _send()."""
-    return _send(EMAIL_BULLETIN_FROM, to_address, subject, text_body, html_body, None)
+    return _send(EMAIL_BULLETIN_FROM, to_address, subject, text_body, html_body,
+                 reply_to or EMAIL_CONTACT_REPLY_TO, headers)
 
 
 def sender_identities():

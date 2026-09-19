@@ -63,7 +63,7 @@
 
 <nav class="mainnav">
   <div class="wrap mainnav-inner">
-    {{ nav_links(uppercase_opinion=True, compact_subscribe=True) }}
+    {{ nav_links(uppercase_opinion=True) }}
     <form class="mainnav-search" action="{{ url_for('search') }}" method="get">
       <input type="search" name="q" placeholder="Ara..." value="{{ request.args.get('q','') }}">
     </form>

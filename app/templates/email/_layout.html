@@ -64,6 +64,12 @@ rendered body via zero-size/display:none-safe tricks.
             <p style="margin:0 0 8px;">
               Bu e-postayı, aboneliklerinizle ilgili bir işlem gerçekleştirdiğiniz için alıyorsunuz.
             </p>
+            {% if subscribe_url %}
+            <p style="margin:0 0 12px; padding:12px; background:#f6f6f6; text-align:center;">
+              {{ forward_cta_text }}<br>
+              <a href="{{ subscribe_url }}" style="color:#c8102e; font-weight:bold;">Hemen Bültenimize Abone Olun</a>
+            </p>
+            {% endif %}
             <p style="margin:0;">
               <a href="{{ privacy_url }}" style="color:#6b6b6b;">Gizlilik / KVKK</a>
               {% if manage_url %} · <a href="{{ manage_url }}" style="color:#6b6b6b;">Tercihlerimi Yönet</a>{% endif %}

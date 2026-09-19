@@ -11,6 +11,14 @@
   var groups = document.querySelectorAll(".admin-nav-group");
   if (!groups.length) return;
 
+  // The server pre-opens the active section's group (right for the narrow
+  // accordion layout). Above 640px the open menu is a floating popover that
+  // would cover page content on load, so start collapsed there -- the
+  // active group stays marked via its underlined summary.
+  if (window.matchMedia("(min-width: 641px)").matches) {
+    groups.forEach(function (group) { group.open = false; });
+  }
+
   groups.forEach(function (group) {
     group.addEventListener("toggle", function () {
       if (!group.open) return;

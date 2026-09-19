@@ -135,10 +135,13 @@
         <a class="btn btn-red" href="{{ url_for('gazete') }}">PDF Arşivine Git</a>
       </div>
     </div>
+
+    <div class="sidebar-block sidebar-block-subscribe">
+      {{ subscribe_form(variant="compact", heading="Bültene Abone Ol",
+                         text="Yeni sayılar ve seçili haberler yayımlandığında haberiniz olsun.") }}
+    </div>
   </aside>
 </div>
-
-{{ subscribe_form() }}
 
 {{ ad_slot('homepage_bottom', section='homepage') }}
 

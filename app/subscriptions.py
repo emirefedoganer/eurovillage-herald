@@ -16,6 +16,8 @@ Turnstile gate cookie in app.py) -- nothing is stored for it, so the
 exact same link can be safely re-embedded in every future email without
 ever persisting a second long-lived plaintext secret per subscriber.
 """
+import hashlib
+import hmac
 import re
 import secrets
 import uuid
@@ -40,6 +42,30 @@ DEFAULT_PREFERENCES = {key: False for key, _ in PREFERENCE_CHOICES}
 CONFIRM_TOKEN_TTL_HOURS = 48
 UNSUBSCRIBE_SALT = "issue-unsubscribe"
 
+# Explicit subscription states. "confirmed" is this project's pre-existing
+# name for what the spec calls "active" -- kept as-is (a rename would touch
+# every call site and test for no functional gain); "bounced"/"complained"/
+# "suppressed" are new. Every one of these EXCEPT "confirmed" is excluded
+# from store.confirmed_subscribers() and therefore from every future
+# campaign send -- see also outbox.py's per-send eligibility recheck,
+# which re-verifies status at the moment a queued bulletin job is actually
+# sent (not just when it was enqueued).
+STATUS_LABELS = {
+    "pending": "Onay Bekliyor",
+    "confirmed": "Onaylı",
+    "unsubscribed": "Ayrılmış",
+    "bounced": "Geri Döndü (Bounced)",
+    "complained": "Şikayet Bildirildi",
+    "suppressed": "Yönetici Tarafından Engellendi",
+}
+# Blocked states: excluded from every campaign, cannot be re-opened by the
+# public form, and are never downgraded by an unsubscribe click.
+BLOCKED_STATUSES = ("bounced", "complained", "suppressed")
+RECOVERABLE_STATUSES = BLOCKED_STATUSES  # legacy name
+# What an audited admin action may clear. A complaint (the reader marked us
+# as spam) is permanent -- deliberately NOT clearable.
+CLEARABLE_STATUSES = ("bounced", "suppressed")
+
 # Bumped whenever the privacy/KVKK notice shown at signup materially
 # changes. Recorded on every subscription record so a future change to
 # this text never silently rewrites what an existing subscriber actually
@@ -48,7 +74,7 @@ UNSUBSCRIBE_SALT = "issue-unsubscribe"
 # reader opted into (the `preferences` dict). The single source of truth
 # for this value; app.py's /gizlilik page imports it directly rather than
 # defining its own copy.
-CURRENT_PRIVACY_NOTICE_VERSION = "2026-09-v2"
+CURRENT_PRIVACY_NOTICE_VERSION = "2026-09-v3"
 
 
 def validate_email(email):
@@ -70,14 +96,34 @@ def _serializer(secret_key):
     return URLSafeSerializer(secret_key, salt=UNSUBSCRIBE_SALT)
 
 
+def _opaque_token(secret_key, salt, subscription_id):
+    """Opaque, non-decodable, per-subscriber token: an HMAC of the internal
+    id under the app secret. Nothing (id, email) can be read back out of
+    the URL, and it needs no storage -- it is recomputed to look a
+    subscriber up (see _subscription_id_from_opaque)."""
+    key = secret_key.encode() if isinstance(secret_key, str) else secret_key
+    return hmac.new(key, f"{salt}:{subscription_id}".encode(), hashlib.sha256).hexdigest()[:40]
+
+
+def _subscription_id_from_opaque(secret_key, salt, token):
+    if not token or "." in token:
+        return None
+    for s in store.load_subscriptions():
+        if hmac.compare_digest(_opaque_token(secret_key, salt, s["id"]), token):
+            return s["id"]
+    return None
+
+
 def unsubscribe_token(secret_key, subscription_id):
-    return _serializer(secret_key).dumps({"id": subscription_id})
+    return _opaque_token(secret_key, UNSUBSCRIBE_SALT, subscription_id)
 
 
 def subscription_id_from_unsubscribe_token(secret_key, token):
-    try:
-        data = _serializer(secret_key).loads(token)
-        return data.get("id")
+    found = _subscription_id_from_opaque(secret_key, UNSUBSCRIBE_SALT, token)
+    if found:
+        return found
+    try:  # legacy signed tokens already sitting in previously sent emails
+        return _serializer(secret_key).loads(token).get("id")
     except BadSignature:
         return None
 
@@ -90,18 +136,17 @@ def _manage_serializer(secret_key):
 
 
 def manage_token(secret_key, subscription_id):
-    """A separate signed token (distinct salt) for the no-login preference
-    -management page -- kept deliberately non-interchangeable with the
-    unsubscribe token even though both just resolve to a subscription id,
-    so a future change to what either link is allowed to do doesn't have
-    to worry about the other accidentally accepting it too."""
-    return _manage_serializer(secret_key).dumps({"id": subscription_id})
+    """Separate salt from the unsubscribe token so the two links are never
+    interchangeable."""
+    return _opaque_token(secret_key, MANAGE_SALT, subscription_id)
 
 
 def subscription_id_from_manage_token(secret_key, token):
+    found = _subscription_id_from_opaque(secret_key, MANAGE_SALT, token)
+    if found:
+        return found
     try:
-        data = _manage_serializer(secret_key).loads(token)
-        return data.get("id")
+        return _manage_serializer(secret_key).loads(token).get("id")
     except BadSignature:
         return None
 
@@ -149,6 +194,12 @@ def subscribe(email, preferences, consent_method="web_form"):
     subs = store.load_subscriptions()
     existing = next((s for s in subs if s["email"].strip().lower() == email), None)
     now = _iso(_now())
+
+    if existing and existing.get("status") in RECOVERABLE_STATUSES:
+        # Bounced/complained/suppressed: the public form must not quietly
+        # re-open the address (recovery is the deliberate admin action,
+        # reactivate_for_resend()). Same generic response to the caller.
+        return existing, None
 
     if existing and existing.get("status") == "confirmed":
         existing["preferences"] = prefs
@@ -229,6 +280,10 @@ def unsubscribe(subscription_id):
     idx = next((i for i, s in enumerate(subs) if s["id"] == subscription_id), None)
     if idx is None or subs[idx]["status"] == "unsubscribed":
         return False
+    if subs[idx]["status"] in RECOVERABLE_STATUSES:
+        # Already excluded from every campaign; never downgrade a
+        # bounce/complaint/suppression record into a plain unsubscribe.
+        return True
     subs[idx]["status"] = "unsubscribed"
     subs[idx]["unsubscribed_at"] = _iso(_now())
     store.save_subscriptions(subs)
@@ -263,5 +318,87 @@ def update_preferences(subscription_id, preferences):
         return None
     subs[idx]["preferences"] = _normalize_preferences(preferences, default_if_empty=False)
     subs[idx]["updated_at"] = _iso(_now())
+    store.save_subscriptions(subs)
+    return subs[idx]
+
+
+def record_bounce(email, reason=""):
+    """Called by the Resend webhook handler (see app.py's
+    /internal/webhooks/resend) on a `email.bounced` event. Moves the
+    matching subscriber out of "confirmed" so store.confirmed_subscribers()
+    -- and therefore every future campaign -- stops selecting them.
+    Setting the same status twice (a redelivered webhook) is a harmless
+    no-op, which is what makes this safe to call without a separate
+    dedup/idempotency log. Returns False for an address with no matching
+    subscriber (never an error -- Resend's bounce events aren't scoped to
+    just bulletin sends)."""
+    subs = store.load_subscriptions()
+    email = (email or "").strip().lower()
+    idx = next((i for i, s in enumerate(subs) if s["email"].strip().lower() == email), None)
+    if idx is None:
+        return False
+    subs[idx]["status"] = "bounced"
+    subs[idx]["bounce_reason"] = (reason or "")[:300]
+    subs[idx]["bounced_at"] = _iso(_now())
+    subs[idx]["updated_at"] = _iso(_now())
+    store.save_subscriptions(subs)
+    return True
+
+
+def record_complaint(email):
+    """`email.complained` event -- a reader marked a campaign as spam.
+    Same idempotency reasoning as record_bounce()."""
+    subs = store.load_subscriptions()
+    email = (email or "").strip().lower()
+    idx = next((i for i, s in enumerate(subs) if s["email"].strip().lower() == email), None)
+    if idx is None:
+        return False
+    subs[idx]["status"] = "complained"
+    subs[idx]["complained_at"] = _iso(_now())
+    subs[idx]["updated_at"] = _iso(_now())
+    store.save_subscriptions(subs)
+    return True
+
+
+def suppress(subscription_id, actor_email, reason=""):
+    """Manual admin block -- for an address the team wants to stop
+    mailing without an actual bounce/complaint event (e.g. a support
+    request). Distinct from `unsubscribe()`: this is an ADMIN action
+    against a subscriber's wishes/record, logged with who did it."""
+    subs = store.load_subscriptions()
+    idx = next((i for i, s in enumerate(subs) if s["id"] == subscription_id), None)
+    if idx is None:
+        return None
+    subs[idx]["status"] = "suppressed"
+    subs[idx]["suppressed_at"] = _iso(_now())
+    subs[idx]["suppressed_by"] = actor_email
+    subs[idx]["suppress_reason"] = (reason or "")[:300]
+    subs[idx]["updated_at"] = _iso(_now())
+    store.save_subscriptions(subs)
+    return subs[idx]
+
+
+def clear_suppression(subscription_id, actor_email, reason):
+    """Explicit, audited recovery step -- deliberately does NOT send
+    anything and does NOT re-enable delivery: the record moves to
+    "unsubscribed" (still excluded from every campaign). The address only
+    becomes eligible again if its owner submits the public subscription
+    form themselves and completes double opt-in. A "complained" record can
+    never be cleared. Returns the record or None."""
+    subs = store.load_subscriptions()
+    idx = next((i for i, s in enumerate(subs) if s["id"] == subscription_id), None)
+    if idx is None or subs[idx]["status"] not in CLEARABLE_STATUSES or not (reason or "").strip():
+        return None
+    now = _iso(_now())
+    prior = subs[idx]["status"]
+    subs[idx]["status"] = "unsubscribed"
+    subs[idx]["unsubscribed_at"] = now
+    subs[idx]["suppression_cleared_at"] = now
+    subs[idx]["suppression_cleared_by"] = actor_email
+    subs[idx]["suppression_cleared_from"] = prior
+    subs[idx]["suppression_cleared_reason"] = reason.strip()[:300]
+    subs[idx]["confirm_token_hash"] = None
+    subs[idx]["confirm_token_expires_at"] = None
+    subs[idx]["updated_at"] = now
     store.save_subscriptions(subs)
     return subs[idx]

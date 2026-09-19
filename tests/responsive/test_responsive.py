@@ -18,7 +18,9 @@ VIEWPORTS = [
     (375, 812, "375w"),
     (390, 844, "390w"),
     (768, 1024, "768w"),
+    (901, 800, "901w"),
     (1024, 768, "1024w"),
+    (1150, 800, "1150w"),
     (1280, 900, "1280w"),
     (1440, 900, "1440w"),
 ]
@@ -77,27 +79,6 @@ def test_public_page_has_no_horizontal_overflow(live_server, page, path, name, w
     page.goto(live_server["base_url"] + path)
     page.wait_for_load_state("networkidle")
     _assert_no_overflow(page, f"{name} @ {vp_label}")
-
-
-@pytest.mark.parametrize("width,height,vp_label", [
-    (901, 700, "901w"), (1024, 768, "1024w"), (1150, 800, "1150w"),
-    (1180, 800, "1180w"), (1280, 900, "1280w"), (1440, 900, "1440w"),
-])
-def test_main_nav_never_overflows_its_own_row(live_server, page, width, height, vp_label):
-    """A component-scoped check the page-level overflow assertion above
-    structurally CANNOT catch: .mainnav-inner has its own
-    overflow-x:auto, so a page-level scrollWidth check stays green even
-    when the nav row itself is too narrow for its contents and silently
-    clips the search box (exactly the real bug caught by eye during this
-    pass -- see nav_links()/mainnav-search's comments in style.css)."""
-    page.set_viewport_size({"width": width, "height": height})
-    page.goto(live_server["base_url"] + "/")
-    page.wait_for_load_state("networkidle")
-    deficit = page.evaluate(
-        "document.querySelector('.mainnav-inner').scrollWidth - "
-        "document.querySelector('.mainnav-inner').clientWidth"
-    )
-    assert deficit <= 1, f"main nav is {deficit}px narrower than its contents need @ {vp_label}"
 
 
 @pytest.mark.parametrize("path,name", ADMIN_PAGES)
@@ -197,3 +178,59 @@ def test_master_only_admin_url_denied_without_a_session(live_server, page):
     cookie at all is denied rather than served."""
     response = page.request.get(live_server["base_url"] + "/admin/roller", max_redirects=0)
     assert response.status in (302, 401, 403)
+
+
+NAV_WIDTHS = [(320, 700), (375, 812), (390, 844), (768, 1024), (901, 800), (1024, 768),
+              (1150, 800), (1200, 800), (1201, 800), (1280, 900), (1440, 900)]
+EXPECTED_NAV_LABELS = ["Ana Sayfa", "Politika", "Şehir", "Kültür", "Röportaj", "Oyun Köşesi",
+                       "Arı - Magazin", "İletişim", "Gazete (PDF)"]
+
+
+@pytest.mark.parametrize("width,height", NAV_WIDTHS)
+def test_public_nav_is_operable_and_never_clips_at_any_width(live_server, page, width, height):
+    """Regression for the ten-link public nav overflowing (and silently
+    clipping its search box inside .mainnav-inner's own overflow-x:auto,
+    which a page-level scrollWidth check cannot see) between ~901 and
+    ~1180px. Where the full bar fits it must fit with zero clipping;
+    where it cannot, it must be replaced by the hamburger drawer with
+    every link still reachable -- never shrunk, never hidden, no
+    "Abone Ol" item anywhere in it."""
+    page.set_viewport_size({"width": width, "height": height})
+    page.goto(live_server["base_url"] + "/")
+    page.wait_for_load_state("networkidle")
+    _assert_no_overflow(page, f"home nav @ {width}w")
+    bar_visible = page.locator(".mainnav").is_visible()
+    if bar_visible:
+        deficit = page.evaluate(
+            "document.querySelector('.mainnav-inner').scrollWidth - document.querySelector('.mainnav-inner').clientWidth")
+        assert deficit <= 1, f"full nav bar is {deficit}px too narrow (clipped) @ {width}w"
+        assert page.locator(".hamburger-btn").is_hidden()
+        assert page.locator(".mainnav-search").is_visible()
+        links = page.locator(".mainnav-inner a").all_text_contents()
+    else:
+        burger = page.locator(".hamburger-btn")
+        assert burger.is_visible(), f"no nav bar and no hamburger @ {width}w"
+        box = burger.bounding_box()
+        assert box["width"] >= 32 and box["height"] >= 32, "hamburger too small for touch"
+        burger.click()
+        assert burger.get_attribute("aria-expanded") == "true"
+        drawer = page.locator("#mobile-drawer")
+        assert drawer.is_visible()
+        links = drawer.locator(".drawer-nav a").all_text_contents()
+        page.keyboard.press("Escape")
+        assert page.locator("#mobile-drawer").is_hidden()
+        assert burger.get_attribute("aria-expanded") == "false"
+        assert page.locator(".mobile-search-btn").is_visible()
+    normalized = [t.strip().lower() for t in links]
+    for label in EXPECTED_NAV_LABELS:
+        assert any(label.lower() in t for t in normalized), f"nav link {label!r} missing @ {width}w: {links}"
+    assert not any("abone" in t for t in normalized), "subscribe item must never be in the nav"
+    assert len(links) == 10  # the ten original links, no more, no fewer
+
+
+def test_public_nav_order_is_unchanged_on_desktop(live_server, page):
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto(live_server["base_url"] + "/")
+    texts = [t.strip().lower() for t in page.locator(".mainnav-inner a").all_text_contents()]
+    idx = [next(i for i, t in enumerate(texts) if lbl.lower() in t) for lbl in EXPECTED_NAV_LABELS]
+    assert idx == sorted(idx)

@@ -16,13 +16,30 @@
       <tbody>
         <tr><td style="width:160px;"><strong>Gönderen</strong></td><td>{{ sender }}</td></tr>
         <tr><td><strong>Konu</strong></td><td>{{ subject }}</td></tr>
-        <tr><td><strong>Hedef Kitle</strong></td><td>{{ bulletin.target_preference }}</td></tr>
+        <tr><td><strong>Bülten Türü</strong></td><td>{{ kind_label }}</td></tr>
+        <tr><td><strong>Hedef Kitle</strong></td><td>{{ audience_label }}{% if not audience.compatible %} <span class="badge">TÜRLE UYUMSUZ — gönderilemez, düzenleyip kaydedin</span>{% endif %}</td></tr>
         <tr><td><strong>Uygun Alıcı Sayısı</strong></td><td>{{ audience.eligible }}</td></tr>
         <tr><td><strong>Durum</strong></td><td>{{ bulletin.status }}</td></tr>
       </tbody>
     </table>
 </div>
   </div>
+
+  {% if popular %}
+  <div class="admin-panel">
+    <h3 style="font-family:var(--font-sans); font-size:14px; margin:0 0 8px;">Çok Okunan Haberler — analitik</h3>
+    <p class="hint">Ölçüt: {{ popular.current.metric }}; dönem: son {{ popular.current.period_days }} gün (UTC, bugün dahil).
+      Kayıtlı seçim onaylandığı andaki sayılarla saklanır; analitik değişse de bu bülten değişmez.</p>
+    <div style="display:flex; flex-wrap:wrap; gap:24px;">
+      <div style="flex:1; min-width:260px;"><strong>Onaylı seçim (bültende bu sırayla)</strong>
+        <ol>{% for a in popular.saved %}<li>{{ a.title }} — {{ a.views if a.views is not none else '—' }}</li>{% else %}<li class="hint">Seçili haber yok.</li>{% endfor %}</ol>
+        {% if popular.snapshot %}<div class="hint">Analitik tarihi: {{ popular.snapshot.generated_at }}</div>{% endif %}</div>
+      <div style="flex:1; min-width:260px;"><strong>Şu anki analitik sıralaması (yalnızca bilgi)</strong>
+        <ol>{% for a in popular.current["items"] %}<li>{{ a.title }} — {{ a.views }}</li>{% endfor %}</ol>
+        {% if popular.current.warning %}<div class="hint" style="color:var(--red);">{{ popular.current.warning }}</div>{% endif %}</div>
+    </div>
+  </div>
+  {% endif %}
 
   <div class="admin-panel" style="display:flex; flex-wrap:wrap; gap:24px; align-items:flex-start;">
     <div style="flex:1; min-width:280px;">
@@ -39,7 +56,8 @@
     {% if bulletin.status in ('draft', 'scheduled') %}
     <div style="flex:1; min-width:280px;">
       <h3 style="font-family:var(--font-sans); font-size:14px; margin:0 0 10px;">Gerçek Gönderim</h3>
-      <a class="btn btn-red" href="{{ url_for('admin.bulletin_send_confirm', bulletin_id=bulletin.id) }}">Gönderime Hazırla</a>
+      {% if audience.compatible %}<a class="btn btn-red" href="{{ url_for('admin.bulletin_send_confirm', bulletin_id=bulletin.id) }}">Gönderime Hazırla</a>
+      {% else %}<span class="hint">Tür ve hedef kitle uyumsuz olduğu için gönderime hazırlanamaz.</span>{% endif %}
       <div class="hint">Alıcı listesini ve son onayı gösteren bir ekrana yönlendirilirsiniz.</div>
     </div>
     {% endif %}

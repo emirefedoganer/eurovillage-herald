@@ -958,11 +958,26 @@ def get_subscription_by_confirm_token(token):
 def confirmed_subscribers(preference_key):
     """Confirmed, still-subscribed emails opted into `preference_key`
     (e.g. 'new_issue'). Used by the publish-notification hook -- never
-    returns anything for a pending or unsubscribed record."""
+    returns anything for a pending, unsubscribed, bounced, complained, or
+    suppressed record (see subscriptions.STATUS_LABELS)."""
     return [
         s for s in load_subscriptions()
         if s.get("status") == "confirmed" and (s.get("preferences") or {}).get(preference_key)
     ]
+
+
+def is_subscriber_eligible(subscription_id, preference_key):
+    """Re-checked at ACTUAL send time by outbox.process_outbox() -- not
+    just when a bulletin campaign was enqueued. A subscriber can
+    unsubscribe, bounce, or flip a preference off in the (possibly long)
+    window between a campaign being queued and the outbox actually
+    draining it; this is what stops that window from silently mailing
+    someone who's no longer eligible. Same rule as confirmed_subscribers()
+    applied to one subscriber instead of a preference-wide scan."""
+    s = get_subscription_by_id(subscription_id)
+    if not s or s.get("status") != "confirmed":
+        return False
+    return bool((s.get("preferences") or {}).get(preference_key))
 
 
 # ------------------------------------------------------------ issue analytics --

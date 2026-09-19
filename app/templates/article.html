@@ -110,17 +110,6 @@
   </div>
   {% endif %}
 
-  {% if linked_issue %}
-  <div class="issue-link-card">
-    <span class="issue-link-kicker">BU HABER GAZETEDE</span>
-    <div class="issue-link-body">
-      <strong>{{ site.name }} — Sayı {{ linked_issue.no }}{% if article.issue_page %}, s. {{ article.issue_page }}{% endif %}</strong>
-      <a class="btn btn-red" onclick="EHAnalytics && EHAnalytics.ctaClick('{{ linked_issue.id }}')"
-         href="{{ url_for('gazete_oku', issue_id=linked_issue.id) }}{% if article.issue_page %}#page={{ article.issue_page }}{% endif %}">Gazetede Oku</a>
-    </div>
-  </div>
-  {% endif %}
-
   {{ ad_slot(ad_bottom_slot, section=article.section, content_id=article.id) }}
 </article>
 {% if sidebar_ad %}

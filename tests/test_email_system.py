@@ -531,6 +531,14 @@ class ResendBackendTests(EmailSystemTestCase):
         self.assertTrue(ok)
 
 
+def _elapse_backoff():
+    """Simulate the retry backoff window having passed."""
+    jobs = store.load_email_outbox()
+    for j in jobs:
+        j["next_attempt_at"] = None
+    store.save_email_outbox(jobs)
+
+
 class OutboxTests(EmailSystemTestCase):
     def test_enqueue_creates_queued_job(self):
         import outbox
@@ -572,6 +580,7 @@ class OutboxTests(EmailSystemTestCase):
             outbox.enqueue("transactional", "a@example.com", "Subj", "text")
             for _ in range(outbox.MAX_ATTEMPTS):
                 outbox.process_outbox(limit=10)
+                _elapse_backoff()
             job = store.load_email_outbox()[0]
             self.assertEqual(job["status"], "failed")
             self.assertEqual(job["retry_count"], outbox.MAX_ATTEMPTS)
@@ -1188,10 +1197,13 @@ class PrivacyPageTests(EmailSystemTestCase):
         self.assertIn("Turnstile", body)
         self.assertIn("Cloudflare", body)
 
-    def test_privacy_notice_keeps_legal_review_placeholders(self):
+    def test_privacy_notice_has_no_development_placeholders(self):
         r = self.client.get("/gizlilik")
         body = r.data.decode("utf-8")
-        self.assertIn("YASAL İNCELEME GEREKLİ", body)
+        for marker in ("YASAL İNCELEME GEREKLİ", "yalnızca geliştirme amaçlı", "yer tutucu"):
+            self.assertNotIn(marker, body)
+        self.assertIn("iletisim@eurovillageherald.com", body)
+        self.assertIn("Resend", body)
 
     def test_privacy_notice_analytics_wording_matches_actual_implementation(self):
         r = self.client.get("/gizlilik")
@@ -1342,6 +1354,7 @@ class AdminTemplateRenderTests(EmailSystemTestCase):
         job = outbox.enqueue("transactional", "a@example.com", "Subj", "text")
         for _ in range(outbox.MAX_ATTEMPTS):
             outbox.process_outbox(limit=10)
+            _elapse_backoff()
         mailer.send_transactional_email = original
         self.login_as("master1")
         r = self.client.get("/admin/eposta-sistemi")
@@ -1554,11 +1567,19 @@ class NewsletterVisibilityTests(EmailSystemTestCase):
     the public site, and that every entry point posts to the SAME
     subscribe_submit() endpoint rather than a second, competing form."""
 
-    def test_nav_has_a_subscribe_link(self):
+    def test_main_nav_does_not_have_a_subscribe_link(self):
+        """Newsletter subscription must never appear in the public nav bar
+        or header -- only in the editorial placements below (homepage
+        right column, article end, its own landing page, optional
+        Standby form)."""
         r = self.client.get("/")
         body = r.data.decode("utf-8")
-        self.assertIn("Bültene Abone Ol", body)
-        self.assertIn('href="/bultene-abone-ol"', body)
+        nav_start = body.index('<nav class="mainnav">')
+        nav_end = body.index('</nav>', nav_start)
+        self.assertNotIn("Abone Ol", body[nav_start:nav_end])
+        drawer_start = body.index('id="mobile-drawer"')
+        drawer_end = body.index('</nav>', drawer_start)
+        self.assertNotIn("Abone Ol", body[drawer_start:drawer_end])
 
     def test_footer_has_a_subscribe_link_on_an_unrelated_page(self):
         r = self.client.get("/hakkimizda")
@@ -1675,6 +1696,544 @@ class NewsletterVisibilityTests(EmailSystemTestCase):
         finally:
             control["mode"] = "live"
             store.save_site_control(control)
+
+
+class ReplyToEndToEndTests(EmailSystemTestCase):
+    def _drain(self):
+        import outbox
+        outbox.process_outbox(limit=50)
+
+    def test_resend_sdk_payload_carries_reply_to_and_untouched_from(self):
+        import mailer
+        import outbox
+        captured = {}
+        orig_send, orig_backends = mailer.resend.Emails.send, dict(mailer._BACKENDS)
+        mailer.resend.Emails.send = staticmethod(lambda params: captured.update(params) or {"id": "msg_1"})
+        mailer._BACKENDS["resend"] = mailer._send_via_resend
+        orig_backend = mailer.BACKEND
+        mailer.BACKEND = "resend"
+        try:
+            outbox.enqueue("transactional", "r@example.com", "S", "t", reply_to=mailer.EMAIL_CONTACT_REPLY_TO)
+            self._drain()
+        finally:
+            mailer.resend.Emails.send = orig_send
+            mailer.BACKEND = orig_backend
+        self.assertEqual(captured["reply_to"], ["iletisim@eurovillageherald.com"])
+        self.assertEqual(captured["from"], mailer.EMAIL_TRANSACTIONAL_FROM)
+        self.assertNotIn("iletisim", captured["from"])
+        self.assertEqual(store.load_email_outbox()[0]["provider_message_id"], "msg_1")
+
+    def test_reply_to_survives_outbox_storage_and_retry(self):
+        import mailer
+        import outbox
+        orig = mailer.send_transactional_email
+        seen = []
+        def flaky(to, subject, text, html=None, reply_to=None):
+            seen.append(reply_to)
+            return (len(seen) > 1, "boom", None, False)
+        mailer.send_transactional_email = flaky
+        try:
+            outbox.enqueue("transactional", "r@example.com", "S", "t", reply_to="iletisim@eurovillageherald.com")
+            self._drain()
+            self.assertEqual(store.load_email_outbox()[0]["status"], "queued")
+            self.assertIsNotNone(store.load_email_outbox()[0]["next_attempt_at"])
+            _elapse_backoff()
+            self._drain()
+        finally:
+            mailer.send_transactional_email = orig
+        self.assertEqual(seen, ["iletisim@eurovillageherald.com"] * 2)
+
+    def test_subscription_emails_and_fake_backend_expose_reply_to(self):
+        import mailer
+        del mailer.FAKE_SENT[:]
+        self.client.post("/abone-ol", data={"email": "rt@example.com", "privacy_ack": "1", "pref_new_issue": "1"})
+        self._drain()
+        sent = [m for m in mailer.FAKE_SENT if m["to"] == "rt@example.com"]
+        self.assertTrue(sent)
+        self.assertEqual(sent[0]["reply_to"], "iletisim@eurovillageherald.com")
+        self.assertEqual(sent[0]["from"], mailer.EMAIL_TRANSACTIONAL_FROM)
+
+    def test_bulletin_sends_use_bulletin_from_with_contact_reply_to(self):
+        import mailer
+        import outbox
+        del mailer.FAKE_SENT[:]
+        outbox.enqueue("bulletin", "b@example.com", "S", "t")
+        self._drain()
+        self.assertEqual(mailer.FAKE_SENT[-1]["from"], mailer.EMAIL_BULLETIN_FROM)
+        self.assertEqual(mailer.FAKE_SENT[-1]["reply_to"], "iletisim@eurovillageherald.com")
+
+
+class SubscriberStatesAndWebhookTests(EmailSystemTestCase):
+    def _confirmed(self, email="w@example.com"):
+        import subscriptions
+        sub, token = subscriptions.subscribe(email, {"new_issue": True})
+        subscriptions.confirm(token)
+        return store.get_subscription_by_email(email)
+
+    def _sign(self, body, secret="whsec_" + "dGVzdC1zZWNyZXQ="):
+        import base64, hashlib, hmac, time
+        ts = str(int(time.time()))
+        key = base64.b64decode(secret.removeprefix("whsec_"))
+        sig = base64.b64encode(hmac.new(key, f"msg_1.{ts}.".encode() + body, hashlib.sha256).digest()).decode()
+        return {"svix-id": "msg_1", "svix-timestamp": ts, "svix-signature": f"v1,{sig}",
+                "Content-Type": "application/json"}
+
+    def setUp(self):
+        super().setUp()
+        self.appmod.RESEND_WEBHOOK_SECRET = "whsec_dGVzdC1zZWNyZXQ="
+
+    def tearDown(self):
+        self.appmod.RESEND_WEBHOOK_SECRET = ""
+
+    def test_bounce_and_complaint_webhooks_exclude_from_campaigns_and_are_idempotent(self):
+        sub = self._confirmed("bo@example.com")
+        body = json.dumps({"type": "email.bounced", "data": {"to": ["Bo@Example.com"], "email_id": "x"}}).encode()
+        for _ in range(2):
+            r = self.client.post("/internal/webhooks/resend", data=body, headers=self._sign(body))
+            self.assertEqual(r.status_code, 200)
+        self.assertEqual(store.get_subscription_by_id(sub["id"])["status"], "bounced")
+        self.assertEqual(store.confirmed_subscribers("new_issue"), [])
+        sub2 = self._confirmed("co@example.com")
+        body = json.dumps({"type": "email.complained", "data": {"to": ["co@example.com"]}}).encode()
+        self.client.post("/internal/webhooks/resend", data=body, headers=self._sign(body))
+        self.assertEqual(store.get_subscription_by_id(sub2["id"])["status"], "complained")
+
+    def test_unsigned_or_badly_signed_webhook_rejected(self):
+        sub = self._confirmed("ns@example.com")
+        body = json.dumps({"type": "email.bounced", "data": {"to": ["ns@example.com"]}}).encode()
+        r = self.client.post("/internal/webhooks/resend", data=body)
+        self.assertEqual(r.status_code, 400)
+        bad = self._sign(body); bad["svix-signature"] = "v1,AAAA"
+        self.assertEqual(self.client.post("/internal/webhooks/resend", data=body, headers=bad).status_code, 400)
+        self.assertEqual(store.get_subscription_by_id(sub["id"])["status"], "confirmed")
+
+    def test_webhook_404s_when_secret_unset(self):
+        self.appmod.RESEND_WEBHOOK_SECRET = ""
+        self.assertEqual(self.client.post("/internal/webhooks/resend", data=b"{}").status_code, 404)
+
+    def test_send_time_eligibility_recheck_skips_unsubscribed_recipient(self):
+        import outbox, subscriptions, mailer
+        sub = self._confirmed("el@example.com")
+        del mailer.FAKE_SENT[:]
+        outbox.enqueue("bulletin", "el@example.com", "S", "t", subscriber_id=sub["id"], target_preference="new_issue")
+        subscriptions.unsubscribe(sub["id"])  # between enqueue and send
+        outbox.process_outbox(limit=10)
+        self.assertEqual(store.load_email_outbox()[0]["status"], "skipped")
+        self.assertEqual(mailer.FAKE_SENT, [])
+
+    def test_public_form_cannot_reopen_a_bounced_or_suppressed_address(self):
+        import subscriptions
+        sub = self._confirmed("pb@example.com")
+        subscriptions.record_bounce("pb@example.com")
+        again, token = subscriptions.subscribe("pb@example.com", {"new_issue": True})
+        self.assertIsNone(token)
+        self.assertEqual(store.get_subscription_by_id(sub["id"])["status"], "bounced")
+
+    def test_clear_suppression_sends_nothing_and_does_not_reenable(self):
+        import subscriptions, mailer
+        sub = self._confirmed("re@example.com")
+        subscriptions.record_bounce("re@example.com", "mailbox gone")
+        del mailer.FAKE_SENT[:]
+        cleared = subscriptions.clear_suppression(sub["id"], "admin@x", "owner confirmed address works")
+        self.assertEqual(cleared["status"], "unsubscribed")
+        self.assertEqual(store.confirmed_subscribers("new_issue"), [])
+        self.assertEqual(mailer.FAKE_SENT, [])
+        self.assertEqual(cleared["suppression_cleared_by"], "admin@x")
+        # only the owner's own public-form + double opt-in re-enables it
+        again, token = subscriptions.subscribe("re@example.com", {"new_issue": True})
+        self.assertEqual(again["status"], "pending")
+        subscriptions.confirm(token)
+        self.assertEqual(len(store.confirmed_subscribers("new_issue")), 1)
+
+    def test_complaint_can_never_be_cleared_and_reason_is_required(self):
+        import subscriptions
+        sub = self._confirmed("cp@example.com")
+        subscriptions.record_complaint("cp@example.com")
+        self.assertIsNone(subscriptions.clear_suppression(sub["id"], "a", "please"))
+        self.assertEqual(store.get_subscription_by_id(sub["id"])["status"], "complained")
+        sub2 = self._confirmed("sp@example.com")
+        subscriptions.suppress(sub2["id"], "a")
+        self.assertIsNone(subscriptions.clear_suppression(sub2["id"], "a", "  "))
+
+    def test_admin_clear_requires_ack_writes_audit_and_sends_no_mail(self):
+        import subscriptions, mailer
+        sub = self._confirmed("au@example.com")
+        subscriptions.suppress(sub["id"], "a")
+        self.login_as("master1")
+        del mailer.FAKE_SENT[:]
+        url = f"/admin/aboneler/{sub['id']}/engeli-kaldir"
+        self.client.post(url, data={"reason": "ok"})
+        self.assertEqual(store.get_subscription_by_id(sub["id"])["status"], "suppressed")
+        self.client.post(url, data={"reason": "ok", "understood": "1"})
+        self.assertEqual(store.get_subscription_by_id(sub["id"])["status"], "unsubscribed")
+        self.assertEqual(mailer.FAKE_SENT, [])
+        self.assertTrue(any(e.get("action") == "subscriber_suppression_cleared" for e in store.load_audit_log()))
+
+    def test_unsubscribe_does_not_downgrade_blocked_states(self):
+        import subscriptions
+        sub = self._confirmed("ub@example.com")
+        subscriptions.record_complaint("ub@example.com")
+        subscriptions.unsubscribe(sub["id"])
+        self.assertEqual(store.get_subscription_by_id(sub["id"])["status"], "complained")
+
+    def test_transient_bounce_does_not_suppress(self):
+        sub = self._confirmed("tb@example.com")
+        body = json.dumps({"type": "email.bounced", "data": {"to": ["tb@example.com"],
+                           "bounce": {"type": "Transient", "message": "full"}}}).encode()
+        self.client.post("/internal/webhooks/resend", data=body, headers=self._sign(body))
+        self.assertEqual(store.get_subscription_by_id(sub["id"])["status"], "confirmed")
+
+    def test_eligibility_matrix_across_all_states(self):
+        import subscriptions
+        ids = {}
+        for name in ("confirmed", "pending", "unsubscribed", "bounced", "complained", "suppressed"):
+            sub, token = subscriptions.subscribe(f"{name}@example.com", {"new_issue": True})
+            if name != "pending":
+                subscriptions.confirm(token)
+            ids[name] = sub["id"]
+        subscriptions.unsubscribe(ids["unsubscribed"])
+        subscriptions.record_bounce("bounced@example.com")
+        subscriptions.record_complaint("complained@example.com")
+        subscriptions.suppress(ids["suppressed"], "a")
+        for name, sid in ids.items():
+            self.assertEqual(store.is_subscriber_eligible(sid, "new_issue"), name == "confirmed", name)
+
+    def test_admin_subscriber_page_renders_new_states(self):
+        import subscriptions
+        self._confirmed("ad@example.com")
+        subscriptions.record_bounce("ad@example.com")
+        self.login_as("master1")
+        r = self.client.get("/admin/aboneler")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Engeli kaldır".encode(), r.data)
+
+
+class BulletinFooterAndLinksTests(EmailSystemTestCase):
+    def _bulletin(self):
+        import bulletins
+        return bulletins.create_draft("custom", "a@x", "Baslik", "Konu", target_preference="new_issue")
+
+    def _real_subscriber(self, email="fw@example.com"):
+        import subscriptions
+        sub, token = subscriptions.subscribe(email, {"new_issue": True})
+        subscriptions.confirm(token)
+        return store.get_subscription_by_email(email)
+
+    def _render(self, subscriber):
+        with self.appmod.app.test_request_context("/", base_url="https://www.eurovillageherald.com"):
+            return self.appmod._render_bulletin(self._bulletin(), subscriber)
+
+    def test_test_bulletin_has_forward_cta_and_no_placeholders(self):
+        subject, text, html, headers = self._render({"id": "test", "email": "t@example.com"})
+        for body in (text, html):
+            self.assertIn("Bu e-posta size yönlendirildi mi? Hemen bültenimize abone olun.", body)
+            self.assertIn("https://www.eurovillageherald.com/bultene-abone-ol", body)
+        self.assertIn("Hemen Bültenimize Abone Olun", html)
+        self.assertNotIn('href="#"', html)
+        self.assertNotIn("Tercihlerimi Yönet", html)
+        self.assertIsNone(headers)
+
+    def test_real_bulletin_has_personal_links_headers_and_no_forbidden_urls(self):
+        sub = self._real_subscriber()
+        subject, text, html, headers = self._render(sub)
+        for body in (text, html):
+            self.assertIn("/abone-ol/tercihler/", body)
+            self.assertIn("/abone-ol/cik/", body)
+            self.assertIn("/bultene-abone-ol", body)
+            self.assertNotIn(sub["email"], body)
+            self.assertNotIn(sub["id"], body)
+            for bad in ("zoho", "zm/#", "javascript:", "railway.app", 'href="#"'):
+                self.assertNotIn(bad, body.lower())
+        self.assertIn("Tercihlerimi Yönet", html)
+        self.assertIn("Abonelikten Çık", html)
+        self.assertTrue(headers["List-Unsubscribe"].startswith("<https://www.eurovillageherald.com/abone-ol/cik/"))
+        self.assertEqual(headers["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click")
+        # the forward CTA link carries no subscriber token
+        cta = "https://www.eurovillageherald.com/bultene-abone-ol"
+        self.assertNotIn(cta + "/", html)
+
+    def test_tokens_are_opaque_and_subscriber_specific(self):
+        import subscriptions
+        a, b = self._real_subscriber("a1@example.com"), self._real_subscriber("b1@example.com")
+        key = self.appmod.app.secret_key
+        ta, tb = subscriptions.manage_token(key, a["id"]), subscriptions.manage_token(key, b["id"])
+        self.assertNotEqual(ta, tb)
+        self.assertNotIn(a["id"], ta)
+        self.assertEqual(subscriptions.subscription_id_from_manage_token(key, ta), a["id"])
+        self.assertIsNone(subscriptions.subscription_id_from_manage_token(key, subscriptions.unsubscribe_token(key, a["id"])))
+        self.assertIsNone(subscriptions.subscription_id_from_manage_token(key, "0" * 40))
+
+    def test_manage_page_shows_all_categories_and_changes_apply_to_eligibility(self):
+        import subscriptions
+        sub = self._real_subscriber()
+        other = self._real_subscriber("other@example.com")
+        token = subscriptions.manage_token(self.appmod.app.secret_key, sub["id"])
+        r = self.client.get(f"/abone-ol/tercihler/{token}")
+        self.assertEqual(r.status_code, 200)
+        for _key, label in subscriptions.PREFERENCE_CHOICES:
+            self.assertIn(label.encode(), r.data)
+        self.assertNotIn(b"/abone-ol/tercihler/" + sub["id"].encode(), r.data)
+        r = self.client.post(f"/abone-ol/tercihler/{token}", data={"pref_breaking_news": "1"}, follow_redirects=True)
+        self.assertIn("Tercihleriniz güncellendi".encode(), r.data)
+        self.assertFalse(store.is_subscriber_eligible(sub["id"], "new_issue"))
+        self.assertTrue(store.is_subscriber_eligible(sub["id"], "breaking_news"))
+        self.assertTrue(store.is_subscriber_eligible(other["id"], "new_issue"))  # untouched
+
+    def test_unsubscribe_get_is_safe_post_is_direct_idempotent_and_leaks_nothing(self):
+        import subscriptions
+        sub = self._real_subscriber()
+        token = subscriptions.unsubscribe_token(self.appmod.app.secret_key, sub["id"])
+        r = self.client.get(f"/abone-ol/cik/{token}")  # link-preview bot / scanner
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn(sub["email"].encode(), r.data)
+        self.assertEqual(store.get_subscription_by_id(sub["id"])["status"], "confirmed")
+        for _ in range(2):  # one-click POST, idempotent
+            r = self.client.post(f"/abone-ol/cik/{token}", data={"List-Unsubscribe": "One-Click"})
+            self.assertEqual(r.status_code, 200)
+            self.assertIn("tamamlandı".encode(), r.data)
+        self.assertEqual(store.get_subscription_by_id(sub["id"])["status"], "unsubscribed")
+        self.assertEqual(store.confirmed_subscribers("new_issue"), [])
+        self.assertNotIn(sub["email"].encode(), self.client.get(f"/abone-ol/cik/{token}").data)
+        self.assertEqual(self.client.get("/abone-ol/cik/" + "f" * 40).status_code, 404)
+        self.assertEqual(self.client.post("/abone-ol/cik/garbage").status_code, 404)
+
+    def test_reply_to_and_headers_survive_outbox_retry_resend_payload_and_fake(self):
+        import bulletins, mailer, outbox
+        sub = self._real_subscriber()
+        bulletin = self._bulletin()
+
+        def render(b, s):
+            with self.appmod.app.test_request_context("/", base_url="https://www.eurovillageherald.com"):
+                return self.appmod._render_bulletin(b, s)
+
+        bulletins.send_test(bulletin["id"], ["tester@example.com"], render)
+        bulletins.send_campaign(bulletin["id"], "a@x", render)
+        jobs = store.load_email_outbox()
+        self.assertEqual(len(jobs), 2)
+        for j in jobs:  # serialized in the durable outbox
+            self.assertEqual(j["reply_to"], "iletisim@eurovillageherald.com")
+        real = next(j for j in jobs if j["subscriber_id"])
+        self.assertIn("List-Unsubscribe", real["headers"])
+
+        captured = []
+        orig_send, orig_backend = mailer.resend.Emails.send, mailer.BACKEND
+        calls = {"n": 0}
+        def flaky(params):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("temporary")
+            captured.append(dict(params))
+            return {"id": "m"}
+        mailer.resend.Emails.send = staticmethod(flaky)
+        mailer.BACKEND = "resend"
+        try:
+            outbox.process_outbox(limit=10)   # first job fails -> retry queued
+            _elapse_backoff()
+            outbox.process_outbox(limit=10)   # retry + remaining
+        finally:
+            mailer.resend.Emails.send = orig_send
+            mailer.BACKEND = orig_backend
+        self.assertEqual(len(captured), 2)
+        for p in captured:
+            self.assertEqual(p["reply_to"], ["iletisim@eurovillageherald.com"])
+            self.assertEqual(p["from"], mailer.EMAIL_BULLETIN_FROM)
+        self.assertTrue(any("List-Unsubscribe-Post" in p.get("headers", {}) for p in captured))
+
+        del mailer.FAKE_SENT[:]
+        outbox.enqueue("bulletin", "z@example.com", "S", "t", reply_to=mailer.EMAIL_CONTACT_REPLY_TO)
+        outbox.process_outbox(limit=10)
+        self.assertEqual(mailer.FAKE_SENT[-1]["reply_to"], "iletisim@eurovillageherald.com")
+        self.assertEqual(mailer.FAKE_SENT[-1]["from"], mailer.EMAIL_BULLETIN_FROM)
+
+
+class BulletinAudienceMappingTests(EmailSystemTestCase):
+    def _extra_articles(self):
+        arts = store.load_articles()
+        base = dict(arts[0])
+        def mk(i, slug, **kw):
+            d = dict(base, id=f"x{i}", slug=slug, title=slug.title(), **kw)
+            return d
+        arts += [mk(1, "zeta-story"), mk(2, "alpha-story"), mk(3, "draft-story", status="draft"),
+                 mk(4, "future-story", status="scheduled", publish_at="2999-01-01T00:00:00Z")]
+        store.save_articles(arts)
+
+    def _views(self, mapping):
+        from datetime import datetime, timezone
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        store.save_article_views({slug: {today: n} for slug, n in mapping.items()})
+
+    def test_every_type_has_exactly_the_documented_audience(self):
+        import bulletins, subscriptions
+        prefs = {k for k, _ in subscriptions.PREFERENCE_CHOICES}
+        expected = {"new_issue": "new_issue", "weekly_digest": "weekly_digest", "popular_stories": "popular_stories",
+                    "editorial_selection": "weekly_digest", "breaking_news": "breaking_news",
+                    "ari_magazin": "ari_magazin", "custom": "new_issue"}
+        self.assertEqual({k: bulletins.default_audience(k) for k in bulletins.BULLETIN_KIND_LABELS}, expected)
+        for kind, spec in bulletins.KIND_AUDIENCE.items():
+            self.assertTrue(set(spec["allowed"]) <= prefs)   # no second audience system
+            self.assertEqual(len(spec["allowed"]) > 1, kind == "custom")
+
+    def test_server_rejects_incompatible_type_audience_everywhere(self):
+        import bulletins
+        with self.assertRaises(bulletins.BulletinAudienceError):
+            bulletins.create_draft("popular_stories", "a@x", "T", "S", target_preference="new_issue")
+        b = bulletins.create_draft("popular_stories", "a@x", "T", "S")
+        self.assertEqual(b["target_preference"], "popular_stories")
+        with self.assertRaises(bulletins.BulletinAudienceError):
+            bulletins.update_draft(b["id"], target_preference="breaking_news")
+        c = bulletins.create_draft("custom", "a@x", "T", "S", target_preference="ari_magazin")
+        self.assertEqual(c["target_preference"], "ari_magazin")     # custom may override
+        self.login_as("master1")
+        r = self.client.post("/admin/bultenler/yeni", data={"kind": "breaking_news", "internal_title": "t", "subject": "s",
+                              "target_preference": "new_issue"})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual([x for x in store.load_bulletins() if x["kind"] == "breaking_news"], [])
+        r = self.client.post(f"/admin/bultenler/{b['id']}/duzenle", data={"kind": "popular_stories", "internal_title": "t",
+                              "subject": "s", "target_preference": "new_issue"})
+        self.assertEqual(store.get_bulletin(b["id"])["target_preference"], "popular_stories")
+
+    def test_changing_type_on_edit_replaces_the_previous_audience(self):
+        import bulletins
+        self.login_as("master1")
+        b = bulletins.create_draft("custom", "a@x", "T", "S", target_preference="ari_magazin")
+        # a stale audience from the old type is REJECTED, nothing is saved
+        self.client.post(f"/admin/bultenler/{b['id']}/duzenle", data={
+            "kind": "breaking_news", "internal_title": "t", "subject": "s", "target_preference": "ari_magazin"})
+        self.assertEqual(store.get_bulletin(b["id"])["kind"], "custom")
+        # omitting the audience applies the new type's default instead of keeping the old one
+        self.client.post(f"/admin/bultenler/{b['id']}/duzenle", data={
+            "kind": "breaking_news", "internal_title": "t", "subject": "s"})
+        self.assertEqual(store.get_bulletin(b["id"])["target_preference"], "breaking_news")
+        self.assertEqual(store.get_bulletin(b["id"])["kind"], "breaking_news")
+
+    def test_duplicate_applies_the_mapping_not_the_stale_source_audience(self):
+        import bulletins
+        self.login_as("master1")
+        b = bulletins.create_draft("weekly_digest", "a@x", "T", "S")
+        bl = store.load_bulletins(); bl[-1]["target_preference"] = "new_issue"; store.save_bulletins(bl)   # stale/legacy
+        self.client.post(f"/admin/bultenler/{b['id']}/kopyala")
+        copy = [x for x in store.load_bulletins() if x["id"] != b["id"]][-1]
+        self.assertEqual(copy["target_preference"], "weekly_digest")
+
+    def test_preview_flags_legacy_mismatch_and_send_is_blocked_scheduled_and_manual(self):
+        import bulletins, outbox
+        self._extra_articles()
+        sub = subscriptions_confirmed = None
+        import subscriptions
+        s, t = subscriptions.subscribe("m@example.com", {"new_issue": True}); subscriptions.confirm(t)
+        b = bulletins.create_draft("popular_stories", "a@x", "T", "S")
+        bl = store.load_bulletins(); bl[-1]["target_preference"] = "new_issue"; store.save_bulletins(bl)
+        self.login_as("master1")
+        r = self.client.get(f"/admin/bultenler/{b['id']}/onizle")
+        self.assertIn("UYUMSUZ".encode(), r.data)
+        r = self.client.post(f"/admin/bultenler/{b['id']}/gonder", follow_redirects=True)
+        self.assertEqual(store.load_email_outbox(), [])
+        self.assertEqual(store.get_bulletin(b["id"])["status"], "draft")
+        self.assertEqual(self.client.get(f"/admin/bultenler/{b['id']}/gonder-onayla").status_code, 302)
+        bl = store.load_bulletins(); bl[-1]["status"] = "scheduled"; bl[-1]["scheduled_at"] = "2000-01-01T00:00:00Z"
+        store.save_bulletins(bl)
+        bulletins.process_scheduled_bulletins(lambda b_, s_: ("s", "t", "<p>h</p>"))
+        self.assertEqual(store.load_email_outbox(), [])
+
+    def test_estimate_endpoint_tracks_type_and_test_send_stays_on_entered_addresses(self):
+        import bulletins, subscriptions, mailer
+        for i, pref in enumerate(("new_issue", "breaking_news", "breaking_news")):
+            s, t = subscriptions.subscribe(f"e{i}@example.com", {pref: True}); subscriptions.confirm(t)
+        self.login_as("master1")
+        d = self.client.get("/admin/bultenler/hedef-kitle?kind=breaking_news&audience=new_issue").get_json()
+        self.assertEqual((d["audience"], d["eligible"]), ("breaking_news", 2))
+        d = self.client.get("/admin/bultenler/hedef-kitle?kind=new_issue").get_json()
+        self.assertEqual((d["audience"], d["eligible"]), ("new_issue", 1))
+        b = bulletins.create_draft("breaking_news", "a@x", "T", "S")
+        del mailer.FAKE_SENT[:]
+        self.client.post(f"/admin/bultenler/{b['id']}/test-gonder", data={"test_addresses": "only@example.com"})
+        outbox = store.load_email_outbox()
+        self.assertEqual([j["to"] for j in outbox], ["only@example.com"])
+        self.assertIsNone(outbox[0]["subscriber_id"])
+
+    def test_form_renders_type_selector_and_only_allowed_audiences(self):
+        self.login_as("master1")
+        html = self.client.get("/admin/bultenler/yeni?kind=breaking_news").data.decode()
+        self.assertIn('id="kind"', html)
+        seg = html[html.index('id="target_preference"'):html.index("audience-estimate")]
+        self.assertEqual(seg.count("<option"), 1)
+        self.assertIn('value="breaking_news" selected', seg)
+        custom = self.client.get("/admin/bultenler/yeni?kind=custom").data.decode()
+        seg = custom[custom.index('id="target_preference"'):custom.index("audience-estimate")]
+        self.assertEqual(seg.count("<option"), 5)
+
+    def test_popular_ranking_uses_only_public_articles_ranked_deterministically(self):
+        import bulletins
+        self._extra_articles()
+        self._views({"zeta-story": 5, "alpha-story": 5, "existing-article": 9, "draft-story": 100,
+                     "future-story": 100, "removed-story": 100})
+        r = bulletins.popular_ranking()
+        self.assertEqual([i["slug"] for i in r["items"]], ["existing-article", "alpha-story", "zeta-story"])  # tie -> slug A-Z
+        self.assertEqual([i["views"] for i in r["items"]], [9, 5, 5])
+        self.assertIsNone(r["warning"])
+        self.assertEqual(r["period_days"], 7)
+        self.assertEqual(r, dict(r, items=bulletins.popular_ranking()["items"]))
+
+    def test_period_boundary_is_seven_utc_days_inclusive_of_today(self):
+        import analytics
+        from datetime import date, timedelta
+        today = date(2026, 9, 19)
+        store.save_article_views({"s": {"2026-09-19": 1, "2026-09-13": 2, "2026-09-12": 100}})
+        self.assertEqual(analytics.article_view_totals(7, today=today), {"s": 3})
+
+    def test_insufficient_data_warns_and_never_invents_a_ranking(self):
+        import bulletins
+        self._views({"existing-article": 2})
+        r = bulletins.popular_ranking()
+        self.assertEqual(len(r["items"]), 1)
+        self.assertIn("Yeterli okunma verisi yok", r["warning"])
+        store.save_article_views({})
+        self.assertEqual(bulletins.popular_ranking()["items"], [])
+
+    def test_saved_selection_is_a_snapshot_and_refresh_changes_nothing_by_itself(self):
+        import bulletins
+        self._extra_articles()
+        self._views({"existing-article": 9, "alpha-story": 5, "zeta-story": 4})
+        self.login_as("master1")
+        self.client.post("/admin/bultenler/yeni", data={
+            "kind": "popular_stories", "internal_title": "t", "subject": "s", "analytics_refreshed": "1",
+            "article_slugs": ["alpha-story", "existing-article"]})
+        b = store.load_bulletins()[-1]
+        self.assertEqual(b["article_slugs"], ["alpha-story", "existing-article"])   # editor's order kept
+        self.assertEqual(b["analytics_snapshot"]["counts"], {"alpha-story": 5, "existing-article": 9})
+        before = dict(b)
+        self._views({"existing-article": 1, "zeta-story": 500})                      # analytics move on
+        self.client.get("/admin/bultenler/populer-oneri")                            # "Analitikten Yenile"
+        self.assertEqual(store.get_bulletin(b["id"])["analytics_snapshot"], before["analytics_snapshot"])
+        self.assertEqual(store.get_bulletin(b["id"])["status"], "draft")
+        self.assertEqual(store.load_email_outbox(), [])
+        # saving WITHOUT pressing refresh keeps the approved counts
+        self.client.post(f"/admin/bultenler/{b['id']}/duzenle", data={
+            "kind": "popular_stories", "internal_title": "t2", "subject": "s", "article_slugs": ["existing-article"]})
+        self.assertEqual(store.get_bulletin(b["id"])["analytics_snapshot"]["counts"], before["analytics_snapshot"]["counts"])
+        # ... and an explicit refresh re-pulls
+        self.client.post(f"/admin/bultenler/{b['id']}/duzenle", data={
+            "kind": "popular_stories", "internal_title": "t2", "subject": "s", "analytics_refreshed": "1",
+            "article_slugs": ["zeta-story"]})
+        self.assertEqual(store.get_bulletin(b["id"])["analytics_snapshot"]["counts"], {"zeta-story": 500})
+
+    def test_unpublished_slugs_cannot_be_saved_into_a_bulletin(self):
+        self._extra_articles()
+        self.login_as("master1")
+        self.client.post("/admin/bultenler/yeni", data={
+            "kind": "popular_stories", "internal_title": "t", "subject": "s",
+            "article_slugs": ["draft-story", "future-story", "nope", "existing-article", "existing-article"]})
+        self.assertEqual(store.load_bulletins()[-1]["article_slugs"], ["existing-article"])
+
+    def test_preview_shows_ranked_articles_with_counts(self):
+        import bulletins
+        self._extra_articles()
+        self._views({"existing-article": 9, "alpha-story": 5, "zeta-story": 4})
+        b = bulletins.create_draft("popular_stories", "a@x", "T", "S", article_slugs=["alpha-story"])
+        self.login_as("master1")
+        html = self.client.get(f"/admin/bultenler/{b['id']}/onizle").data.decode()
+        self.assertIn("Existing Article — 9", html)
+        self.assertIn("son 7 gün", html)
 
 
 if __name__ == "__main__":

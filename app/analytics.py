@@ -161,18 +161,32 @@ def record_article_view(slug):
     store.save_article_views(data)
 
 
-def top_article_slugs(days=7, limit=10):
-    """[(slug, view_count), ...] sorted by views over the last `days`
-    days, most-viewed first. Empty if there's no view data yet (e.g. a
-    fresh deploy) -- callers must fall back to manual selection in that
-    case, never treat this as an error."""
+POPULAR_PERIOD_DAYS = 7
+
+
+def article_view_totals(days=POPULAR_PERIOD_DAYS, today=None):
+    """{slug: views} for the `days` UTC calendar days ENDING TODAY, inclusive
+    (days=7 -> today and the six days before it). The metric is the
+    first-party per-article daily page-view counter written by
+    record_article_view() (article_views.json): one increment per article
+    page load, aggregated per UTC calendar day. Nothing about individual
+    readers is stored or used."""
     from datetime import datetime, timedelta, timezone
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    cutoff_str = cutoff.strftime("%Y-%m-%d")
-    data = store.load_article_views()
+    today = today or datetime.now(timezone.utc).date()
+    first = (today - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    last = today.strftime("%Y-%m-%d")
     totals = {}
-    for slug, per_day in data.items():
-        total = sum(count for day, count in per_day.items() if day >= cutoff_str)
+    for slug, per_day in store.load_article_views().items():
+        total = sum(count for day, count in per_day.items() if first <= day <= last)
         if total:
             totals[slug] = total
-    return sorted(totals.items(), key=lambda kv: -kv[1])[:limit]
+    return totals
+
+
+def top_article_slugs(days=POPULAR_PERIOD_DAYS, limit=10):
+    """[(slug, views), ...] most-viewed first over the period defined by
+    article_view_totals(); ties are broken by slug A-Z so the ranking is
+    fully deterministic. Empty when there is no view data yet -- never an
+    error (callers show a warning instead of inventing a ranking)."""
+    totals = article_view_totals(days)
+    return sorted(totals.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]

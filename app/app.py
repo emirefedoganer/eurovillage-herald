@@ -519,17 +519,8 @@ def _render_article(article, is_preview=False):
     ) else None
     if article["section"] == "magazin":
         g.publication_context = "ari"
-    # "Bu Haber Gazetede" -- only ever shown for a PUBLIC issue, even if
-    # the article itself points at one that's since been unpublished/
-    # archived-away or was never finished; is_issue_public() is the same
-    # check the reader page itself uses.
-    linked_issue = None
-    if article.get("issue_id"):
-        candidate = store.get_issue(article["issue_id"])
-        if candidate and store.is_issue_public(candidate):
-            linked_issue = candidate
     return render_template("article.html", article=article, related=related, article_authors=article_authors,
-                            columnist=columnist, is_preview=is_preview, linked_issue=linked_issue)
+                            columnist=columnist, is_preview=is_preview)
 
 
 @app.route("/makale/<slug>")
@@ -944,6 +935,7 @@ def subscribe_submit():
         )
         outbox.enqueue(
             "transactional", sub["email"], "The Eurovillage Herald aboneliğinizi doğrulayın", text, html_body=html,
+            reply_to=mailer.EMAIL_CONTACT_REPLY_TO,
             idempotency_key=f"subscribe_confirm:{sub['id']}:{sub['confirm_token_hash']}",
         )
     # Same message whether the address was new, already pending, or
@@ -966,7 +958,8 @@ def subscribe_confirm(token):
     )
     text = "Aboneliğiniz onaylandı. Şu konularda e-posta alacaksınız:\n\n" + "\n".join(f"- {l}" for l in enabled_labels)
     outbox.enqueue("transactional", sub["email"], "Aboneliğiniz onaylandı — The Eurovillage Herald", text,
-                    html_body=html, idempotency_key=f"subscribe_confirmed:{sub['id']}")
+                    html_body=html, reply_to=mailer.EMAIL_CONTACT_REPLY_TO,
+                    idempotency_key=f"subscribe_confirmed:{sub['id']}")
     return render_template("subscribe_result.html", ok=True, message="Aboneliğiniz onaylandı. Teşekkürler!")
 
 
@@ -993,7 +986,7 @@ def unsubscribe_page(token):
             message = "Abonelikten çıkışınız tamamlandı."
         return render_template("subscribe_result.html", ok=True, message=message)
     sub = store.get_subscription_by_id(sub_id)
-    return render_template("unsubscribe_confirm.html", email=sub["email"] if sub else None,
+    return render_template("unsubscribe_confirm.html", active=bool(sub and sub["status"] != "unsubscribed"),
                             category_label=category_label if category else None)
 
 
@@ -2176,31 +2169,37 @@ def _audit_issue_schedule_change(actor_email, before, after):
 
 
 def _bulletin_footer_links(subscriber, target_preference):
-    """(manage_url, unsubscribe_url, category_unsubscribe_url) -- '#'
-    placeholders for a test send, which has no real subscriber id."""
+    """(manage_url, unsubscribe_url) for a REAL subscriber; (None, None)
+    for a test send, which has no subscriber -- no '#' placeholders."""
     if not subscriber or subscriber.get("id") == "test":
-        return "#", "#", "#"
+        return None, None
     sid = subscriber["id"]
-    cat_url = url_for("unsubscribe_page", token=subscriptions.unsubscribe_token(app.secret_key, sid),
-                       kategori=target_preference, _external=True)
-    return _manage_url(sid), _unsubscribe_url(sid), cat_url
+    return _manage_url(sid), _unsubscribe_url(sid)
+
+
+FORWARD_CTA_TEXT = "Bu e-posta size yönlendirildi mi? Hemen bültenimize abone olun."
 
 
 def _render_bulletin(bulletin, subscriber):
     """The render_fn bulletins.py's send_campaign()/send_test() call once
-    per recipient. Content (article headlines/images/issue cover) is
-    resolved fresh here, not baked into the bulletin record."""
+    per recipient. Returns (subject, text, html, headers). Content is
+    resolved fresh here, not baked into the bulletin record. The
+    forwarded-copy CTA links to the PUBLIC subscription page (no token),
+    so it works for someone the mail was forwarded to."""
     lead, others = bulletins.resolve_articles(bulletin)
-    manage_url, unsub_url, cat_unsub_url = _bulletin_footer_links(subscriber, bulletin["target_preference"])
+    manage_url, unsub_url = _bulletin_footer_links(subscriber, bulletin["target_preference"])
+    subscribe_url = url_for("subscribe_landing", _external=True)
     subject = bulletin["subject"]
+    footer_ctx = dict(privacy_url=_privacy_url(), manage_url=manage_url, unsubscribe_url=unsub_url,
+                      subscribe_url=subscribe_url, forward_cta_text=FORWARD_CTA_TEXT)
 
     if bulletin["kind"] == "new_issue" and bulletin.get("issue_id"):
         issue = store.get_issue(bulletin["issue_id"]) or {}
-        issue_url = url_for("gazete_oku", issue_id=issue.get("id"), _external=True) if issue else "#"
+        issue_url = url_for("gazete_oku", issue_id=issue.get("id"), _external=True) if issue else subscribe_url
         html = render_template(
             "email/bulletin_new_issue.html", subject=subject, preheader=bulletin.get("preheader"),
             issue=issue, issue_url=issue_url, bulletin=bulletin, lead_article=lead, other_articles=others,
-            privacy_url=_privacy_url(), manage_url=manage_url, unsubscribe_url=unsub_url,
+            **footer_ctx,
         )
         lines = [f"THE EUROVILLAGE HERALD — SAYI {issue.get('no')} YAYINDA", "", issue.get("title", ""), ""]
         if bulletin.get("intro_text"):
@@ -2215,7 +2214,7 @@ def _render_bulletin(bulletin, subscriber):
         html = render_template(
             "email/bulletin_generic.html", subject=subject, preheader=bulletin.get("preheader"),
             kind_label=kind_label, bulletin=bulletin, lead_article=lead, other_articles=others,
-            privacy_url=_privacy_url(), manage_url=manage_url, unsubscribe_url=unsub_url,
+            **footer_ctx,
         )
         lines = [f"THE EUROVILLAGE HERALD — {kind_label.upper()}", "", bulletin["internal_title"], ""]
         if bulletin.get("intro_text"):
@@ -2223,8 +2222,16 @@ def _render_bulletin(bulletin, subscriber):
         for a in ([lead] if lead else []) + others:
             lines.append(f"- {a['title']} — " + url_for("article_page", slug=a["slug"], _external=True))
 
-    lines += ["", f"Tercihlerimi yönet: {manage_url}", f"Abonelikten çık: {unsub_url}"]
-    return subject, "\n".join(lines), html
+    lines += ["", FORWARD_CTA_TEXT, f"Hemen Bültenimize Abone Olun: {subscribe_url}"]
+    headers = None
+    if manage_url and unsub_url:
+        lines += ["", f"Tercihlerimi Yönet: {manage_url}", f"Abonelikten Çık: {unsub_url}"]
+        # RFC 8058 one-click: mail clients POST to the URL directly; a
+        # plain GET (link previews, scanners) only shows a confirm page.
+        headers = {"List-Unsubscribe": f"<{unsub_url}>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
+    else:
+        lines += ["", "[TEST] Bu bir test gönderimidir; kişisel tercih/abonelikten çıkma bağlantıları yalnızca gerçek abone gönderimlerinde yer alır."]
+    return subject, "\n".join(lines), html, headers
 
 
 def _on_issue_published(issue):
@@ -3828,11 +3835,47 @@ def draft_discard(draft_id):
 @master_admin_required
 def subscribers_list():
     subs = sorted(store.load_subscriptions(), key=lambda s: s.get("created_at", ""), reverse=True)
-    counts = {"pending": 0, "confirmed": 0, "unsubscribed": 0}
+    counts = {key: 0 for key in subscriptions.STATUS_LABELS}
     for s in subs:
         counts[s.get("status", "pending")] = counts.get(s.get("status", "pending"), 0) + 1
     return render_template("admin/subscribers_list.html", subs=subs, counts=counts,
-                            preference_labels=subscriptions.PREFERENCE_LABELS, active="subscribers")
+                            preference_labels=subscriptions.PREFERENCE_LABELS,
+                            status_labels=subscriptions.STATUS_LABELS,
+                            recoverable=subscriptions.RECOVERABLE_STATUSES, active="subscribers")
+
+
+@admin_bp.route("/aboneler/<sub_id>/engelle", methods=["POST"])
+@master_admin_required
+def subscriber_suppress(sub_id):
+    actor = _resolve_logged_in_user()
+    if subscriptions.suppress(sub_id, actor["email"], request.form.get("reason", "")):
+        store.append_audit(actor["email"], "subscriber_suppressed", sub_id)
+        flash("Abone engellendi; artık kampanya e-postası almayacak.", "success")
+    else:
+        flash("Abone bulunamadı.", "error")
+    return redirect(url_for("admin.subscribers_list"))
+
+
+@admin_bp.route("/aboneler/<sub_id>/engeli-kaldir", methods=["POST"])
+@master_admin_required
+def subscriber_clear_suppression(sub_id):
+    """Clears a bounce/manual suppression -- and NOTHING else: no email is
+    sent, delivery is not re-enabled (record becomes "unsubscribed"). The
+    address owner must re-subscribe via the public form and confirm by
+    double opt-in. Complaints cannot be cleared."""
+    actor = _resolve_logged_in_user()
+    reason = request.form.get("reason", "").strip()
+    if not request.form.get("understood") or not reason:
+        flash("Engeli kaldırmak için gerekçe yazın ve sonuçları okuduğunuzu onaylayın.", "error")
+        return redirect(url_for("admin.subscribers_list"))
+    sub = subscriptions.clear_suppression(sub_id, actor["email"], reason)
+    if not sub:
+        flash("Bu kayıt için engel kaldırılamaz (şikayet kayıtları kalıcıdır).", "error")
+        return redirect(url_for("admin.subscribers_list"))
+    store.append_audit(actor["email"], "subscriber_suppression_cleared", sub_id,
+                        {"from": sub["suppression_cleared_from"], "reason": reason})
+    flash("Engel kaldırıldı. Abone e-posta ALMAYACAK; yalnızca kendisi formdan yeniden abone olup onaylarsa listeye girer.", "success")
+    return redirect(url_for("admin.subscribers_list"))
 
 
 # ------------------------------------------------------ admin: bulletins --
@@ -3848,38 +3891,88 @@ def bulletins_list():
                             preference_labels=subscriptions.PREFERENCE_LABELS, active="bulletins")
 
 
+def _bulletin_form_articles(form, kind):
+    """Ordered, published-only slugs from the form (order = submitted order,
+    which for a "Çok Okunan Haberler" draft is the editor's arrangement)."""
+    seen, slugs = set(), []
+    for s in form.getlist("article_slugs"):
+        if s not in seen and store.get_article(s, published_only=True):
+            seen.add(s)
+            slugs.append(s)
+    return slugs
+
+
+def _snapshot_from_form(form, slugs, existing=None):
+    """The approved analytics counts stored on a popular_stories draft.
+    Counts are NEVER taken from the browser. A fresh server-side ranking is
+    used only when the editor explicitly pulled one (form field
+    analytics_refreshed=1, set by "Analitikten Yenile" or on a brand-new
+    draft); otherwise the previously saved snapshot is kept untouched, so
+    analytics moving on can never silently change a saved/scheduled
+    bulletin. Slugs the editor added by hand get a count only if the saved
+    snapshot lacks one AND a fresh ranking has it."""
+    if existing and form.get("analytics_refreshed") != "1":
+        return existing
+    return bulletins.snapshot_from_ranking(bulletins.popular_ranking(limit=1000), slugs)
+
+
+def _bulletin_form_context(bulletin, kind, form_error=None):
+    suggested, ranking = [], None
+    if kind == "popular_stories":
+        ranking = bulletins.popular_ranking()
+        suggested = [i["slug"] for i in ranking["items"]]
+    audience = (bulletin["target_preference"] if bulletin else bulletins.default_audience(kind))
+    if not bulletins.is_compatible(kind, audience):
+        audience = bulletins.default_audience(kind)
+    approved = []
+    if bulletin and kind == "popular_stories":
+        counts = (bulletin.get("analytics_snapshot") or {}).get("counts", {})
+        titles = {a["slug"]: a for a in store.public_articles(store.load_articles())}
+        approved = [{"slug": s, "title": titles[s]["title"], "views": counts.get(s)}
+                    for s in bulletin.get("article_slugs", []) if s in titles]
+    elif kind == "popular_stories" and ranking:
+        approved = list(ranking["items"])
+    return dict(bulletin=bulletin, kind=kind, kind_labels=bulletins.BULLETIN_KIND_LABELS,
+                preference_choices=subscriptions.PREFERENCE_CHOICES,
+                audience=audience, audience_map=bulletins.audience_map(),
+                eligible=len(bulletins.eligible_recipients(audience)),
+                articles=store.all_articles_sorted(published_only=True), suggested_slugs=suggested,
+                ranking=ranking, approved=approved,
+                snapshot=(bulletin or {}).get("analytics_snapshot"),
+                issues=store.all_issues_sorted(), active="bulletins")
+
+
 @admin_bp.route("/bultenler/yeni", methods=["GET", "POST"])
 @master_admin_required
 def bulletin_new():
     actor = _resolve_logged_in_user()
     if request.method == "POST":
         kind = request.form.get("kind", "custom")
-        article_slugs = [s for s in request.form.getlist("article_slugs") if store.get_article(s, published_only=True)]
+        article_slugs = _bulletin_form_articles(request.form, kind)
         lead = request.form.get("lead_article_slug") or (article_slugs[0] if article_slugs else None)
-        bulletin = bulletins.create_draft(
-            kind, actor["email"],
-            internal_title=request.form.get("internal_title", "").strip(),
-            subject=request.form.get("subject", "").strip(),
-            preheader=request.form.get("preheader", "").strip(),
-            target_preference=request.form.get("target_preference", "new_issue"),
-            issue_id=request.form.get("issue_id") or None,
-            intro_text=request.form.get("intro_text", "").strip(),
-            lead_article_slug=lead, article_slugs=article_slugs,
-        )
+        try:
+            bulletin = bulletins.create_draft(
+                kind, actor["email"],
+                internal_title=request.form.get("internal_title", "").strip(),
+                subject=request.form.get("subject", "").strip(),
+                preheader=request.form.get("preheader", "").strip(),
+                target_preference=request.form.get("target_preference"),
+                issue_id=request.form.get("issue_id") or None,
+                intro_text=request.form.get("intro_text", "").strip(),
+                lead_article_slug=lead, article_slugs=article_slugs,
+            )
+        except bulletins.BulletinAudienceError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("admin.bulletin_new", kind=kind if kind in bulletins.KIND_AUDIENCE else "custom"))
+        if kind == "popular_stories":
+            bulletins.update_draft(bulletin["id"], analytics_snapshot=_snapshot_from_form(request.form, article_slugs))
         flash("Bülten taslağı oluşturuldu.", "success")
         return redirect(url_for("admin.bulletin_edit", bulletin_id=bulletin["id"]))
 
     kind = request.args.get("kind", "custom")
-    suggested_slugs = []
-    if kind == "popular_stories":
-        top = analytics.top_article_slugs(days=7, limit=15)
-        suggested_slugs = [slug for slug, _ in top]
-    articles = store.all_articles_sorted(published_only=True)
-    return render_template("admin/bulletin_form.html", bulletin=None, kind=kind,
-                            kind_labels=bulletins.BULLETIN_KIND_LABELS,
-                            preference_choices=subscriptions.PREFERENCE_CHOICES,
-                            articles=articles, suggested_slugs=suggested_slugs,
-                            issues=store.all_issues_sorted(), active="bulletins")
+    if kind not in bulletins.KIND_AUDIENCE:
+        kind = "custom"
+    return render_template("admin/bulletin_form.html", **_bulletin_form_context(None, kind))
 
 
 @admin_bp.route("/bultenler/<bulletin_id>/duzenle", methods=["GET", "POST"])
@@ -3892,28 +3985,78 @@ def bulletin_edit(bulletin_id):
         if bulletin["status"] not in ("draft", "scheduled"):
             flash("Gönderilmiş veya iptal edilmiş bir bülten düzenlenemez.", "error")
             return redirect(url_for("admin.bulletins_list"))
-        article_slugs = [s for s in request.form.getlist("article_slugs") if store.get_article(s, published_only=True)]
+        kind = request.form.get("kind", bulletin["kind"])
+        article_slugs = _bulletin_form_articles(request.form, kind)
         lead = request.form.get("lead_article_slug") or (article_slugs[0] if article_slugs else None)
         scheduled_at = None
         if request.form.get("schedule_choice") == "scheduled":
             scheduled_at = editorial_tz.local_input_to_utc_iso(request.form.get("scheduled_at", ""))
-        bulletins.update_draft(
-            bulletin_id, internal_title=request.form.get("internal_title", "").strip(),
+        fields = dict(
+            kind=kind, internal_title=request.form.get("internal_title", "").strip(),
             subject=request.form.get("subject", "").strip(), preheader=request.form.get("preheader", "").strip(),
-            target_preference=request.form.get("target_preference", bulletin["target_preference"]),
+            target_preference=request.form.get("target_preference"),
             issue_id=request.form.get("issue_id") or None, intro_text=request.form.get("intro_text", "").strip(),
             lead_article_slug=lead, article_slugs=article_slugs, scheduled_at=scheduled_at,
         )
+        if kind == "popular_stories":
+            fields["analytics_snapshot"] = _snapshot_from_form(
+                request.form, article_slugs, existing=bulletin.get("analytics_snapshot"))
+        try:
+            bulletins.update_draft(bulletin_id, **fields)
+        except bulletins.BulletinAudienceError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("admin.bulletin_edit", bulletin_id=bulletin_id))
         flash("Bülten güncellendi.", "success")
         return redirect(url_for("admin.bulletin_edit", bulletin_id=bulletin_id))
 
-    articles = store.all_articles_sorted(published_only=True)
-    suggested_slugs = [s for s, _ in analytics.top_article_slugs(days=7, limit=15)] if bulletin["kind"] == "popular_stories" else []
-    return render_template("admin/bulletin_form.html", bulletin=bulletin, kind=bulletin["kind"],
-                            kind_labels=bulletins.BULLETIN_KIND_LABELS,
-                            preference_choices=subscriptions.PREFERENCE_CHOICES,
-                            articles=articles, suggested_slugs=suggested_slugs,
-                            issues=store.all_issues_sorted(), active="bulletins")
+    ctx = _bulletin_form_context(bulletin, bulletin["kind"])
+    if not bulletins.is_compatible(bulletin["kind"], bulletin["target_preference"]):
+        flash("Bu bültenin kayıtlı hedef kitlesi türüyle uyumsuz; kaydedince türün hedef kitlesi uygulanır. "
+              "Düzeltilmeden gönderilemez.", "error")
+    return render_template("admin/bulletin_form.html", **ctx)
+
+
+@admin_bp.route("/bultenler/hedef-kitle")
+@master_admin_required
+def bulletin_audience_info():
+    """Live data for the form: the type's default/allowed audiences and the
+    current eligible-recipient estimate."""
+    kind = request.args.get("kind", "custom")
+    if kind not in bulletins.KIND_AUDIENCE:
+        abort(400)
+    try:
+        audience = bulletins.resolve_audience(kind, request.args.get("audience") or None)
+    except bulletins.BulletinAudienceError:
+        audience = bulletins.default_audience(kind)
+    return jsonify(kind=kind, audience=audience, allowed=list(bulletins.KIND_AUDIENCE[kind]["allowed"]),
+                   eligible=len(bulletins.eligible_recipients(audience)))
+
+
+@admin_bp.route("/bultenler/populer-oneri")
+@master_admin_required
+def bulletin_popular_suggestions():
+    """"Analitikten Yenile": a fresh ranking, returned to the form only --
+    nothing is saved, sent or scheduled by asking for it."""
+    return jsonify(bulletins.popular_ranking())
+
+
+@admin_bp.route("/bultenler/<bulletin_id>/kopyala", methods=["POST"])
+@master_admin_required
+def bulletin_duplicate(bulletin_id):
+    actor = _resolve_logged_in_user()
+    src = store.get_bulletin(bulletin_id)
+    if not src:
+        abort(404)
+    copy = bulletins.create_draft(
+        src["kind"], actor["email"], internal_title=f"{src['internal_title']} (kopya)"[:160],
+        subject=src["subject"], preheader=src.get("preheader", ""),
+        target_preference=None,  # the type's audience, never the source's possibly-stale one
+        issue_id=src.get("issue_id"), intro_text=src.get("intro_text", ""),
+        lead_article_slug=src.get("lead_article_slug"), article_slugs=src.get("article_slugs", []))
+    if src.get("analytics_snapshot"):
+        bulletins.update_draft(copy["id"], analytics_snapshot=src["analytics_snapshot"])
+    flash("Bülten kopyalandı (taslak).", "success")
+    return redirect(url_for("admin.bulletin_edit", bulletin_id=copy["id"]))
 
 
 @admin_bp.route("/bultenler/<bulletin_id>/onizle")
@@ -3923,9 +4066,18 @@ def bulletin_preview(bulletin_id):
     if not bulletin:
         abort(404)
     fake_subscriber = {"id": "test", "email": "onizleme@eurovillageherald.com"}
-    subject, text_body, html_body = _render_bulletin(bulletin, fake_subscriber)
+    subject, text_body, html_body, _headers = _render_bulletin(bulletin, fake_subscriber)
     audience = bulletins.audience_preview(bulletin)
-    return render_template("admin/bulletin_preview.html", bulletin=bulletin, subject=subject,
+    popular = None
+    if bulletin["kind"] == "popular_stories":
+        titles = {a["slug"]: a["title"] for a in store.public_articles(store.load_articles())}
+        counts = (bulletin.get("analytics_snapshot") or {}).get("counts", {})
+        popular = {"saved": [{"slug": s, "title": titles[s], "views": counts.get(s)}
+                             for s in bulletin.get("article_slugs", []) if s in titles],
+                   "snapshot": bulletin.get("analytics_snapshot"), "current": bulletins.popular_ranking()}
+    return render_template("admin/bulletin_preview.html", bulletin=bulletin, subject=subject, popular=popular,
+                            audience_label=subscriptions.PREFERENCE_LABELS.get(bulletin["target_preference"]),
+                            kind_label=bulletins.BULLETIN_KIND_LABELS.get(bulletin["kind"]),
                             html_body=html_body, text_body=text_body, audience=audience,
                             sender=mailer.EMAIL_BULLETIN_FROM, active="bulletins")
 
@@ -3959,6 +4111,9 @@ def bulletin_send_confirm(bulletin_id):
     if not bulletin or bulletin["status"] not in ("draft", "scheduled"):
         abort(404)
     audience = bulletins.audience_preview(bulletin)
+    if not audience["compatible"]:
+        flash("Bülten türü ile hedef kitle uyumsuz; göndermeden önce düzeltin.", "error")
+        return redirect(url_for("admin.bulletin_edit", bulletin_id=bulletin_id))
     return render_template("admin/bulletin_send_confirm.html", bulletin=bulletin, audience=audience,
                             sender=mailer.EMAIL_BULLETIN_FROM,
                             preference_label=subscriptions.PREFERENCE_LABELS.get(bulletin["target_preference"]),
@@ -3969,7 +4124,11 @@ def bulletin_send_confirm(bulletin_id):
 @master_admin_required
 def bulletin_send(bulletin_id):
     actor = _resolve_logged_in_user()
-    bulletin = bulletins.send_campaign(bulletin_id, actor["email"], _render_bulletin)
+    try:
+        bulletin = bulletins.send_campaign(bulletin_id, actor["email"], _render_bulletin)
+    except bulletins.BulletinAudienceError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("admin.bulletin_edit", bulletin_id=bulletin_id))
     if not bulletin:
         flash("Bu bülten gönderilemedi (zaten gönderilmiş veya iptal edilmiş olabilir).", "error")
         return redirect(url_for("admin.bulletins_list"))
@@ -3999,7 +4158,9 @@ def bulletin_cancel(bulletin_id):
 @master_admin_required
 def email_system_health():
     return render_template("admin/email_system.html", identities=mailer.sender_identities(),
-                            outbox_stats=outbox.stats(), failed=outbox.failed_jobs(), active="email_system")
+                            outbox_stats=outbox.stats(), failed=outbox.failed_jobs(),
+                            retrying=outbox.retrying_jobs(), max_attempts=outbox.MAX_ATTEMPTS,
+                            active="email_system")
 
 
 @admin_bp.route("/eposta-sistemi/yeniden-dene/<job_id>", methods=["POST"])
@@ -4040,6 +4201,72 @@ def internal_process_outbox():
         abort(403)
     count = outbox.process_outbox(limit=200)
     return jsonify(processed=count)
+
+
+# Resend delivery-status webhooks (Svix-signed). RESEND_WEBHOOK_SECRET is
+# the "whsec_..." signing secret from Resend's dashboard; it lives only in
+# the environment, never in source/templates/DB. Unset -> the route 404s
+# rather than accepting unverified events.
+RESEND_WEBHOOK_SECRET = os.environ.get("RESEND_WEBHOOK_SECRET", "").strip()
+WEBHOOK_TOLERANCE_SECONDS = 300
+
+
+def _verify_svix_signature(secret, headers, body):
+    """Svix scheme: HMAC-SHA256 over "<svix-id>.<svix-timestamp>.<body>"
+    with the base64-decoded secret (after the "whsec_" prefix); the header
+    may hold several space-separated "v1,<b64>" candidates."""
+    import base64
+    import hashlib
+    import hmac
+    import time
+    msg_id = headers.get("svix-id", "")
+    timestamp = headers.get("svix-timestamp", "")
+    signatures = headers.get("svix-signature", "")
+    if not (msg_id and timestamp and signatures):
+        return False
+    try:
+        if abs(time.time() - int(timestamp)) > WEBHOOK_TOLERANCE_SECONDS:
+            return False
+        key = base64.b64decode(secret.removeprefix("whsec_"))
+    except (ValueError, TypeError):
+        return False
+    signed = f"{msg_id}.{timestamp}.".encode() + body
+    expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest()).decode()
+    for candidate in signatures.split():
+        version, _, sig = candidate.partition(",")
+        if version == "v1" and hmac.compare_digest(sig, expected):
+            return True
+    return False
+
+
+@app.route("/internal/webhooks/resend", methods=["POST"])
+def resend_webhook():
+    if not RESEND_WEBHOOK_SECRET:
+        abort(404)
+    body = request.get_data()
+    if not _verify_svix_signature(RESEND_WEBHOOK_SECRET, request.headers, body):
+        abort(400)
+    event = request.get_json(silent=True) or {}
+    etype = event.get("type", "")
+    data = event.get("data") or {}
+    recipients = data.get("to") or []
+    if isinstance(recipients, str):
+        recipients = [recipients]
+    # Every handler below just sets a status/field (never increments), so a
+    # redelivered event is a harmless no-op -- that is the idempotency.
+    if etype == "email.bounced":
+        bounce = data.get("bounce") or {}
+        # Only a permanent (hard) bounce suppresses the address; a
+        # transient one (full mailbox, temporary failure) just annotates the job.
+        if str(bounce.get("type", "Permanent")).lower() == "permanent":
+            for addr in recipients:
+                subscriptions.record_bounce(addr, bounce.get("message") or "")
+    elif etype == "email.complained":
+        for addr in recipients:
+            subscriptions.record_complaint(addr)
+    if etype in ("email.delivered", "email.bounced", "email.complained", "email.failed"):
+        outbox.mark_provider_event(data.get("email_id"), etype)
+    return jsonify(ok=True)
 
 
 # ----------------------------------------------------------- admin: roles --
