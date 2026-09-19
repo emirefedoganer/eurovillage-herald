@@ -51,8 +51,7 @@ def test_sudoku_export_matches_on_screen_design(live_server, browser):
     export_board = export.crop((g.SK_MARGIN * 4, (g.SK_MARGIN + g.SK_TITLE_H) * 4,
                                 (g.SK_MARGIN + board) * 4, (g.SK_MARGIN + g.SK_TITLE_H + board) * 4))
     site = Image.open(io.BytesIO(grid_png)).convert("RGBA")
-    backdrop = Image.new("RGBA", export_board.size, (255, 255, 255, 255))
-    backdrop.alpha_composite(export_board)
+    backdrop = export_board.convert("RGBA")   # the default export is already opaque white
     site = site.resize(backdrop.size)
     pair = Image.new("RGB", (backdrop.width * 2 + 20, backdrop.height), "white")
     pair.paste(site.convert("RGB"), (0, 0))

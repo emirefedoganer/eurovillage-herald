@@ -12,6 +12,7 @@
       <a class="btn btn-outline" href="{{ url_for('admin.sudoku_preview', sid=sudoku.id) }}" target="_blank">Ön İzleme</a>
       <a class="btn btn-outline" href="{{ url_for('admin.sudoku_png', sid=sudoku.id) }}">PNG İndir</a>
       <a class="btn btn-outline" href="{{ url_for('admin.sudoku_png', sid=sudoku.id) }}?solved=1">Çözüm PNG</a>
+      <a class="btn btn-outline" href="{{ url_for('admin.sudoku_png', sid=sudoku.id) }}?seffaf=1" title="Arka plan şeffaf; bazı görüntüleyiciler siyah gösterebilir">Şeffaf PNG</a>
       <a class="btn btn-outline" href="{{ url_for('admin.sudoku_list') }}">← Listeye Dön</a>
     </div>
   </div>

@@ -2891,8 +2891,10 @@ def crossword_png(cid):
     cw = store.get_crossword(cid)
     if not cw:
         abort(404)
-    buf = games_export.build_crossword_png(cw)
-    return send_file(buf, mimetype="image/png", as_attachment=True, download_name=f"{cw['slug']}.png")
+    transparent = request.args.get("seffaf") == "1"   # opt-in only; the default download is opaque white
+    buf = games_export.build_crossword_png(cw, transparent=transparent)
+    suffix = "-seffaf" if transparent else ""
+    return send_file(buf, mimetype="image/png", as_attachment=True, download_name=f"{cw['slug']}{suffix}.png")
 
 
 # ---- sudoku ----------------------------------------------------------------
@@ -3131,8 +3133,9 @@ def sudoku_png(sid):
     if not sd:
         abort(404)
     solved = request.args.get("solved") == "1"
-    buf = games_export.build_sudoku_png(sd, solved=solved)
-    suffix = "-cozum" if solved else ""
+    transparent = request.args.get("seffaf") == "1"
+    buf = games_export.build_sudoku_png(sd, solved=solved, transparent=transparent)
+    suffix = ("-cozum" if solved else "") + ("-seffaf" if transparent else "")
     return send_file(buf, mimetype="image/png", as_attachment=True, download_name=f"{sd['slug']}{suffix}.png")
 
 

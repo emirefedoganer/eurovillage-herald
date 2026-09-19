@@ -6,11 +6,13 @@ Both games share ONE export pipeline (see _Canvas / _font below):
   - Rendered at SCALE (4x) the on-screen design size from the start --
     every coordinate, line width and font size is `design px * SCALE` --
     never a small image enlarged afterwards.
-  - RGBA with a genuinely transparent background (alpha 0). Only ink is
-    drawn: black/blue text and lines are painted with their own colour and
-    Pillow's antialiasing coverage becomes the pixel's alpha, so edge
-    pixels are ink-coloured at partial alpha -- there is no background
-    colour anywhere in the pipeline to fringe against.
+  - The DEFAULT export is an opaque white RGB image: many phone/desktop
+    viewers paint transparent pixels black, so transparency must never be
+    the default. Ink is antialiased directly against that white. A separate,
+    explicitly labelled transparent RGBA variant ("Şeffaf PNG",
+    transparent=True) exists for layout use; there ink is drawn onto alpha 0
+    so edge pixels carry ink colour at partial alpha (no background hue to
+    fringe against).
   - The typeface is the site's own web font, Libre Franklin (variable
     weight, SIL OFL, vendored in static/fonts/). If it cannot be loaded the
     export FAILS LOUDLY instead of silently falling back to another font.
@@ -51,9 +53,12 @@ def _font(size_px, weight):
 class _Canvas:
     """Transparent RGBA canvas in DESIGN pixels, drawn at SCALE."""
 
-    def __init__(self, width, height):
+    def __init__(self, width, height, transparent=False):
         self.width, self.height = width * SCALE, height * SCALE
-        self.img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
+        if transparent:
+            self.img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
+        else:
+            self.img = Image.new("RGB", (self.width, self.height), (255, 255, 255))
         self.draw = ImageDraw.Draw(self.img)
 
     def rect(self, x0, y0, x1, y1, fill):
@@ -86,28 +91,43 @@ def crossword_dimensions(crossword):
     return board_w, board_h
 
 
-def build_crossword_png(crossword):
+def build_crossword_png(crossword, transparent=False):
     from games_engine import compute_slots
     grid = crossword["grid"]
     board_w, board_h = crossword_dimensions(crossword)
     width = board_w + 2 * XW_MARGIN
     height = board_h + 2 * XW_MARGIN + XW_TITLE_H
-    cv = _Canvas(width, height)
+    cv = _Canvas(width, height, transparent)
     numbers, _slots = compute_slots(grid)
 
     cv.text(XW_MARGIN, XW_MARGIN + 6, crossword.get("title", ""), 20, 700, INK)
 
     left, top = XW_MARGIN, XW_MARGIN + XW_TITLE_H
-    cv.rect(left, top, left + board_w, top + board_h, BLACK)      # frame + 1px grid lines
+
+    def open_cell(r, c):
+        return 0 <= r < len(grid) and 0 <= c < len(grid[0]) and not grid[r][c]["block"]
+
+    # Block cells are simply left as background (white): there is NO dark
+    # panel. Every playable cell gets its own ink outline -- 1px lines where
+    # it touches another playable cell (shared, as in the on-screen grid gap)
+    # and the 2px frame weight on its free sides.
     for r, row in enumerate(grid):
         for c, cell in enumerate(row):
             if cell["block"]:
-                continue                                          # black cells stay black
+                continue
             x0 = left + XW_FRAME + c * (XW_CELL + XW_GAP)
             y0 = top + XW_FRAME + r * (XW_CELL + XW_GAP)
-            # A white cell must be genuinely OPAQUE white on top of the
-            # black grid lines: the surrounding page is transparent, but the
-            # puzzle's own cells are part of the artwork (see tests).
+            el = XW_GAP if open_cell(r, c - 1) else XW_FRAME
+            er = XW_GAP if open_cell(r, c + 1) else XW_FRAME
+            et = XW_GAP if open_cell(r - 1, c) else XW_FRAME
+            eb = XW_GAP if open_cell(r + 1, c) else XW_FRAME
+            cv.rect(x0 - el, y0 - et, x0 + XW_CELL + er, y0 + XW_CELL + eb, BLACK)
+    for r, row in enumerate(grid):
+        for c, cell in enumerate(row):
+            if cell["block"]:
+                continue
+            x0 = left + XW_FRAME + c * (XW_CELL + XW_GAP)
+            y0 = top + XW_FRAME + r * (XW_CELL + XW_GAP)
             cv.rect(x0, y0, x0 + XW_CELL, y0 + XW_CELL, (255, 255, 255, 255))
             num = numbers.get((r, c))
             if num:
@@ -138,11 +158,11 @@ def sudoku_dimensions():
     return board, board
 
 
-def build_sudoku_png(sudoku, solved=False):
+def build_sudoku_png(sudoku, solved=False, transparent=False):
     grid = sudoku["solution_grid"] if solved else sudoku["starting_grid"]
     given = sudoku["starting_grid"]
     offs, board = _sk_offsets()
-    cv = _Canvas(board + 2 * SK_MARGIN, board + 2 * SK_MARGIN + SK_TITLE_H)
+    cv = _Canvas(board + 2 * SK_MARGIN, board + 2 * SK_MARGIN + SK_TITLE_H, transparent)
     cv.text(SK_MARGIN, SK_MARGIN + 4, sudoku.get("title", ""), 20, 700, INK)
 
     left, top = SK_MARGIN, SK_MARGIN + SK_TITLE_H

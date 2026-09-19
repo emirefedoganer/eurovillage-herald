@@ -12,6 +12,7 @@
       <span class="badge {{ 'badge-lead' if crossword.status=='published' else 'badge-secondary' }}">{{ crossword.status }}</span>
       <a class="btn btn-outline" href="{{ url_for('admin.crossword_preview', cid=crossword.id) }}" target="_blank">Ön İzleme</a>
       <a class="btn btn-outline" href="{{ url_for('admin.crossword_png', cid=crossword.id) }}">PNG İndir</a>
+      <a class="btn btn-outline" href="{{ url_for('admin.crossword_png', cid=crossword.id) }}?seffaf=1" title="Arka plan şeffaf; bazı görüntüleyiciler siyah gösterebilir">Şeffaf PNG</a>
       <a class="btn btn-outline" href="{{ url_for('admin.crossword_list') }}">← Listeye Dön</a>
     </div>
   </div>
