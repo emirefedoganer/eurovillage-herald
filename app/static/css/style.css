@@ -854,7 +854,21 @@ body.drawer-open{ overflow: hidden; }
 .admin-stat-card .n{ font-family: var(--font-headline); font-weight: 900; font-size: 30px; display: block; }
 .admin-stat-card .l{ font-family: var(--font-sans); font-size: 11.5px; color: var(--gray-500); text-transform: uppercase; letter-spacing: .04em; }
 
-.xw-build-layout{ display: grid; grid-template-columns: minmax(0,1fr) minmax(0, 340px); gap: 30px; align-items: start; }
+/* Editor = two normal-flow grid columns with a fixed gap. Both are
+   min-width:0 so neither can be pushed wider than its track. The board column
+   is an inline-size CONTAINER: the shared .xw-grid sizes its cells from
+   `cqw`, which previously had no container here and silently fell back to the
+   VIEWPORT width -- cells stayed 64px and the fixed-width grid (plus an inline
+   max-width:620px that replaced .xw-grid's max-width:100%) ran past its 560px
+   column, underneath the clue panel. Now cells are 94% of the column / cols
+   (square, never distorted) and the grid can never exceed its column. Below
+   900px the WHOLE clue panel stacks under the WHOLE editor column. */
+.xw-build-layout{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); column-gap: 30px; row-gap: 24px; align-items: start; }
+.xw-build-layout > *{ min-width: 0; }
+.xw-build-main{ container-type: inline-size; }
+.xw-build-side{ min-width: 0; }
+.xw-build-hint{ flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.xw-build-main .xw-grid{ max-width: 100%; }
 .xw-build-toolbar{ display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; font-family: var(--font-sans); font-size: 13px; align-items: center; }
 .xw-build-toolbar label{ display: flex; align-items: center; gap: 6px; }
 .xwb-cell{
@@ -865,13 +879,15 @@ body.drawer-open{ overflow: hidden; }
 .xwb-cell.xwb-block{ background: var(--black); }
 .xwb-cell .xw-number{ color: var(--gray-500); }
 .xwb-cell.xwb-conflict{ background: #fbe7e9; }
-.xw-clue-editor{ max-height: 640px; overflow-y: auto; border: 1px solid var(--gray-300); padding: 14px; }
+.xw-clue-editor{ max-height: 640px; overflow-y: auto; overflow-x: hidden; min-width: 0; width: 100%; border: 1px solid var(--gray-300); padding: 14px; }
 .xw-clue-editor h3{ font-family: var(--font-sans); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-500); margin: 14px 0 8px; }
-.xw-clue-editor .clue-row{ display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.xw-clue-editor .clue-row{ display: flex; gap: 8px; align-items: center; margin-bottom: 6px; min-width: 0; }
+.xw-clue-editor .clue-row .ans{ flex: 0 1 auto; max-width: 34%; min-width: 0; text-align: right; overflow-wrap: anywhere; }
 .xw-clue-editor .clue-row .num{ font-family: var(--font-sans); font-weight: 700; width: 28px; flex-shrink: 0; font-size: 13px; }
-.xw-clue-editor .clue-row input{ flex: 1; padding: 7px 9px; border: 1px solid var(--gray-300); border-radius: 3px; font-family: var(--font-sans); font-size: 13px; }
+.xw-clue-editor .clue-row input{ flex: 1 1 0; min-width: 0; padding: 7px 9px; border: 1px solid var(--gray-300); border-radius: 3px; font-family: var(--font-sans); font-size: 13px; }
 .xw-clue-editor .clue-row input.empty-clue{ border-color: var(--red); background: #fff8f8; }
-.xw-build-save-bar{ position: sticky; bottom: 0; background: var(--paper); border-top: 1px solid var(--gray-300); padding: 12px 0; margin-top: 16px; display: flex; gap: 10px; align-items: center; }
+/* normal flow, NOT sticky: a viewport-pinned bar sat on top of the grid's last row whenever the board extended below the fold */
+.xw-build-save-bar{ position: static; background: var(--paper); border-top: 1px solid var(--gray-300); padding: 12px 0; margin-top: 16px; display: flex; gap: 10px; align-items: center; }
 .xw-save-status{ font-family: var(--font-sans); font-size: 12.5px; color: var(--gray-500); }
 
 /* ---------- admin: sudoku editor ---------- */
@@ -893,7 +909,7 @@ body.drawer-open{ overflow: hidden; }
 @media (max-width: 900px){
   .xw-layout{ grid-template-columns: 1fr; }
   .xw-clues{ grid-template-columns: 1fr; }
-  .xw-build-layout{ grid-template-columns: 1fr; }
+  .xw-build-layout{ grid-template-columns: minmax(0, 1fr); }
   .game-header h1{ font-size: 28px; }
 }
 @media (max-width: 480px){

@@ -132,6 +132,7 @@
       row.appendChild(numSpan);
       row.appendChild(input);
       const ans = document.createElement("span");
+      ans.className = "ans";
       ans.style.fontFamily = "monospace";
       ans.style.fontSize = "12px";
       ans.style.color = "#888";

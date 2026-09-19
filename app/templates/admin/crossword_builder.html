@@ -49,13 +49,13 @@
 
   <div class="admin-panel">
     <div class="xw-build-layout">
-      <div>
+      <div class="xw-build-main">
         <div class="xw-build-toolbar">
           <button type="button" id="xwb-toggle-block" class="btn btn-outline" disabled>Blok Kare Yap</button>
           <button type="button" id="xwb-clear" class="btn btn-outline">Izgarayı Temizle</button>
-          <span class="hint">Bir kareye tıklayın, sonra harf yazın. Karenin numaralandırması otomatiktir.</span>
+          <span class="hint xw-build-hint">Bir kareye tıklayın, sonra harf yazın. Karenin numaralandırması otomatiktir.</span>
         </div>
-        <div id="xwb-grid" class="xw-grid" style="max-width: 620px;"></div>
+        <div id="xwb-grid" class="xw-grid"></div>
 
         <div class="xw-build-save-bar">
           <button type="button" id="xwb-save" class="btn btn-red">Izgara ve İpuçlarını Kaydet</button>
@@ -72,7 +72,7 @@
         <div class="hint" style="margin-top:8px;">Kaydetmeden yayımlarsanız son kaydedilen ızgara kullanılır — önce "Izgara ve İpuçlarını Kaydet" ile kaydedin.</div>
       </div>
 
-      <div id="xwb-data-root">
+      <div id="xwb-data-root" class="xw-build-side">
         <div class="xw-clue-editor">
           <h3>Soldan Sağa</h3>
           <div id="xwb-across-editor"></div>
